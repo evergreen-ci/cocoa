@@ -1,0 +1,4 @@
+hash: ""
+imports:
+  - name: github.com/aws/aws-sdk-go
+    version: v1.38.54

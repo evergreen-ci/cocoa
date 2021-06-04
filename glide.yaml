@@ -1,0 +1,3 @@
+package: github.com/evergreen-ci/cocoa
+import:
+  - package: github.com/aws/aws-sdk-go
