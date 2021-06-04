@@ -81,10 +81,10 @@ endif
 
 $(buildDir)/output.%.test: .FORCE
 	$(gobin) test $(testArgs) ./$(if $(subst $(name),,$*),$(subst -,/,$*),) | tee $@
-	!(grep -s -q "^FAIL" $@ || grep -s -q "^WARNING: DATA RACE" $@ || grep -s -q "no test files" $@)
+	@!(grep -s -q "^FAIL" $@ || grep -s -q "^WARNING: DATA RACE" $@ || grep -s -q "no test files" $@)
 $(buildDir)/output.%.coverage: .FORCE
 	$(gobin) test $(testArgs) ./$(if $(subst $(name),,$*),$(subst -,/,$*),) -covermode=count -coverprofile $@ | tee $(buildDir)/output.$*.test
-	[ -f $@ ] && $(gobin) tool cover -func=$@ | sed 's%$(projectPath)/%%' | column -t
+	@[ -f $@ ] && $(gobin) tool cover -func=$@ | sed 's%$(projectPath)/%%' | column -t
 $(buildDir)/output.%.coverage.html: $(buildDir)/output.%.coverage .FORCE
 	$(gobin) tool cover -html=$< -o $@
 # We have to handle the PATH specially for CI, because if the PATH has a different version of Go in it, it'll break.
