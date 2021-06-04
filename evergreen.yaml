@@ -1,0 +1,95 @@
+command_type: test
+stepback: false
+ignore:
+    - "*.md" # don't schedule tests if a commit only changes markdown files
+    - "*.rst" # don't schedule tests if a commit only changes rst files
+
+#######################################
+#         YAML Templates              #
+#######################################
+variables:
+  - &run-target
+    # Runs a make target. The task name should correspond to a make target.
+    name: test
+    commands:
+      - func: run-make
+        vars: { target: "${task_name}" }
+
+#######################################
+#              Functions              #
+#######################################
+functions:
+  get-project:
+    command: git.get_project
+    type: system
+    params:
+      directory: gopath/src/github.com/evergreen-ci/cocoa
+  run-make:
+    command: subprocess.exec
+    type: test
+    params:
+      working_dir: gopath/src/github.com/evergreen-ci/cocoa
+      binary: make
+      args: ["${target}"]
+      include_expansions_in_env: ["DISABLE_COVERAGE", "GO_BIN_PATH", "GOROOT", "RACE_DETECTOR"]
+      env:
+        GOPATH: ${workdir}/gopath
+  parse-results:
+    command: gotest.parse_files
+    type: setup
+    params:
+      files:
+        - "gopath/src/github.com/evergreen-ci/cocoa/build/output.*"
+
+#######################################
+#                Tasks                #
+#######################################
+tasks:
+  - <<: *run-target
+    tags: ["test"]
+    name: test-cocoa
+
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-cocoa
+
+#######################################
+#           Buildvariants             #
+#######################################
+buildvariants:
+  - name: race-detector
+    display_name: Race Detector (Arch Linux)
+    expansions:
+      DISABLE_COVERAGE: true
+      GOROOT: /opt/golang/go1.16
+      GO_BIN_PATH: /opt/golang/go1.16/bin/go
+      RACE_DETECTOR: true
+    run_on:
+      - archlinux-new-small
+      - archlinux-new-large
+    tasks:
+      - name: ".test"
+
+  - name: lint
+    display_name: Lint (Arch Linux)
+    expansions:
+      DISABLE_COVERAGE: true
+      GOROOT: /opt/golang/go1.16
+      GO_BIN_PATH: /opt/golang/go1.16/bin/go
+    run_on:
+      - archlinux-new-small
+      - archlinux-new-large
+    tasks: 
+      - name: ".lint"
+
+  - name: ubuntu
+    display_name: Ubuntu 18.04
+    expansions:
+      DISABLE_COVERAGE: true
+      GOROOT: /opt/golang/go1.16
+      GO_BIN_PATH: /opt/golang/go1.16/bin/go
+    run_on:
+      - ubuntu1804-small
+      - ubuntu1804-large
+    tasks:
+      - name: ".test"
