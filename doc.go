@@ -10,6 +10,5 @@ frequently-used operations.
 The ECSClient interface provides a convenience wrapper around the ECS API. If
 the ECSPodManager does not fulfill your needs, you can make API calls directly
 to ECS instead.
-
 */
 package cocoa

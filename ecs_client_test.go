@@ -1,5 +1,11 @@
 package cocoa
 
-import "testing"
+import (
+	"testing"
 
-func TestECSClient(t *testing.T) {}
+	"github.com/stretchr/testify/assert"
+)
+
+func TestECSClient(t *testing.T) {
+	assert.Implements(t, (*ECSClient)(nil), &BasicECSClient{})
+}
