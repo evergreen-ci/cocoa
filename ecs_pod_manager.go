@@ -8,13 +8,13 @@ type ECSPodManager interface {
 	// Create creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
-	CreatePod(context.Context, ...*ECSPodCreationOptions) (ECSPod, error)
+	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
 	// Stop stops a pod.
-	StopPod(context.Context, ECSPod) error
+	StopPod(ctx context.Context, p ECSPod) error
 	// Delete deletes a pod with the given options, cleaning up all the
 	// resources that it uses. Options are applied in the order they're
 	// specified and conflicting options are overwritten.
-	DeletePod(context.Context, ECSPod, ...*ECSPodDeletionOptions) error
+	DeletePod(ctx context.Context, p ECSPod, opts ...*ECSPodDeletionOptions) error
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.

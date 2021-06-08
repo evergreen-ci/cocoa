@@ -5,23 +5,23 @@ import (
 	"errors"
 )
 
-// SecretsManager provides a Vault implementation backed by Amazon Secrets
+// BasicSecretsManager provides a Vault implementation backed by Amazon Secrets
 // Manager.
-type SecretsManager struct {
+type BasicSecretsManager struct {
 }
 
-func (m *SecretsManager) CreateSecret(ctx context.Context, opts ...*SecretCreationOptions) (id string, err error) {
+func (m *BasicSecretsManager) CreateSecret(ctx context.Context, opts ...*SecretCreationOptions) (id string, err error) {
 	return "", errors.New("TODO: implement")
 }
 
-func (m *SecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
+func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
 	return "", errors.New("TODO: implement")
 }
 
-func (m *SecretsManager) UpdateValue(ctx context.Context, id string) error {
+func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id string) error {
 	return errors.New("TODO: implement")
 }
 
-func (m *SecretsManager) DeleteSecret(ctx context.Context, id string) error {
+func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
 	return errors.New("TODO: implement")
 }

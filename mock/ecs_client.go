@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/evergreen-ci/cocoa"
 )
 
 // MockECSClient provides a mock implementation of a cocoa.ECSClient. This makes
@@ -14,19 +13,15 @@ import (
 type MockECSClient struct {
 }
 
-func NewMockECSClient() (cocoa.ECSClient, error) {
-	return &MockECSClient{}, nil
-}
-
-func (c *MockECSClient) RegisterTaskDefinition(context.Context, *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
+func (c *MockECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
-func (c *MockECSClient) DeregisterTaskDefinition(context.Context, *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
+func (c *MockECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
-func (c *MockECSClient) RunTask(context.Context, *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
+func (c *MockECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
