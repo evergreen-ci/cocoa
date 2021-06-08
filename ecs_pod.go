@@ -9,3 +9,13 @@ type ECSPod interface {
 	// which must uniquely identify the backing resource in ECS.
 	DefinitionID() string
 }
+
+type BasicECSPod struct{}
+
+func (p *BasicECSPod) ID() string {
+	return ""
+}
+
+func (p *BasicECSPod) DefinitionID() string {
+	return ""
+}
