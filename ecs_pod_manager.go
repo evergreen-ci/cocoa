@@ -1,6 +1,9 @@
 package cocoa
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // ECSPodManager allows you to interact with pods backed by ECS without needing
 // to make direct API calls to ECS to perform common operations.
@@ -185,4 +188,20 @@ func mergeECSPodDeletionOptions(opts ...*ECSPodDeletionOptions) *ECSPodDeletionO
 	}
 
 	return &merged
+}
+
+// BasicECSPodManager provides an ECSPodManager implementation as a thin wrapper
+// backed by calls to Amazon ECS.
+type BasicECSPodManager struct{}
+
+func (m *BasicECSPodManager) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
+	return nil, errors.New("TODO: implement")
+}
+
+func (m *BasicECSPodManager) StopPod(ctx context.Context, p ECSPod) error {
+	return errors.New("TODO: implement")
+}
+
+func (m *BasicECSPodManager) DeletePod(ctx context.Context, p ECSPod, opts ...*ECSPodDeletionOptions) error {
+	return errors.New("TODO: implement")
 }

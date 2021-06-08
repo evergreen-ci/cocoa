@@ -10,8 +10,7 @@ import (
 // MockVault provides a mock implementation of a secret.Vault. This makes it
 // possible to introspect on inputs to the vault and control the vault's output.
 // It provides some default implementations where possible.
-type MockVault struct {
-}
+type MockVault struct{}
 
 func (m *MockVault) CreateSecret(ctx context.Context, opts ...*secret.SecretCreationOptions) (id string, err error) {
 	return "", errors.New("TODO: implement")
