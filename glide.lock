@@ -22,3 +22,5 @@ imports:
     version: 109220a80710164f651a5fd407aa7924e32cd1a7
   - name: golang.org/x/net
     version: abc453219eb586afb3fc1742e8c685c28b9f7eea
+  - name: github.com/davecgh/go-spew
+    version: v1.1.1
