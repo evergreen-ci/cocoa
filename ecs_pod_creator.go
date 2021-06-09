@@ -5,8 +5,7 @@ import (
 	"errors"
 )
 
-// ECSPodCreator provides a means to create ECS
-// to make direct API calls to ECS to perform common operations.
+// ECSPodCreator provides a means to create a new pod backed by ECS.
 type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
@@ -16,7 +15,8 @@ type ECSPodCreator interface {
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
 type ECSPodCreationOptions struct {
-	// TaskDefinition defines an existing task definition that should be used
+	// TaskDefinition defines a task definition that should be used if the pod
+	// is being created from an existing definition.
 	TaskDefinition *ECSTaskDefinition
 	// ContainerDefinitions defines settings that apply to individual containers
 	// within the pod.
@@ -30,6 +30,11 @@ type ECSPodCreationOptions struct {
 	CPU *int
 	// Tags are resource tags to apply to the pod.
 	Tags []string
+}
+
+func (o *ECSPodCreationOptions) SetTaskDefinition(def ECSTaskDefinition) *ECSPodCreationOptions {
+	o.TaskDefinition = &def
+	return o
 }
 
 // SetContainerDefinitions sets the container definitions for the pod. This
@@ -241,15 +246,15 @@ func (e *EnvironmentVariable) SetValue(val string) *EnvironmentVariable {
 	return e
 }
 
-// SetSecretOptions sets the environment variable's secret value. This is mutually
-// exclusive with setting the non-secret (EnvironmentVariable).Value.
+// SetSecretOptions sets the environment variable's secret value. This is
+// mutually exclusive with setting the non-secret (EnvironmentVariable).Value.
 func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentVariable {
 	e.SecretOpts = &opts
 	return e
 }
 
 // BasicECSPodCreator provides an ECSPodCreator implementation to create
-// BasicECSPods.
+// ECS pods.
 type BasicECSPodCreator struct{}
 
 // CreatePod creates a new ECSPod.

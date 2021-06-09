@@ -8,6 +8,6 @@ frequently-used operations.
 
 The SecretsManagerClient interface provides a convenience wrapper around the
 Secrets Manager API. If the Vault interface does not fulfill your needs, you can
-make API calls directly to Secrets Manager instead.
+make calls directly to the Secrets Manager API instead.
 */
 package secret

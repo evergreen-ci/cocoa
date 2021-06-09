@@ -34,7 +34,8 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 	return nil, errors.New("TODO: implement")
 }
 
-// Close is a no-op.
+// Close closes the mock client. The mock output can be customized. By default,
+// it is a no-op that returns no error.
 func (c *SecretsManagerClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
 }

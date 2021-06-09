@@ -33,7 +33,8 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 	return nil, errors.New("TODO: implement")
 }
 
-// Close is a no-op.
+// Close closes the mock client. The mock output can be customized. By default,
+// it is a no-op that returns no error.
 func (c *ECSClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
 }
