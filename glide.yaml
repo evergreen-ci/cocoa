@@ -1,3 +1,8 @@
 package: github.com/evergreen-ci/cocoa
 import:
   - package: github.com/aws/aws-sdk-go
+  - package: github.com/pkg/errors
+  - package: github.com/stretchr/testify
+
+  - package: github.com/mongodb/grip
+  - package: github.com/evergreen-ci/utility

@@ -2,5 +2,12 @@ hash: ""
 imports:
   - name: github.com/aws/aws-sdk-go
     version: v1.38.54
+  - name: github.com/pkg/errors
+    version: v0.9.1
   - name: github.com/stretchr/testify
     version: v1.7.0
+
+  - name: github.com/mongodb/grip
+    version: 109220a80710164f651a5fd407aa7924e32cd1a7
+  - name: github.com/evergreen-ci/utility
+    version: 9a40a71c1784193533247813b8361f534fe4101b
