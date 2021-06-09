@@ -52,28 +52,36 @@ tasks:
   - <<: *run-target
     tags: ["test"]
     name: test-awsutil
+    must_have_test_results: true
   - <<: *run-target
     tags: ["test"]
     name: test-cocoa
+    must_have_test_results: true
   - <<: *run-target
     tags: ["test"]
     name: test-mock
+    must_have_test_results: true
   - <<: *run-target
     tags: ["test"]
     name: test-secret
+    must_have_test_results: true
 
   - <<: *run-target
     tags: ["lint"]
     name: lint-awsutil
+    must_have_test_results: true
   - <<: *run-target
     tags: ["lint"]
     name: lint-cocoa
+    must_have_test_results: true
   - <<: *run-target
     tags: ["lint"]
     name: lint-mock
+    must_have_test_results: true
   - <<: *run-target
     tags: ["lint"]
     name: lint-secret
+    must_have_test_results: true
 
 task_groups:
   - name: lint_group

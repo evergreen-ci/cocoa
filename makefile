@@ -97,7 +97,14 @@ $(buildDir)/output.%.lint: $(buildDir)/run-linter .FORCE
 # end lint, test, and coverage artifacts
 
 vendor-clean:
+	rm -rf vendor/github.com/evergreen-ci/gimlet/vendor/github.com/mongodb/grip/
+	rm -rf vendor/github.com/evergreen-ci/utility/gitignore.go
+	rm -rf vendor/github.com/evergreen-ci/utility/parsing.go
 	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/testify/
+	rm -rf vendor/github.com/jmespath/go-jmespath/internal/testify/
+	find vendor/ -name "*.gif" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" -o -name "*testdata*" | xargs rm -rf
+	find vendor/ -type d -empty | xargs rm -rf
+	find vendor/ -type d -name '.git' | xargs rm -rf
 
 clean:
 	rm -rf $(buildDir)

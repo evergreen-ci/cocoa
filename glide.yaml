@@ -1,8 +1,12 @@
 package: github.com/evergreen-ci/cocoa
 import:
   - package: github.com/aws/aws-sdk-go
+  - package: github.com/jpillora/backoff
   - package: github.com/pkg/errors
+  - package: github.com/PuerkitoBio/rehttp
   - package: github.com/stretchr/testify
+  - package: golang.org/x/oauth2
 
+  - package: github.com/evergreen-ci/gimlet
   - package: github.com/mongodb/grip
   - package: github.com/evergreen-ci/utility
