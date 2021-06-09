@@ -6,7 +6,7 @@ import "context"
 type Vault interface {
 	// CreateSecret creates a new secret. Options are applied in the order
 	// they're specified and conflicting options are overwritten.
-	CreateSecret(ctx context.Context, opts ...*SecretCreationOptions) (id string, err error)
+	CreateSecret(ctx context.Context, opts ...*CreationOptions) (id string, err error)
 	// GetValue returns the value of the secret identified by ID.
 	GetValue(ctx context.Context, id string) (val string, err error)
 	// UpdateValue updates an existing secret's value by ID.
@@ -15,26 +15,27 @@ type Vault interface {
 	DeleteSecret(ctx context.Context, id string) error
 }
 
-// SecretCreationOptions provide options to create a secret.
-type SecretCreationOptions struct {
+// CreationOptions provide options to create a secret.
+type CreationOptions struct {
 	Name  *string
 	Value *string
 }
 
 // SetName sets the friendly name for the secret.
-func (o *SecretCreationOptions) SetName(name string) *SecretCreationOptions {
+func (o *CreationOptions) SetName(name string) *CreationOptions {
 	o.Name = &name
 	return o
 }
 
 // SetValue sets the secret value.
-func (o *SecretCreationOptions) SetValue(value string) *SecretCreationOptions {
+func (o *CreationOptions) SetValue(value string) *CreationOptions {
 	o.Value = &value
 	return o
 }
 
-func mergeSecretCreationOptions(opts ...*SecretCreationOptions) *SecretCreationOptions {
-	merged := SecretCreationOptions{}
+//nolint:deadcode
+func mergeCreationOptions(opts ...*CreationOptions) *CreationOptions {
+	merged := CreationOptions{}
 
 	for _, opt := range opts {
 		if opt == nil {

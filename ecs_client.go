@@ -26,18 +26,22 @@ type ECSClient interface {
 // It supports retrying requests using exponential backoff and jitter.
 type BasicECSClient struct{}
 
+// RegisterTaskDefinition registers a new task definition.
 func (c *BasicECSClient) RegisterTaskDefinition(context.Context, *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// DeregisterTaskDefinition deregisters an existing task definition.
 func (c *BasicECSClient) DeregisterTaskDefinition(context.Context, *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// RunTask runs a new task.
 func (c *BasicECSClient) RunTask(context.Context, *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// Close closes the client.
 func (c *BasicECSClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
 }

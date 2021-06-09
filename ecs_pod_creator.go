@@ -72,6 +72,7 @@ func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
 	return o
 }
 
+//nolint:deadcode
 func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationOptions {
 	merged := ECSPodCreationOptions{}
 
@@ -92,6 +93,7 @@ func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationO
 	return &merged
 }
 
+// ECSTaskDefinition represents options for an existing ECS task definition.
 type ECSTaskDefinition struct {
 	// ID is the ID of the task definition, which should already exist.
 	ID *string
@@ -106,7 +108,7 @@ func (o *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
 	return o
 }
 
-// SetOwned sets if the task defintiion should be owned by its pod.
+// SetOwned sets if the task definition should be owned by its pod.
 func (o *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
 	o.Owned = &owned
 	return o
@@ -173,7 +175,8 @@ func (o *ECSContainerDefinition) SetEnvironmentVariables(envVars []EnvironmentVa
 	return o
 }
 
-// AddSecrets adds new environment variables to the existing ones for the container.
+// AddEnvironmentVariables adds new environment variables to the existing ones
+// for the container.
 func (o *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentVariable) *ECSContainerDefinition {
 	o.EnvVars = append(o.EnvVars, envVars...)
 	return o

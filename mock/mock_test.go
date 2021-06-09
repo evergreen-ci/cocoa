@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMockSecretsManagerClient(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &MockECSPodCreator{})
-	assert.Implements(t, (*cocoa.ECSClient)(nil), &MockECSClient{})
+func TestInterfaces(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &ECSPodCreator{})
+	assert.Implements(t, (*cocoa.ECSClient)(nil), &ECSClient{})
 
-	assert.Implements(t, (*secret.Vault)(nil), &MockVault{})
-	assert.Implements(t, (*secret.SecretsManagerClient)(nil), &MockSecretsManagerClient{})
+	assert.Implements(t, (*secret.Vault)(nil), &Vault{})
+	assert.Implements(t, (*secret.SecretsManagerClient)(nil), &SecretsManagerClient{})
 }

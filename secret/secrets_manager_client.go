@@ -13,9 +13,9 @@ import (
 type SecretsManagerClient interface {
 	// CreateSecret creates a new secret.
 	CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
-	// CreateSecret gets the decrypted contents of a secret.
+	// GetSecretValue gets the decrypted value of a secret.
 	GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
-	// CreateSecret deletes an existing secret.
+	// DeleteSecret deletes an existing secret.
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
 	// Close closes the client and cleans up its resources. Implementations
 	// should ensure that this is idempotent.
@@ -27,18 +27,22 @@ type SecretsManagerClient interface {
 // exponential backoff and jitter.
 type BasicSecretsManagerClient struct{}
 
+// CreateSecret creates a new secret.
 func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// GetSecretValue gets the decrypted value of an existing secret.
 func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// DeleteSecret deletes an existing secret.
 func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
+// Close closes the client.
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
 }

@@ -7,24 +7,34 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
-// MockSecretsManagerClient proivdes a mock implementation of a
+// SecretsManagerClient provides a mock implementation of a
 // secret.SecretsManagerClient. This makes it possible to introspect on inputs
 // to the client and control the client's output. It provides some default
 // implementations where possible.
-type MockSecretsManagerClient struct{}
+type SecretsManagerClient struct{}
 
-func (c *MockSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+// CreateSecret saves the input options and returns a new mock secret. The mock
+// output can be customized. By default, it will create a cached mock secret
+// based on the input.
+func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
-func (c *MockSecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+// GetSecretValue saves the input options and returns an existing mock secret's
+// value. The mock output can be customized. By default, it will return a cached
+// mock secret if it exists.
+func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
-func (c *MockSecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
+// DeleteSecret saves the input options and deletes an existing mock secret. The
+// mock output can be customized. By default, it will delete a cached mock
+// secret if it exists.
+func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 
-func (c *MockSecretsManagerClient) Close(ctx context.Context) error {
+// Close is a no-op.
+func (c *SecretsManagerClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
 }
