@@ -2,9 +2,11 @@ package secret
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/evergreen-ci/cocoa/awsutil"
 )
 
 // SecretsManagerClient provides a common interface to interact with a Secrets
@@ -25,7 +27,21 @@ type SecretsManagerClient interface {
 // BasicSecretsManagerClient provides a SecretsManagerClient implementation that
 // wraps the Secrets Manager API. It supports retrying requests using
 // exponential backoff and jitter.
-type BasicSecretsManagerClient struct{}
+type BasicSecretsManagerClient struct {
+	opts awsutil.ClientOptions
+}
+
+// NewBasicSecretsManagerClient creates a new Secrets Manager client from the
+// given options.
+func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid options")
+	}
+
+	return &BasicSecretsManagerClient{
+		opts: opts,
+	}, nil
+}
 
 // CreateSecret creates a new secret.
 func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
@@ -44,5 +60,6 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 
 // Close closes the client.
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
-	return errors.New("TODO: implement")
+	c.opts.Close()
+	return nil
 }
