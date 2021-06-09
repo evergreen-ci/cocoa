@@ -82,9 +82,11 @@ func main() {
 		if cwd != pkg {
 			pkgDir += pkg
 		}
-		splitLintArgs := strings.Split(lintArgs, " ")
 		args := []string{lintBin, "run"}
-		args = append(args, splitLintArgs...)
+		if len(lintArgs) > 0 {
+			splitLintArgs := strings.Split(lintArgs, " ")
+			args = append(args, splitLintArgs...)
+		}
 		args = append(args, pkgDir)
 
 		startAt := time.Now()
