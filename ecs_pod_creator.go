@@ -32,6 +32,7 @@ type ECSPodCreationOptions struct {
 	Tags []string
 }
 
+// SetTaskDefinition sets the task definition for the pod.
 func (o *ECSPodCreationOptions) SetTaskDefinition(def ECSTaskDefinition) *ECSPodCreationOptions {
 	o.TaskDefinition = &def
 	return o
