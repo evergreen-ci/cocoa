@@ -75,6 +75,29 @@ tasks:
     tags: ["lint"]
     name: lint-secret
 
+task_groups:
+  - name: lint_group
+    tasks: [".lint"]
+    max_hosts: 4
+    setup_group:
+      - func: get-project
+    teardown_task:
+      - func: parse-results
+      - func: run-make 
+        vars: 
+          target: clean-results
+  - name: test_group
+    tasks: [".test"]
+    max_hosts: 4
+    setup_group:
+      - func: get-project
+    teardown_task:
+      - func: parse-results
+      - func: run-make
+        vars:
+          target: clean-results
+
+
 #######################################
 #           Buildvariants             #
 #######################################
@@ -90,7 +113,7 @@ buildvariants:
       - archlinux-new-small
       - archlinux-new-large
     tasks:
-      - name: ".test"
+      - name: test_group
 
   - name: lint
     display_name: Lint (Arch Linux)
@@ -102,7 +125,7 @@ buildvariants:
       - archlinux-new-small
       - archlinux-new-large
     tasks: 
-      - name: ".lint"
+      - name: lint_group
 
   - name: ubuntu
     display_name: Ubuntu 18.04
@@ -114,4 +137,4 @@ buildvariants:
       - ubuntu1804-small
       - ubuntu1804-large
     tasks:
-      - name: ".test"
+      - name: test_group
