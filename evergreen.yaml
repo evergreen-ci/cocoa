@@ -33,6 +33,10 @@ functions:
       args: ["${target}"]
       include_expansions_in_env: ["DISABLE_COVERAGE", "GO_BIN_PATH", "GOROOT", "RACE_DETECTOR"]
       env:
+        AWS_ACCESS_KEY: ${aws_access_key}
+        AWS_SECRET_ACCESS_KEY: ${aws_secret_access_key}
+        AWS_ROLE: ${aws_role}
+        AWS_REGION: ${aws_region}
         GOPATH: ${workdir}/gopath
   parse-results:
     command: gotest.parse_files
@@ -47,11 +51,29 @@ functions:
 tasks:
   - <<: *run-target
     tags: ["test"]
+    name: test-awsutil
+  - <<: *run-target
+    tags: ["test"]
     name: test-cocoa
+  - <<: *run-target
+    tags: ["test"]
+    name: test-mock
+  - <<: *run-target
+    tags: ["test"]
+    name: test-secret
 
   - <<: *run-target
     tags: ["lint"]
+    name: lint-awsutil
+  - <<: *run-target
+    tags: ["lint"]
     name: lint-cocoa
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-mock
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-secret
 
 #######################################
 #           Buildvariants             #
