@@ -1,8 +1,8 @@
 name := cocoa
 projectPath := github.com/evergreen-ci/cocoa
 buildDir := build
-testPackages := $(name)
-allPackages := $(name)
+allPackages := $(name) secret mock
+testPackages := $(allPackages)
 lintPackages := $(allPackages)
 
 # start environment setup
@@ -36,6 +36,10 @@ coverageOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).
 coverageHtmlOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).coverage.html)
 .PRECIOUS: $(coverageOutput) $(coverageHtmlOutput) $(lintOutput) $(testOutput)
 
+.DEFAULT_GOAL := compile
+
+compile:
+	$(gobin) build $(subst $(name),,$(subst -,/,$(foreach target,$(allPackages),./$(target))))
 test: $(testOutput)
 lint: $(lintOutput)
 coverage: $(coverageOutput)
