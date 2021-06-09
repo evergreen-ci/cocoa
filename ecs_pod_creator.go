@@ -5,23 +5,19 @@ import (
 	"errors"
 )
 
-// ECSPodManager allows you to interact with pods backed by ECS without needing
+// ECSPodCreator provides a means to create ECS
 // to make direct API calls to ECS to perform common operations.
-type ECSPodManager interface {
-	// Create creates a new pod backed by ECS with the given options. Options
+type ECSPodCreator interface {
+	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
-	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
-	// Stop stops a pod.
-	StopPod(ctx context.Context, p ECSPod) error
-	// Delete deletes a pod with the given options, cleaning up all the
-	// resources that it uses. Options are applied in the order they're
-	// specified and conflicting options are overwritten.
-	DeletePod(ctx context.Context, p ECSPod, opts ...*ECSPodDeletionOptions) error
+	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error)
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
 type ECSPodCreationOptions struct {
+	// TaskDefinition defines an existing task definition that should be used
+	TaskDefinition *ECSTaskDefinition
 	// ContainerDefinitions defines settings that apply to individual containers
 	// within the pod.
 	ContainerDefinitions []ECSContainerDefinition
@@ -96,6 +92,26 @@ func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationO
 	return &merged
 }
 
+type ECSTaskDefinition struct {
+	// ID is the ID of the task definition, which should already exist.
+	ID *string
+	// Owned determines whether or not the task definition is owned by its pod
+	// or not.
+	Owned *bool
+}
+
+// SetID sets the task definition ID.
+func (o *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
+	o.ID = &id
+	return o
+}
+
+// SetOwned sets if the task defintiion should be owned by its pod.
+func (o *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
+	o.Owned = &owned
+	return o
+}
+
 // ECSContainerDefinition defines settings that apply to a single container
 // within an ECS pod.
 type ECSContainerDefinition struct {
@@ -108,8 +124,8 @@ type ECSContainerDefinition struct {
 	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
 	// to 1 vCPU on a machine.
 	CPU *int
-	// Secrets are secret values to be passed into the environment.
-	Secrets []string
+	// EnvVars are environment variables.
+	EnvVars []EnvironmentVariable
 	// Tags are resource tags to apply.
 	Tags []string
 }
@@ -120,16 +136,19 @@ func (o *ECSContainerDefinition) SetImage(img string) *ECSContainerDefinition {
 	return o
 }
 
+// SetCommand sets the command for the container to run.
 func (o *ECSContainerDefinition) SetCommand(cmd string) *ECSContainerDefinition {
 	o.Command = &cmd
 	return o
 }
 
+// SetMemoryMB sets the amount of memory (in MB) to allocate.
 func (o *ECSContainerDefinition) SetMemoryMB(mem int) *ECSContainerDefinition {
 	o.MemoryMB = &mem
 	return o
 }
 
+// SetCPU sets the number of CPU units to allocate.
 func (o *ECSContainerDefinition) SetCPU(cpu int) *ECSContainerDefinition {
 	o.CPU = &cpu
 	return o
@@ -147,61 +166,90 @@ func (o *ECSContainerDefinition) AddTags(tags ...string) *ECSContainerDefinition
 	return o
 }
 
-// SetSecrets sets the secrets for the container. This overwrites any existing
-// secrets.
-func (o *ECSContainerDefinition) SetSecrets(secrets []string) *ECSContainerDefinition {
-	o.Secrets = secrets
+// SetEnvironmentVariables sets the environment variables for the container.
+// This overwrites any existing environment variables.
+func (o *ECSContainerDefinition) SetEnvironmentVariables(envVars []EnvironmentVariable) *ECSContainerDefinition {
+	o.EnvVars = envVars
 	return o
 }
 
-// AddSecrets adds new secrets to the existing ones for the container.
-func (o *ECSContainerDefinition) AddSecrets(secrets ...string) *ECSContainerDefinition {
-	o.Secrets = append(o.Secrets, secrets...)
+// AddSecrets adds new environment variables to the existing ones for the container.
+func (o *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentVariable) *ECSContainerDefinition {
+	o.EnvVars = append(o.EnvVars, envVars...)
 	return o
 }
 
-// ECSPodDeletionOptions provide options to delete a pod backed by ECS.
-type ECSPodDeletionOptions struct {
-	// KeepDefinition determines whether or not the pod's definition will be
-	// deleted. If true, only the pod instance will be deleted; otherwise, the
-	// pod's underlying definition will also be deleted. By default, this is
-	// false.
-	KeepDefinition *bool
+// SecretOptions represents a secret with a name and value.
+type SecretOptions struct {
+	// Name is the name of the secret to be stored.
+	Name *string
+	// Value is the secret's value.
+	Value *string
+	// Exists determines whether or not the secret already exists or must be
+	// created before it can be used.
+	Exists *bool
+	// Owned determines whether or not the secret is owned by its pod or not.
+	Owned *bool
 }
 
-func (o *ECSPodDeletionOptions) SetKeepDefinition(keep bool) *ECSPodDeletionOptions {
-	o.KeepDefinition = &keep
-	return o
+// SetName sets the secret's name.
+func (s *SecretOptions) SetName(name string) *SecretOptions {
+	s.Name = &name
+	return s
 }
 
-func mergeECSPodDeletionOptions(opts ...*ECSPodDeletionOptions) *ECSPodDeletionOptions {
-	merged := ECSPodDeletionOptions{}
-
-	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-
-		if opt.KeepDefinition != nil {
-			merged.KeepDefinition = opt.KeepDefinition
-		}
-	}
-
-	return &merged
+// SetValue sets the secret's value.
+func (s *SecretOptions) SetValue(val string) *SecretOptions {
+	s.Value = &val
+	return s
 }
 
-// BasicECSPodManager provides an ECSPodManager implementation as a thin wrapper
-// backed by calls to Amazon ECS.
-type BasicECSPodManager struct{}
+// SetExists sets whether or not the secret already exists or or must be
+// created.
+func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
+	s.Exists = &exists
+	return s
+}
 
-func (m *BasicECSPodManager) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
+// SetOwned sets if the secret should be owned by its pod.
+func (s *SecretOptions) SetOwned(owned bool) *SecretOptions {
+	s.Owned = &owned
+	return s
+}
+
+// EnvironmentVariable represents an environment variable which can be
+// optionally backed by a secret.
+type EnvironmentVariable struct {
+	Name       *string
+	Value      *string
+	SecretOpts *SecretOptions
+}
+
+// SetName sets the environment variable name.
+func (e *EnvironmentVariable) SetName(name string) *EnvironmentVariable {
+	e.Name = &name
+	return e
+}
+
+// SetValue sets the environment variable's value. This is mutually exclusive
+// with setting the (EnvironmentVariable).SecretOptions.
+func (e *EnvironmentVariable) SetValue(val string) *EnvironmentVariable {
+	e.Value = &val
+	return e
+}
+
+// SetSecretOptions sets the environment variable's secret value. This is mutually
+// exclusive with setting the non-secret (EnvironmentVariable).Value.
+func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentVariable {
+	e.SecretOpts = &opts
+	return e
+}
+
+// BasicECSPodCreator provides an ECSPodCreator implementation to create
+// BasicECSPods.
+type BasicECSPodCreator struct{}
+
+// CreatePod creates a new ECSPod.
+func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error) {
 	return nil, errors.New("TODO: implement")
-}
-
-func (m *BasicECSPodManager) StopPod(ctx context.Context, p ECSPod) error {
-	return errors.New("TODO: implement")
-}
-
-func (m *BasicECSPodManager) DeletePod(ctx context.Context, p ECSPod, opts ...*ECSPodDeletionOptions) error {
-	return errors.New("TODO: implement")
 }

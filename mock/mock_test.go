@@ -9,8 +9,7 @@ import (
 )
 
 func TestMockSecretsManagerClient(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPodManager)(nil), &MockECSPodManager{})
-	assert.Implements(t, (*cocoa.ECSPod)(nil), &MockECSPod{})
+	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &MockECSPodCreator{})
 	assert.Implements(t, (*cocoa.ECSClient)(nil), &MockECSClient{})
 
 	assert.Implements(t, (*secret.Vault)(nil), &MockVault{})

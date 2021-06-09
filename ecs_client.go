@@ -23,7 +23,7 @@ type ECSClient interface {
 }
 
 // BasicECSClient provides an ECSClient implementation that wraps the ECS API.
-// It supports retrying requesting using exponential backoff and jitter.
+// It supports retrying requests using exponential backoff and jitter.
 type BasicECSClient struct{}
 
 func (c *BasicECSClient) RegisterTaskDefinition(context.Context, *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
