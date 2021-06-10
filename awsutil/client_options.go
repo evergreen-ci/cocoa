@@ -41,7 +41,7 @@ func NewClientOptions() *ClientOptions {
 	return &ClientOptions{}
 }
 
-// SetRetryOptions sets the client's credentials.
+// SetCredentials sets the client's credentials.
 func (o *ClientOptions) SetCredentials(creds *credentials.Credentials) *ClientOptions {
 	o.Creds = creds
 	return o
