@@ -59,23 +59,34 @@ func (c *BasicECSClient) setup() error {
 		return nil
 	}
 
-	if c.session == nil {
-		creds, err := c.opts.GetCredentials()
-		if err != nil {
-			return errors.Wrap(err, "getting credentials")
-		}
-		s, err := session.NewSession(&aws.Config{
-			HTTPClient:  c.opts.HTTPClient,
-			Region:      c.opts.Region,
-			Credentials: creds,
-		})
-		if err != nil {
-			return errors.Wrap(err, "creating session")
-		}
-		c.session = s
+	if err := c.setupSession(); err != nil {
+		return errors.Wrap(err, "setting up session")
 	}
 
 	c.ecs = ecs.New(c.session)
+
+	return nil
+}
+
+func (c *BasicECSClient) setupSession() error {
+	if c.session != nil {
+		return nil
+	}
+
+	creds, err := c.opts.GetCredentials()
+	if err != nil {
+		return errors.Wrap(err, "getting credentials")
+	}
+	sess, err := session.NewSession(&aws.Config{
+		HTTPClient:  c.opts.HTTPClient,
+		Region:      c.opts.Region,
+		Credentials: creds,
+	})
+	if err != nil {
+		return errors.Wrap(err, "creating session")
+	}
+
+	c.session = sess
 
 	return nil
 }
