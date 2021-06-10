@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
@@ -25,11 +29,35 @@ type SecretsManagerClient interface {
 // BasicSecretsManagerClient provides a SecretsManagerClient implementation that
 // wraps the Secrets Manager API. It supports retrying requests using
 // exponential backoff and jitter.
-type BasicSecretsManagerClient struct{}
+type BasicSecretsManagerClient struct {
+	// self added
+	sm *secretsmanager.SecretsManager
+}
 
 // CreateSecret creates a new secret.
 func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
-	return nil, errors.New("TODO: implement")
+	// calls CreateSecret in Secrets Manager API
+	var out *secretsmanager.CreateSecretOutput
+	var err error
+	msg := makeAWSLogMessage("CreateSecret", in)
+	err = utility.Retry(
+		ctx,
+		func() (bool, error) {
+			out, err = c.sm.CreateSecretWithContext(ctx, in)
+			if err != nil {
+				if smerr, ok := err.(awserr.Error); ok {
+					grip.Debug(message.WrapError(smerr, msg))
+				}
+				return true, err
+			}
+			grip.Info(msg)
+			return false, nil
+		}, awsClientDefaultRetryOptions())
+
+	if err != nil {
+		return nil, err
+	}
+	return out, err
 }
 
 // GetSecretValue gets the decrypted value of an existing secret.
@@ -45,4 +73,12 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 // Close closes the client.
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 	return errors.New("TODO: implement")
+}
+
+func makeAWSLogMessage(name, endpoint string, in interface{}) message.Fields {
+	return message.Fields{
+		"message":  "AWS API call",
+		"endpoint": endpoint,
+		"input":    in,
+	}
 }
