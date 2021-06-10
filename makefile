@@ -1,7 +1,7 @@
 name := cocoa
 projectPath := github.com/evergreen-ci/cocoa
 buildDir := build
-allPackages := $(name) secret mock
+allPackages := $(name) secret mock awsutil
 testPackages := $(allPackages)
 lintPackages := $(allPackages)
 
@@ -95,6 +95,18 @@ $(buildDir)/output.%.coverage.html: $(buildDir)/output.%.coverage .FORCE
 $(buildDir)/output.%.lint: $(buildDir)/run-linter .FORCE
 	@$(if $(GO_BIN_PATH), PATH="$(shell dirname $(GO_BIN_PATH)):$(PATH)") ./$< --output=$@ --lintBin=$(buildDir)/golangci-lint --packages='$*'
 # end lint, test, and coverage artifacts
+
+vendor-clean:
+	rm -rf vendor/github.com/evergreen-ci/gimlet/vendor/github.com/mongodb/grip/
+	rm -rf vendor/github.com/evergreen-ci/utility/gitignore.go
+	rm -rf vendor/github.com/evergreen-ci/utility/parsing.go
+	rm -rf vendor/github.com/jmespath/go-jmespath/internal/testify/
+	rm -rf vendor/github.com/mongodb/grip/vendor/github.com/stretchr/testify/
+	rm -rf vendor/github.com/stretchr/objx/vendor/github.com/davecgh/go-spew/
+	rm -rf vendor/github.com/stretchr/objx/vendor/github.com/stretchr/testify/
+	find vendor/ -name "*.gif" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" -o -name "*testdata*" | xargs rm -rf
+	find vendor/ -type d -empty | xargs rm -rf
+	find vendor/ -type d -name '.git' | xargs rm -rf
 
 clean:
 	rm -rf $(buildDir)
