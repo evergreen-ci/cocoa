@@ -30,8 +30,10 @@ type ClientOptions struct {
 	// HTTPClient is the HTTP client to use to make requests.
 	HTTPClient *http.Client
 
-	session  *session.Session
-	stsCreds *credentials.Credentials
+	stsSession *session.Session
+	stsCreds   *credentials.Credentials
+
+	session *session.Session
 
 	ownsHTTPClient bool
 }
@@ -106,14 +108,39 @@ func (o *ClientOptions) GetCredentials() (*credentials.Credentials, error) {
 		return o.stsCreds, nil
 	}
 
+	if o.stsSession == nil {
+		sess, err := session.NewSession(&aws.Config{
+			HTTPClient:  o.HTTPClient,
+			Region:      o.Region,
+			Credentials: o.Creds,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "creating session")
+		}
+
+		o.stsSession = sess
+	}
+
+	o.stsCreds = stscreds.NewCredentials(o.stsSession, *o.Role)
+
+	return o.stsCreds, nil
+}
+
+// GetSession gets the authenticated session to perform authorized API actions.
+func (o *ClientOptions) GetSession() (*session.Session, error) {
 	if o.session != nil {
-		return stscreds.NewCredentials(o.session, *o.Role), nil
+		return o.session, nil
+	}
+
+	creds, err := o.GetCredentials()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting credentials")
 	}
 
 	sess, err := session.NewSession(&aws.Config{
 		HTTPClient:  o.HTTPClient,
 		Region:      o.Region,
-		Credentials: o.Creds,
+		Credentials: creds,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "creating session")
@@ -121,7 +148,7 @@ func (o *ClientOptions) GetCredentials() (*credentials.Credentials, error) {
 
 	o.session = sess
 
-	return stscreds.NewCredentials(o.session, *o.Role), nil
+	return o.session, nil
 }
 
 // Close cleans up the HTTP client if it is owned by this client.
