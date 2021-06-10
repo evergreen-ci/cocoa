@@ -40,16 +40,21 @@ type BasicECSClient struct {
 
 // NewBasicECSClient creates a new ECS client from the given options.
 func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, errors.Wrap(err, "invalid options")
+	c := &BasicECSClient{
+		opts: &opts,
+	}
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
 	}
 
-	return &BasicECSClient{
-		opts: &opts,
-	}, nil
+	return c, nil
 }
 
 func (c *BasicECSClient) setup() error {
+	if err := c.opts.Validate(); err != nil {
+		return errors.Wrap(err, "invalid options")
+	}
+
 	if c.ecs != nil {
 		return nil
 	}
