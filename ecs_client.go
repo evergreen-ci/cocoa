@@ -99,7 +99,7 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 
 	var out *ecs.RegisterTaskDefinitionOutput
 	var err error
-	msg := makeAWSLogMessage("RegisterTaskDefinition", in)
+	msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
 			out, err = c.ecs.RegisterTaskDefinitionWithContext(ctx, in)
@@ -127,12 +127,4 @@ func (c *BasicECSClient) RunTask(context.Context, *ecs.RunTaskInput) (*ecs.RunTa
 func (c *BasicECSClient) Close(ctx context.Context) error {
 	c.opts.Close()
 	return nil
-}
-
-func makeAWSLogMessage(endpoint string, in interface{}) message.Fields {
-	return message.Fields{
-		"message":  "AWS API call",
-		"endpoint": endpoint,
-		"input":    in,
-	}
 }
