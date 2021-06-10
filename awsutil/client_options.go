@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ClientOptions represent AWS client options such as authentication and making
+// requests.
 type ClientOptions struct {
 	// Creds are the client credentials, which may be used to either connect to
 	// the ECS API directly, or authenticate to STS to retrieve temporary
