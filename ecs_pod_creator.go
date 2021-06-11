@@ -191,7 +191,7 @@ func (o *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentV
 // SecretOptions represents a secret with a name and value that may or may not
 // be owned by its pod.
 type SecretOptions struct {
-	OwnedSecret
+	PodSecret
 	// Exists determines whether or not the secret already exists or must be
 	// created before it can be used.
 	Exists *bool

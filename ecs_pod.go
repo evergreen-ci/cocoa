@@ -9,9 +9,9 @@ import (
 
 // ECSPod represents a pod that is backed by ECS.
 type ECSPod struct {
-	TaskID           string        `bson:"-" json:"-" yaml:"-"`
-	TaskDefinitionID string        `bson:"-" json:"-" yaml:"-"`
-	Secrets          []OwnedSecret `bson:"-" json:"-" yaml:"-"`
+	TaskID           string      `bson:"-" json:"-" yaml:"-"`
+	TaskDefinitionID string      `bson:"-" json:"-" yaml:"-"`
+	Secrets          []PodSecret `bson:"-" json:"-" yaml:"-"`
 }
 
 // Info returns information about the current state of the pod.
@@ -35,8 +35,8 @@ type ECSPodInfo struct {
 	Status string
 }
 
-// OwnedSecret is a named secret that may or may not be owned by its pod.
-type OwnedSecret struct {
+// PodSecret is a named secret that may or may not be owned by its pod.
+type PodSecret struct {
 	secret.NamedSecret
 	// Owned determines whether or not the secret is owned by its pod or not.
 	Owned *bool
