@@ -3,10 +3,9 @@ package secret
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
+	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -129,7 +128,29 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 
 // DeleteSecret deletes an existing secret.
 func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
-	return nil, errors.New("TODO: implement")
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *secretsmanager.DeleteSecretOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("DeleteSecret", in)
+	if err := utility.Retry(
+		ctx,
+		func() (bool, error) {
+			out, err = c.sm.DeleteSecretWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Close closes the client.
