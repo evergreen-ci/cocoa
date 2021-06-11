@@ -8,8 +8,10 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
@@ -34,25 +36,71 @@ type SecretsManagerClient interface {
 // wraps the Secrets Manager API. It supports retrying requests using
 // exponential backoff and jitter.
 type BasicSecretsManagerClient struct {
-	// self added
-	sm   *secretsmanager.SecretsManager
-	opts awsutil.ClientOptions
+	sm      *secretsmanager.SecretsManager
+	opts    awsutil.ClientOptions
+	session *session.Session
 }
 
 // NewBasicSecretsManagerClient creates a new Secrets Manager client from the
 // given options.
 func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
-	if err := opts.Validate(); err != nil {
-		return nil, errors.Wrap(err, "invalid options")
+	c := &BasicSecretsManagerClient{
+		opts: opts,
+	}
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
 	}
 
-	return &BasicSecretsManagerClient{
-		opts: opts,
-	}, nil
+	return c, nil
+}
+
+func (c *BasicSecretsManagerClient) setup() error {
+	if err := c.opts.Validate(); err != nil {
+		return errors.Wrap(err, "invalid options")
+	}
+
+	if c.sm != nil {
+		return nil
+	}
+
+	if err := c.setupSession(); err != nil {
+		return errors.Wrap(err, "setting up session")
+	}
+
+	c.sm = secretsmanager.New(c.session)
+
+	return nil
+}
+
+func (c *BasicSecretsManagerClient) setupSession() error {
+	if c.session != nil {
+		return nil
+	}
+
+	creds, err := c.opts.GetCredentials()
+	if err != nil {
+		return errors.Wrap(err, "getting credentials")
+	}
+	sess, err := session.NewSession(&aws.Config{
+		HTTPClient:  c.opts.HTTPClient,
+		Region:      c.opts.Region,
+		Credentials: creds,
+	})
+	if err != nil {
+		return errors.Wrap(err, "creating session")
+	}
+
+	c.session = sess
+
+	return nil
 }
 
 // CreateSecret creates a new secret.
 func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
 	var out *secretsmanager.CreateSecretOutput
 	var err error
 	msg := awsutil.MakeAPILogMessage("CreateSecret", in)
