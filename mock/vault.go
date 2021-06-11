@@ -15,7 +15,7 @@ type Vault struct{}
 // CreateSecret saves the input options and returns a mock secret ID. The mock
 // output can be customized. By default, it will create a cached mock secret
 // based on the input.
-func (m *Vault) CreateSecret(ctx context.Context, opts ...*secret.CreationOptions) (id string, err error) {
+func (m *Vault) CreateSecret(ctx context.Context, s secret.NamedSecret) (id string, err error) {
 	return "", errors.New("TODO: implement")
 }
 

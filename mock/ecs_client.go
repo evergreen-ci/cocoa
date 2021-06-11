@@ -33,6 +33,20 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 	return nil, errors.New("TODO: implement")
 }
 
+// DescribeTasks saves the input and returns information about the existing
+// tasks. The mock output can be customized. By default, it will describe all
+// cached tasks that match.
+func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
+	return nil, errors.New("TODO: implement")
+}
+
+// StopTask saves the input and stops a mock task. The mock output can be
+// customized. By default, it will mark a cached task as stopped if it exists
+// and is running.
+func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
+	return nil, errors.New("TODO: implement")
+}
+
 // Close closes the mock client. The mock output can be customized. By default,
 // it is a no-op that returns no error.
 func (c *ECSClient) Close(ctx context.Context) error {

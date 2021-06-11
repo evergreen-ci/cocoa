@@ -10,7 +10,7 @@ import (
 type BasicSecretsManager struct{}
 
 // CreateSecret creates a new secret.
-func (m *BasicSecretsManager) CreateSecret(ctx context.Context, opts ...*CreationOptions) (id string, err error) {
+func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
 	return "", errors.New("TODO: implement")
 }
 
