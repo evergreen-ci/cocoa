@@ -7,10 +7,7 @@ import (
 
 // BasicSecretsManager provides a Vault implementation backed by Amazon Secrets
 // Manager.
-type BasicSecretsManager struct {
-	v    *Vault
-	opts *CreationOptions
-}
+type BasicSecretsManager struct{}
 
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, opts ...*CreationOptions) (id string, err error) {
