@@ -9,6 +9,7 @@ import (
 	"github.com/mongodb/grip/message"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
@@ -52,23 +53,22 @@ func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsMana
 
 // CreateSecret creates a new secret.
 func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
-	// calls CreateSecret in Secrets Manager API
 	var out *secretsmanager.CreateSecretOutput
 	var err error
-	msg := makeAWSLogMessage("CreateSecret", in)
-	err = utility.Retry(
+	msg := awsutil.MakeAPILogMessage("CreateSecret", in)
+	if err := utility.Retry(
 		ctx,
 		func() (bool, error) {
 			out, err = c.sm.CreateSecretWithContext(ctx, in)
-			if err != nil {
-				if awsErr, ok := err.(awserr.Error); ok {
-					grip.Debug(message.WrapError(awsErr, msg))
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
 				}
-				return true, err
 			}
-			return false, nil
-		}, *c.opts.RetryOpts)
-	if err != nil {
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
 	return out, err
@@ -88,12 +88,4 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 	c.opts.Close()
 	return nil
-}
-
-func makeAWSLogMessage(endpoint string, in interface{}) message.Fields {
-	return message.Fields{
-		"message":  "AWS API call",
-		"endpoint": endpoint,
-		"input":    in,
-	}
 }
