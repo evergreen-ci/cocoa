@@ -3,21 +3,20 @@ package cocoa
 import (
 	"context"
 	"errors"
+
+	"github.com/evergreen-ci/cocoa/secret"
 )
 
 // ECSPod represents a pod that is backed by ECS.
-type ECSPod struct{}
-
-// ID is the pod's unique identifier, which must uniquely identify the
-// backing resource in ECS.
-func (p *ECSPod) ID() string {
-	return ""
+type ECSPod struct {
+	TaskID           string        `bson:"-" json:"-" yaml:"-"`
+	TaskDefinitionID string        `bson:"-" json:"-" yaml:"-"`
+	Secrets          []OwnedSecret `bson:"-" json:"-" yaml:"-"`
 }
 
-// DefinitionID is the unique identifier for the pod's template definition,
-// which must uniquely identify the backing resource in ECS.
-func (p *ECSPod) DefinitionID() string {
-	return ""
+// Info returns information about the current state of the pod.
+func (p *ECSPod) Info(ctx context.Context) (*ECSPodInfo, error) {
+	return nil, errors.New("TODO: implement")
 }
 
 // Stop stops the running pod.
@@ -28,4 +27,17 @@ func (p *ECSPod) Stop(ctx context.Context) error {
 // Delete deletes the pod and its owned resources.
 func (p *ECSPod) Delete(ctx context.Context) error {
 	return errors.New("TODO: implement")
+}
+
+// ECSPodInfo provides information about the current status of the pod.
+type ECSPodInfo struct {
+	// Status is the current status of the pod.
+	Status string
+}
+
+// OwnedSecret is a named secret that may or may not be owned by its pod.
+type OwnedSecret struct {
+	secret.NamedSecret
+	// Owned determines whether or not the secret is owned by its pod or not.
+	Owned *bool
 }

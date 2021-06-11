@@ -188,17 +188,13 @@ func (o *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentV
 	return o
 }
 
-// SecretOptions represents a secret with a name and value.
+// SecretOptions represents a secret with a name and value that may or may not
+// be owned by its pod.
 type SecretOptions struct {
-	// Name is the name of the secret to be stored.
-	Name *string
-	// Value is the secret's value.
-	Value *string
+	OwnedSecret
 	// Exists determines whether or not the secret already exists or must be
 	// created before it can be used.
 	Exists *bool
-	// Owned determines whether or not the secret is owned by its pod or not.
-	Owned *bool
 }
 
 // SetName sets the secret's name.
@@ -213,6 +209,12 @@ func (s *SecretOptions) SetValue(val string) *SecretOptions {
 	return s
 }
 
+// SetOwned sets if the secret should be owned by its pod.
+func (s *SecretOptions) SetOwned(owned bool) *SecretOptions {
+	s.Owned = &owned
+	return s
+}
+
 // SetExists sets whether or not the secret already exists or or must be
 // created.
 func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
@@ -220,13 +222,7 @@ func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
 	return s
 }
 
-// SetOwned sets if the secret should be owned by its pod.
-func (s *SecretOptions) SetOwned(owned bool) *SecretOptions {
-	s.Owned = &owned
-	return s
-}
-
-// EnvironmentVariable represents an environment variable which can be
+// EnvironmentVariable represents an environment variable, which can be
 // optionally backed by a secret.
 type EnvironmentVariable struct {
 	Name       *string
@@ -256,9 +252,18 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 
 // BasicECSPodCreator provides an ECSPodCreator implementation to create
 // ECS pods.
-type BasicECSPodCreator struct{}
+type BasicECSPodCreator struct {
+	client ECSClient
+}
 
-// CreatePod creates a new ECSPod.
+// NewBasicECSPodCreator creates a helper to create pods backed by ECS.
+func NewBasicECSPodCreator(c ECSClient) *BasicECSPodCreator {
+	return &BasicECSPodCreator{
+		client: c,
+	}
+}
+
+// CreatePod creates a new pod backed by ECS.
 func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }

@@ -4,9 +4,9 @@ import "context"
 
 // Vault allows you to interact with a secrets storage service.
 type Vault interface {
-	// CreateSecret creates a new secret. Options are applied in the order
-	// they're specified and conflicting options are overwritten.
-	CreateSecret(ctx context.Context, opts ...*CreationOptions) (id string, err error)
+	// CreateSecret creates a new secret and returns the unique identifier for
+	// the stored secret.
+	CreateSecret(ctx context.Context, s NamedSecret) (id string, err error)
 	// GetValue returns the value of the secret identified by ID.
 	GetValue(ctx context.Context, id string) (val string, err error)
 	// UpdateValue updates an existing secret's value by ID.
@@ -15,41 +15,22 @@ type Vault interface {
 	DeleteSecret(ctx context.Context, id string) error
 }
 
-// CreationOptions provide options to create a secret.
-type CreationOptions struct {
-	Name  *string
+// NamedSecret represents a secret with a name.
+type NamedSecret struct {
+	// Name is the friendly human-readable name of the secret.
+	Name *string
+	// Value is the stored value of the secret.
 	Value *string
 }
 
 // SetName sets the friendly name for the secret.
-func (o *CreationOptions) SetName(name string) *CreationOptions {
+func (o *NamedSecret) SetName(name string) *NamedSecret {
 	o.Name = &name
 	return o
 }
 
 // SetValue sets the secret value.
-func (o *CreationOptions) SetValue(value string) *CreationOptions {
+func (o *NamedSecret) SetValue(value string) *NamedSecret {
 	o.Value = &value
 	return o
-}
-
-//nolint:deadcode
-func mergeCreationOptions(opts ...*CreationOptions) *CreationOptions {
-	merged := CreationOptions{}
-
-	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-
-		if opt.Name != nil {
-			merged.Name = opt.Name
-		}
-
-		if opt.Value != nil {
-			merged.Value = opt.Value
-		}
-	}
-
-	return &merged
 }
