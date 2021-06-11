@@ -2,13 +2,16 @@ package secret
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/evergreen-ci/cocoa/awsutil"
+	"github.com/evergreen-ci/utility"
 )
 
 // SecretsManagerClient provides a common interface to interact with a Secrets
@@ -31,7 +34,20 @@ type SecretsManagerClient interface {
 // exponential backoff and jitter.
 type BasicSecretsManagerClient struct {
 	// self added
-	sm *secretsmanager.SecretsManager
+	sm   *secretsmanager.SecretsManager
+	opts awsutil.ClientOptions
+}
+
+// NewBasicSecretsManagerClient creates a new Secrets Manager client from the
+// given options.
+func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid options")
+	}
+
+	return &BasicSecretsManagerClient{
+		opts: opts,
+	}, nil
 }
 
 // CreateSecret creates a new secret.
@@ -45,15 +61,13 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 		func() (bool, error) {
 			out, err = c.sm.CreateSecretWithContext(ctx, in)
 			if err != nil {
-				if smerr, ok := err.(awserr.Error); ok {
-					grip.Debug(message.WrapError(smerr, msg))
+				if awsErr, ok := err.(awserr.Error); ok {
+					grip.Debug(message.WrapError(awsErr, msg))
 				}
 				return true, err
 			}
-			grip.Info(msg)
 			return false, nil
-		}, awsClientDefaultRetryOptions())
-
+		}, *c.opts.RetryOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -72,10 +86,11 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 
 // Close closes the client.
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
-	return errors.New("TODO: implement")
+	c.opts.Close()
+	return nil
 }
 
-func makeAWSLogMessage(name, endpoint string, in interface{}) message.Fields {
+func makeAWSLogMessage(endpoint string, in interface{}) message.Fields {
 	return message.Fields{
 		"message":  "AWS API call",
 		"endpoint": endpoint,

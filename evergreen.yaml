@@ -20,7 +20,7 @@ variables:
 #######################################
 functions:
   get-project:
-    command: git.get_project
+    command: git.get_project # git clone github.com/evergreen-ci/cocoa
     type: system
     params:
       directory: gopath/src/github.com/evergreen-ci/cocoa
@@ -33,6 +33,10 @@ functions:
       args: ["${target}"]
       include_expansions_in_env: ["DISABLE_COVERAGE", "GO_BIN_PATH", "GOROOT", "RACE_DETECTOR"]
       env:
+        AWS_ACCESS_KEY: ${aws_access_key}
+        AWS_SECRET_ACCESS_KEY: ${aws_secret_access_key}
+        AWS_ROLE: ${aws_role}
+        AWS_REGION: ${aws_region}
         GOPATH: ${workdir}/gopath
   parse-results:
     command: gotest.parse_files
@@ -47,11 +51,60 @@ functions:
 tasks:
   - <<: *run-target
     tags: ["test"]
+    name: test-awsutil
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["test"]
     name: test-cocoa
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["test"]
+    name: test-mock
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["test"]
+    name: test-secret
+    must_have_test_results: true
 
   - <<: *run-target
     tags: ["lint"]
+    name: lint-awsutil
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
     name: lint-cocoa
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-mock
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-secret
+    must_have_test_results: true
+
+task_groups:
+  - name: lint_group
+    tasks: [".lint"]
+    max_hosts: 4
+    setup_group:
+      - func: get-project
+    teardown_task:
+      - func: parse-results
+      - func: run-make
+        vars:
+          target: clean-results
+  - name: test_group
+    tasks: [".test"]
+    max_hosts: 4
+    setup_group:
+      - func: get-project
+    teardown_task:
+      - func: parse-results
+      - func: run-make
+        vars:
+          target: clean-results
+
 
 #######################################
 #           Buildvariants             #
@@ -68,7 +121,7 @@ buildvariants:
       - archlinux-new-small
       - archlinux-new-large
     tasks:
-      - name: ".test"
+      - name: test_group
 
   - name: lint
     display_name: Lint (Arch Linux)
@@ -79,8 +132,8 @@ buildvariants:
     run_on:
       - archlinux-new-small
       - archlinux-new-large
-    tasks: 
-      - name: ".lint"
+    tasks:
+      - name: lint_group
 
   - name: ubuntu
     display_name: Ubuntu 18.04
@@ -92,4 +145,4 @@ buildvariants:
       - ubuntu1804-small
       - ubuntu1804-large
     tasks:
-      - name: ".test"
+      - name: test_group
