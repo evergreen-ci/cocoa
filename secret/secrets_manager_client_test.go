@@ -60,13 +60,6 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 		require.NoError(t, err)
 		require.NotZero(t, out)
 
-		/*
-			CreateSecretOutput
-				ARN *string
-				Name *string
-				ReplicationStatus []*ReplicationStatusType
-				VersionId *string
-		*/
 		defer func() {
 			if out != nil && out.Name != nil && out.ARN != nil {
 				out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
@@ -79,7 +72,6 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 
 		require.NotZero(t, out.Name)
 		require.NotZero(t, out.ARN)
-		// fmt.Println("outRS", &out.ReplicationStatus)
 
 	})
 }
