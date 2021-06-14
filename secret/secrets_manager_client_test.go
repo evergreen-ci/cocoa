@@ -32,7 +32,7 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 	c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
 		Creds:  credentials.NewEnvCredentials(),
 		Region: aws.String(os.Getenv("AWS_REGION")),
-		Role:   aws.String(os.Getenv("AWS_Role")),
+		Role:   aws.String(os.Getenv("AWS_ROLE")),
 		RetryOpts: &utility.RetryOptions{
 			MaxAttempts: 5,
 		},
