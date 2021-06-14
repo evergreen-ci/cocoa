@@ -21,7 +21,7 @@ func TestSecretsManagerClient(t *testing.T) {
 }
 
 func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
-	// checkAWSEnvVars(t)
+	checkAWSEnvVars(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -50,6 +50,37 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 		out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{})
 		assert.Error(t, err)
 		assert.Zero(t, out)
+	})
+
+	t.Run("CreateAndDeleteSucceed", func(t *testing.T) {
+		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+			Name:         aws.String("hello"),
+			SecretString: aws.String("foo"),
+		})
+		require.NoError(t, err)
+		require.NotZero(t, out)
+
+		/*
+			CreateSecretOutput
+				ARN *string
+				Name *string
+				ReplicationStatus []*ReplicationStatusType
+				VersionId *string
+		*/
+		defer func() {
+			if out != nil && out.Name != nil && out.ARN != nil {
+				out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+					SecretId: out.ARN,
+				})
+				require.NoError(t, err)
+				require.NotZero(t, out)
+			}
+		}()
+
+		require.NotZero(t, out.Name)
+		require.NotZero(t, out.ARN)
+		// fmt.Println("outRS", &out.ReplicationStatus)
+
 	})
 }
 
