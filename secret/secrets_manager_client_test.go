@@ -55,7 +55,8 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 	t.Run("CreateAndDeleteSucceed", func(t *testing.T) {
 		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
 			Name:         aws.String("hello"),
-			SecretString: aws.String("foo"),
+			Description:  aws.String("foo"),
+			SecretString: aws.String("bar"),
 		})
 		require.NoError(t, err)
 		require.NotZero(t, out)
