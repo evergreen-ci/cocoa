@@ -38,6 +38,7 @@ functions:
         AWS_ROLE: ${aws_role}
         AWS_REGION: ${aws_region}
         AWS_ECS_CLUSTER: ${aws_ecs_cluster}
+        AWS_SECRET_PREFIX: ${aws_secret_prefix}
         GOPATH: ${workdir}/gopath
   parse-results:
     command: gotest.parse_files
