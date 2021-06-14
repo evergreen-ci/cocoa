@@ -10,7 +10,7 @@ type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
-	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error)
+	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
@@ -197,24 +197,6 @@ type SecretOptions struct {
 	Exists *bool
 }
 
-// SetName sets the secret's name.
-func (s *SecretOptions) SetName(name string) *SecretOptions {
-	s.Name = &name
-	return s
-}
-
-// SetValue sets the secret's value.
-func (s *SecretOptions) SetValue(val string) *SecretOptions {
-	s.Value = &val
-	return s
-}
-
-// SetOwned sets if the secret should be owned by its pod.
-func (s *SecretOptions) SetOwned(owned bool) *SecretOptions {
-	s.Owned = &owned
-	return s
-}
-
 // SetExists sets whether or not the secret already exists or or must be
 // created.
 func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
@@ -264,6 +246,6 @@ func NewBasicECSPodCreator(c ECSClient) *BasicECSPodCreator {
 }
 
 // CreatePod creates a new pod backed by ECS.
-func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error) {
+func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }
