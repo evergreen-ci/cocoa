@@ -54,7 +54,7 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 
 	t.Run("CreateAndDeleteSucceed", func(t *testing.T) {
 		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
-			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hello"),
+			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hello_world"),
 			Description:  aws.String("foo"),
 			SecretString: aws.String("bar"),
 		})
