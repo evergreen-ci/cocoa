@@ -3,6 +3,8 @@ package cocoa
 import (
 	"context"
 	"errors"
+
+	"github.com/evergreen-ci/cocoa/secret"
 )
 
 // ECSPodCreator provides a means to create a new pod backed by ECS.
@@ -10,7 +12,7 @@ type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
-	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error)
+	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
@@ -78,8 +80,10 @@ func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
 	return o
 }
 
-//nolint:deadcode
-func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationOptions {
+// MergeECSPodCreationOptions merges all the given options to create an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOptions {
 	merged := ECSPodCreationOptions{}
 
 	for _, opt := range opts {
@@ -96,7 +100,7 @@ func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationO
 		}
 	}
 
-	return &merged
+	return merged
 }
 
 // ECSTaskDefinition represents options for an existing ECS task definition.
@@ -197,24 +201,6 @@ type SecretOptions struct {
 	Exists *bool
 }
 
-// SetName sets the secret's name.
-func (s *SecretOptions) SetName(name string) *SecretOptions {
-	s.Name = &name
-	return s
-}
-
-// SetValue sets the secret's value.
-func (s *SecretOptions) SetValue(val string) *SecretOptions {
-	s.Value = &val
-	return s
-}
-
-// SetOwned sets if the secret should be owned by its pod.
-func (s *SecretOptions) SetOwned(owned bool) *SecretOptions {
-	s.Owned = &owned
-	return s
-}
-
 // SetExists sets whether or not the secret already exists or or must be
 // created.
 func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
@@ -254,16 +240,18 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 // ECS pods.
 type BasicECSPodCreator struct {
 	client ECSClient
+	vault  secret.Vault
 }
 
 // NewBasicECSPodCreator creates a helper to create pods backed by ECS.
-func NewBasicECSPodCreator(c ECSClient) *BasicECSPodCreator {
+func NewBasicECSPodCreator(c ECSClient, v secret.Vault) *BasicECSPodCreator {
 	return &BasicECSPodCreator{
 		client: c,
+		vault:  v,
 	}
 }
 
 // CreatePod creates a new pod backed by ECS.
-func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (*ECSPod, error) {
+func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }
