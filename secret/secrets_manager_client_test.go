@@ -64,7 +64,8 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 		defer func() {
 			if out != nil && out.Name != nil && out.ARN != nil {
 				out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
-					SecretId: out.ARN,
+					ForceDeleteWithoutRecovery: aws.Bool(true),
+					SecretId:                   out.ARN,
 				})
 				require.NoError(t, err)
 				require.NotZero(t, out)
