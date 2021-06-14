@@ -3,6 +3,8 @@ package cocoa
 import (
 	"context"
 	"errors"
+
+	"github.com/evergreen-ci/cocoa/secret"
 )
 
 // ECSPodCreator provides a means to create a new pod backed by ECS.
@@ -78,8 +80,10 @@ func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
 	return o
 }
 
-//nolint:deadcode
-func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationOptions {
+// MergeECSPodCreationOptions merges all the given options to create an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOptions {
 	merged := ECSPodCreationOptions{}
 
 	for _, opt := range opts {
@@ -96,7 +100,7 @@ func mergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) *ECSPodCreationO
 		}
 	}
 
-	return &merged
+	return merged
 }
 
 // ECSTaskDefinition represents options for an existing ECS task definition.
@@ -236,12 +240,14 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 // ECS pods.
 type BasicECSPodCreator struct {
 	client ECSClient
+	vault  secret.Vault
 }
 
 // NewBasicECSPodCreator creates a helper to create pods backed by ECS.
-func NewBasicECSPodCreator(c ECSClient) *BasicECSPodCreator {
+func NewBasicECSPodCreator(c ECSClient, v secret.Vault) *BasicECSPodCreator {
 	return &BasicECSPodCreator{
 		client: c,
+		vault:  v,
 	}
 }
 

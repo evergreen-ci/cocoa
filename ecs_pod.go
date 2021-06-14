@@ -20,17 +20,53 @@ type ECSPod interface {
 
 // BasicECSPod represents a pod that is backed by ECS.
 type BasicECSPod struct {
-	client    ECSClient
-	resources ECSPodResources
-	status    ECSPodStatus
+	opts BasicECSPodOptions
+}
+
+// BasicECSPodOptions are options to create a BasicECSPod.
+type BasicECSPodOptions struct {
+	Client    ECSClient
+	Vault     secret.Vault
+	Resources *ECSPodResources
+	Status    *ECSPodStatus
+}
+
+// MergeECSPodOptions merges all the given options describing an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodOptions(opts ...*BasicECSPodOptions) BasicECSPodOptions {
+	merged := BasicECSPodOptions{}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		if opt.Client != nil {
+			merged.Client = opt.Client
+		}
+
+		if opt.Vault != nil {
+			merged.Vault = opt.Vault
+		}
+
+		if opt.Resources != nil {
+			merged.Resources = opt.Resources
+		}
+
+		if opt.Status != nil {
+			merged.Status = opt.Status
+		}
+	}
+
+	return merged
 }
 
 // NewBasicECSPod initializes a new pod that is backed by ECS.
-func NewBasicECSPod(c ECSClient, res ECSPodResources, stat ECSPodStatus) *BasicECSPod {
+func NewBasicECSPod(opts ...*BasicECSPodOptions) *BasicECSPod {
+	merged := MergeECSPodOptions(opts...)
 	return &BasicECSPod{
-		client:    c,
-		resources: res,
-		status:    stat,
+		opts: merged,
 	}
 }
 
