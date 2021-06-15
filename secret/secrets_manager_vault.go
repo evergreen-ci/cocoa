@@ -2,7 +2,6 @@ package secret
 
 import (
 	"context"
-	"errors"
 
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
@@ -30,12 +29,14 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
 	newManager := NewBasicSecretsManager(m.client)
-	return newManager.GetValue(ctx, id)
+	out, err := newManager.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
+	return *out.SecretString, err
 }
 
 // UpdateValue updates an existing secret's value.
 func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id string) error {
-	return errors.New("TODO: implement")
+	newManager := NewBasicSecretsManager(m.client)
+	return newManager.UpdateValue(ctx, id)
 }
 
 // DeleteSecret deletes an existing secret.

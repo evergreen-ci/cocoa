@@ -123,7 +123,56 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 
 // GetSecretValue gets the decrypted value of an existing secret.
 func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
-	return nil, errors.New("TODO: implement")
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *secretsmanager.GetSecretValueOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("GetSecret", in)
+	if err := utility.Retry(
+		ctx,
+		func() (bool, error) {
+			out, err = c.sm.GetSecretValueWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, err
+}
+
+// UpdateSecretValue updates the decrypted value of an existing secret.
+func (c *BasicSecretsManagerClient) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *secretsmanager.UpdateSecretOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("UpdateSecret", in)
+	if err := utility.Retry(
+		ctx,
+		func() (bool, error) {
+			out, err = c.sm.UpdateSecretWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, err
 }
 
 // DeleteSecret deletes an existing secret.

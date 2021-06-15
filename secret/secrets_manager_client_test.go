@@ -79,57 +79,6 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 
 }
 
-func TestVaultCreateAndDeleteSecret(t *testing.T) {
-	checkAWSEnvVars(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(os.Getenv("AWS_REGION")),
-		Role:   aws.String(os.Getenv("AWS_ROLE")),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
-		},
-		HTTPClient: hc,
-	})
-	require.NoError(t, err)
-
-	m := NewBasicSecretsManager(c)
-	require.NoError(t, err)
-
-	t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
-		out, err := m.CreateSecret(ctx, NamedSecret{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
-
-	t.Run("VaultDeleteFailsWithInvalidInput", func(t *testing.T) {
-		err := m.DeleteSecret(ctx, "")
-		assert.Error(t, err)
-	})
-
-	t.Run("VaultCreateAndDeleteSucceed", func(t *testing.T) {
-		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String("hello"),
-			Value: aws.String("world")})
-
-		require.NoError(t, err)
-		require.NotZero(t, out)
-
-		defer func() {
-			if out != "" {
-				err := m.DeleteSecret(ctx, out)
-				require.NoError(t, err)
-			}
-		}()
-	})
-}
-
 func checkAWSEnvVars(t *testing.T) {
 	missing := []string{}
 
