@@ -61,7 +61,7 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 
 	t.Run("VaultCreateAndDeleteSucceed", func(t *testing.T) {
 		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hello"),
+			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hi"),
 			Value: aws.String("world")})
 
 		require.NoError(t, err)
