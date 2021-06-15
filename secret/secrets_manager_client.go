@@ -24,6 +24,8 @@ type SecretsManagerClient interface {
 	CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
 	// GetSecretValue gets the decrypted value of a secret.
 	GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
+	// UpdateSecret updates the decrypted value of an existing secret.
+	UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
 	// DeleteSecret deletes an existing secret.
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
 	// Close closes the client and cleans up its resources. Implementations
