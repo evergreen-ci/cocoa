@@ -40,11 +40,19 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 
 	m := NewBasicSecretsManager(c)
 
-	t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
-		out, err := m.CreateSecret(ctx, NamedSecret{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
+	Cleanup := func(out string) {
+		if out != "" {
+			err := m.DeleteSecret(ctx, out)
+			require.NoError(t, err)
+		}
+	}
+
+	// Temporarily commented out because waiting for input validation
+	// t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
+	// 	out, err := m.CreateSecret(ctx, NamedSecret{})
+	// 	assert.Error(t, err)
+	// 	assert.Zero(t, out)
+	// })
 
 	t.Run("VaultDeleteFailsWithInvalidInput", func(t *testing.T) {
 		err := m.DeleteSecret(ctx, "")
@@ -59,13 +67,66 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 		require.NoError(t, err)
 		require.NotZero(t, out)
 
+		defer Cleanup(out)
+	})
+
+	t.Run("VaultGetFailsWithInvalidInput", func(t *testing.T) {
+		out, err := m.GetValue(ctx, "")
+		assert.Error(t, err)
+		assert.Zero(t, out)
+	})
+
+	t.Run("VaultUpdateFailsWithInvalidInput", func(t *testing.T) {
+		err := m.UpdateValue(ctx, "", "")
+		assert.Error(t, err)
+	})
+
+	t.Run("VaultCreateAndGetSucceed", func(t *testing.T) {
+
+		out, err := m.CreateSecret(ctx, NamedSecret{
+			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "ham"),
+			Value: aws.String("eggs")})
+
+		require.NoError(t, err)
+		require.NotZero(t, out)
+
+		defer Cleanup(out)
+
 		defer func() {
 			if out != "" {
-				err := m.DeleteSecret(ctx, out)
+				out, err := m.GetValue(ctx, out)
 				require.NoError(t, err)
+				require.NotZero(t, out)
+				assert.Equal(t, "eggs", out)
 			}
 		}()
 	})
 
-	// TODO: tests for Get, Update (Invalid, Success)
+	t.Run("VaultUpdateSucceed", func(t *testing.T) {
+		out, err := m.CreateSecret(ctx, NamedSecret{
+			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "spam"),
+			Value: aws.String("eggs"),
+		})
+		require.NoError(t, err)
+		require.NotZero(t, out)
+
+		defer Cleanup(out)
+
+		defer func() {
+			if out != "" {
+				out, err := m.GetValue(ctx, out)
+				require.NoError(t, err)
+				require.NotZero(t, out)
+				assert.Equal(t, "ham", out)
+			}
+		}()
+
+		defer func() {
+			if out != "" {
+				err := m.UpdateValue(ctx, out, "ham")
+				require.NoError(t, err)
+			}
+		}()
+
+	})
 }

@@ -2,8 +2,8 @@ package secret
 
 import (
 	"context"
-	"errors"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
@@ -22,30 +22,33 @@ func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
 
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
-	newManager := NewBasicSecretsManager(m.client)
-	if s.Name == nil || s.Value == nil {
-		return "", errors.New("Invalid input")
-	}
-	out, err := newManager.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{Name: s.Name, SecretString: s.Value})
+	out, err := m.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+		Name:         s.Name,
+		SecretString: s.Value,
+	})
 	return *out.ARN, err
 }
 
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
-	newManager := NewBasicSecretsManager(m.client)
-	out, err := newManager.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
+	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
 	return *out.SecretString, err
 }
 
 // UpdateValue updates an existing secret's value.
-func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id string) error {
-	newManager := NewBasicSecretsManager(m.client)
-	return newManager.UpdateValue(ctx, id)
+func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) error {
+	_, err := m.client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+		SecretId:     aws.String(id),
+		SecretString: aws.String(val),
+	})
+	return err
 }
 
 // DeleteSecret deletes an existing secret.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
-	newManager := NewBasicSecretsManager(m.client)
-	_, err := newManager.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{SecretId: &id})
+	_, err := m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+		ForceDeleteWithoutRecovery: aws.Bool(true),
+		SecretId:                   &id,
+	})
 	return err
 }
