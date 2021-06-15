@@ -2,6 +2,7 @@ package secret
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
@@ -22,8 +23,13 @@ func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
 	newManager := NewBasicSecretsManager(m.client)
+	// TODO: check to see if NamedSecret is valid
+	if s.Name == nil || s.Value == nil {
+		return "", errors.New("Invalid input")
+	}
 	out, err := newManager.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{Name: s.Name, SecretString: s.Value})
 	return *out.ARN, err
+
 }
 
 // GetValue returns an existing secret's decrypted value.
