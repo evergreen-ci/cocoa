@@ -40,9 +40,20 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 
 	m := NewBasicSecretsManager(c)
 
+	t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
+		out, err := m.CreateSecret(ctx, NamedSecret{})
+		assert.Error(t, err)
+		assert.Zero(t, out)
+	})
+
+	t.Run("VaultDeleteFailsWithInvalidInput", func(t *testing.T) {
+		err := m.DeleteSecret(ctx, "")
+		assert.Error(t, err)
+	})
+
 	t.Run("VaultCreateAndDeleteSucceed", func(t *testing.T) {
 		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String("hello"),
+			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hello"),
 			Value: aws.String("world")})
 
 		require.NoError(t, err)
