@@ -77,6 +77,82 @@ func TestSecretsManagerCreateAndDeleteSecret(t *testing.T) {
 
 	})
 
+	t.Run("GetFailsWithInvalidInput", func(t *testing.T) {
+		out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{})
+		assert.Error(t, err)
+		assert.Zero(t, out)
+	})
+
+	t.Run("UpdateFailsWithInvalidInput", func(t *testing.T) {
+		out, err := c.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{})
+		assert.Error(t, err)
+		assert.Zero(t, out)
+	})
+
+	//
+
+	t.Run("CreateAndGetSucceed", func(t *testing.T) {
+		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "foo"),
+			SecretString: aws.String("bar"),
+		})
+		require.NoError(t, err)
+		require.NotZero(t, out)
+
+		defer func() {
+			if out != nil && out.Name != nil && out.ARN != nil {
+				out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+					SecretId: out.ARN,
+				})
+				require.NoError(t, err)
+				require.NotZero(t, out)
+				assert.Equal(t, "bar", *out.SecretString)
+			}
+		}()
+
+		require.NotZero(t, out.Name)
+		require.NotZero(t, out.ARN)
+	})
+
+	t.Run("UpdateSucceed", func(t *testing.T) {
+		// create, update, get, check
+
+		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "mongo"),
+			SecretString: aws.String("db"),
+		})
+		require.NoError(t, err)
+		require.NotZero(t, out)
+
+		// get
+		defer func() {
+			if out != nil && out.Name != nil && out.ARN != nil {
+				out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+					SecretId: out.ARN,
+				})
+				require.NoError(t, err)
+				require.NotZero(t, out)
+				assert.Equal(t, "mongodb", *out.SecretString)
+			}
+		}()
+
+		// update
+		defer func() {
+			if out != nil && out.Name != nil && out.ARN != nil {
+				out, err := c.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+					SecretId:     out.ARN,
+					SecretString: aws.String("mongodb"),
+				})
+				require.NoError(t, err)
+				require.NotZero(t, out)
+			}
+		}()
+
+		require.NotZero(t, out.Name)
+		require.NotZero(t, out.ARN)
+
+	})
+
 }
 
 func checkAWSEnvVars(t *testing.T) {

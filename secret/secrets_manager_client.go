@@ -148,7 +148,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 	return out, err
 }
 
-// UpdateSecretValue updates the decrypted value of an existing secret.
+// UpdateSecret updates the decrypted value of an existing secret.
 func (c *BasicSecretsManagerClient) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")

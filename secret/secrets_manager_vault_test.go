@@ -66,4 +66,6 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 			}
 		}()
 	})
+
+	// TODO: tests for Get, Update (Invalid, Success)
 }
