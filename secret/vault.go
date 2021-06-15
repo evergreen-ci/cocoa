@@ -1,6 +1,10 @@
 package secret
 
-import "context"
+import (
+	"context"
+
+	"github.com/mongodb/grip"
+)
 
 // Vault allows you to interact with a secrets storage service.
 type Vault interface {
@@ -23,14 +27,27 @@ type NamedSecret struct {
 	Value *string
 }
 
+// NewNamedSecret returns a new uninitialized named secret.
+func NewNamedSecret() *NamedSecret {
+	return &NamedSecret{}
+}
+
 // SetName sets the friendly name for the secret.
-func (o *NamedSecret) SetName(name string) *NamedSecret {
-	o.Name = &name
-	return o
+func (s *NamedSecret) SetName(name string) *NamedSecret {
+	s.Name = &name
+	return s
 }
 
 // SetValue sets the secret value.
-func (o *NamedSecret) SetValue(value string) *NamedSecret {
-	o.Value = &value
-	return o
+func (s *NamedSecret) SetValue(value string) *NamedSecret {
+	s.Value = &value
+	return s
+}
+
+// Validate checks that both the name and value for the secret are set.
+func (s *NamedSecret) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(s.Name == nil, "must specify a name")
+	catcher.NewWhen(s.Value == nil, "must specify a value")
+	return catcher.Resolve()
 }

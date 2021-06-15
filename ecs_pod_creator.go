@@ -2,9 +2,13 @@ package cocoa
 
 import (
 	"context"
-	"errors"
 
+	"github.com/pkg/errors"
+
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa/secret"
+	"github.com/evergreen-ci/utility"
+	"github.com/mongodb/grip"
 )
 
 // ECSPodCreator provides a means to create a new pod backed by ECS.
@@ -13,15 +17,18 @@ type ECSPodCreator interface {
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
 	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
+	// CreatePodFromExistingDefinition creates a new pod backed by ECS from an
+	// existing task definition.
+	CreatePodFromExistingDefinition(ctx context.Context, def ECSTaskDefinition, opts ...*ECSPodExecutionOptions) (ECSPod, error)
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
 type ECSPodCreationOptions struct {
-	// TaskDefinition defines a task definition that should be used if the pod
-	// is being created from an existing definition.
-	TaskDefinition *ECSTaskDefinition
+	// Name is the friendly name of the pod. By default, this is a random
+	// string.
+	Name *string
 	// ContainerDefinitions defines settings that apply to individual containers
-	// within the pod.
+	// within the pod. This is required.
 	ContainerDefinitions []ECSContainerDefinition
 	// MemoryMB is the memory limit (in MB) across all containers in the pod.
 	// This is ignored for pods running Windows containers.
@@ -30,13 +37,24 @@ type ECSPodCreationOptions struct {
 	// 1024 CPU units is equivalent to 1 vCPU on a machine. This is ignored for
 	// pods running Windows containers.
 	CPU *int
-	// Tags are resource tags to apply to the pod.
+	// TaskRole is the role that the pod can use. Depending on the
+	// configuration, this may be required if
+	// (ECSPodExecutionOptions).SupportsDebugMode is true.
+	TaskRole *string
+	// Tags are resource tags to apply to the pod definition.
 	Tags []string
+	// ExecutionOpts specify options to configure how the pod executes.
+	ExecutionOpts *ECSPodExecutionOptions
 }
 
-// SetTaskDefinition sets the task definition for the pod.
-func (o *ECSPodCreationOptions) SetTaskDefinition(def ECSTaskDefinition) *ECSPodCreationOptions {
-	o.TaskDefinition = &def
+// NewECSPodCreationOptions returns new uninitialized options to create a pod.
+func NewECSPodCreationOptions() *ECSPodCreationOptions {
+	return &ECSPodCreationOptions{}
+}
+
+// SetName sets the friendly name of the pod.
+func (o *ECSPodCreationOptions) SetName(name string) *ECSPodCreationOptions {
+	o.Name = &name
 	return o
 }
 
@@ -68,16 +86,61 @@ func (o *ECSPodCreationOptions) SetCPU(cpu int) *ECSPodCreationOptions {
 	return o
 }
 
-// SetTags sets the tags for the pod. This overwrites any existing tags.
+// SetTaskRole sets the task role that the pod can use.
+func (o *ECSPodCreationOptions) SetTaskRole(role string) *ECSPodCreationOptions {
+	o.TaskRole = &role
+	return o
+}
+
+// SetTags sets the tags for the pod definition. This overwrites any existing
+// tags.
 func (o *ECSPodCreationOptions) SetTags(tags []string) *ECSPodCreationOptions {
 	o.Tags = tags
 	return o
 }
 
-// AddTags adds new tags to the existing ones for the pod.
+// AddTags adds new tags to the existing ones for the pod definition.
 func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
 	o.Tags = append(o.Tags, tags...)
 	return o
+}
+
+// SetExecutionOptions sets the options to configure how the pod executes.
+func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions) *ECSPodCreationOptions {
+	o.ExecutionOpts = &opts
+	return o
+}
+
+// Validate checks that all the required parameters are given and the values are
+// valid.
+func (o *ECSPodCreationOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
+	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
+	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
+	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
+	for _, def := range o.ContainerDefinitions {
+		catcher.Wrapf(def.Validate(), "container definition '%s'", def.Name)
+	}
+
+	if o.ExecutionOpts != nil {
+		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
+	}
+
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	if o.Name == nil {
+		o.Name = utility.ToStringPtr(utility.RandomString())
+	}
+
+	if o.ExecutionOpts == nil {
+		placementOpts := NewECSPodPlacementOptions().SetStrategy(BinpackPlacement).SetStrategyParameter(BinpackMemory)
+		o.ExecutionOpts = NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
+	}
+
+	return nil
 }
 
 // MergeECSPodCreationOptions merges all the given options to create an ECS pod.
@@ -103,109 +166,109 @@ func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOp
 	return merged
 }
 
-// ECSTaskDefinition represents options for an existing ECS task definition.
-type ECSTaskDefinition struct {
-	// ID is the ID of the task definition, which should already exist.
-	ID *string
-	// Owned determines whether or not the task definition is owned by its pod
-	// or not.
-	Owned *bool
-}
-
-// SetID sets the task definition ID.
-func (o *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
-	o.ID = &id
-	return o
-}
-
-// SetOwned sets if the task definition should be owned by its pod.
-func (o *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
-	o.Owned = &owned
-	return o
-}
-
 // ECSContainerDefinition defines settings that apply to a single container
 // within an ECS pod.
 type ECSContainerDefinition struct {
-	// Image is the Docker image to use.
+	// Name is the friendly name of the container. By default, this is a random
+	// string.
+	Name *string
+	// Image is the Docker image to use. This is required.
 	Image *string
-	// Command is the command to run.
-	Command *string
+	// Command is the command to run, separated into individual arguments. By
+	// default, there is no command.
+	Command []string
 	// MemoryMB is the amount of memory (in MB) to allocate.
 	MemoryMB *int
 	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
 	// to 1 vCPU on a machine.
 	CPU *int
-	// EnvVars are environment variables.
+	// EnvVars are environment variables to make available in the container.
 	EnvVars []EnvironmentVariable
 	// Tags are resource tags to apply.
 	Tags []string
 }
 
+// NewECSContainerDefinition returns a new uninitialized container definition.
+func NewECSContainerDefinition() *ECSContainerDefinition {
+	return &ECSContainerDefinition{}
+}
+
+// SetName sets the friendly name for the container.
+func (d *ECSContainerDefinition) SetName(name string) *ECSContainerDefinition {
+	d.Name = &name
+	return d
+}
+
 // SetImage sets the image for the container.
-func (o *ECSContainerDefinition) SetImage(img string) *ECSContainerDefinition {
-	o.Image = &img
-	return o
+func (d *ECSContainerDefinition) SetImage(img string) *ECSContainerDefinition {
+	d.Image = &img
+	return d
 }
 
 // SetCommand sets the command for the container to run.
-func (o *ECSContainerDefinition) SetCommand(cmd string) *ECSContainerDefinition {
-	o.Command = &cmd
-	return o
+func (d *ECSContainerDefinition) SetCommand(cmd []string) *ECSContainerDefinition {
+	d.Command = cmd
+	return d
 }
 
 // SetMemoryMB sets the amount of memory (in MB) to allocate.
-func (o *ECSContainerDefinition) SetMemoryMB(mem int) *ECSContainerDefinition {
-	o.MemoryMB = &mem
-	return o
+func (d *ECSContainerDefinition) SetMemoryMB(mem int) *ECSContainerDefinition {
+	d.MemoryMB = &mem
+	return d
 }
 
 // SetCPU sets the number of CPU units to allocate.
-func (o *ECSContainerDefinition) SetCPU(cpu int) *ECSContainerDefinition {
-	o.CPU = &cpu
-	return o
+func (d *ECSContainerDefinition) SetCPU(cpu int) *ECSContainerDefinition {
+	d.CPU = &cpu
+	return d
 }
 
 // SetTags sets the tags for the container. This overwrites any existing tags.
-func (o *ECSContainerDefinition) SetTags(tags []string) *ECSContainerDefinition {
-	o.Tags = tags
-	return o
+func (d *ECSContainerDefinition) SetTags(tags []string) *ECSContainerDefinition {
+	d.Tags = tags
+	return d
 }
 
 // AddTags adds new tags to the existing ones for the container.
-func (o *ECSContainerDefinition) AddTags(tags ...string) *ECSContainerDefinition {
-	o.Tags = append(o.Tags, tags...)
-	return o
+func (d *ECSContainerDefinition) AddTags(tags ...string) *ECSContainerDefinition {
+	d.Tags = append(d.Tags, tags...)
+	return d
 }
 
 // SetEnvironmentVariables sets the environment variables for the container.
 // This overwrites any existing environment variables.
-func (o *ECSContainerDefinition) SetEnvironmentVariables(envVars []EnvironmentVariable) *ECSContainerDefinition {
-	o.EnvVars = envVars
-	return o
+func (d *ECSContainerDefinition) SetEnvironmentVariables(envVars []EnvironmentVariable) *ECSContainerDefinition {
+	d.EnvVars = envVars
+	return d
 }
 
 // AddEnvironmentVariables adds new environment variables to the existing ones
 // for the container.
-func (o *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentVariable) *ECSContainerDefinition {
-	o.EnvVars = append(o.EnvVars, envVars...)
-	return o
+func (d *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentVariable) *ECSContainerDefinition {
+	d.EnvVars = append(d.EnvVars, envVars...)
+	return d
 }
 
-// SecretOptions represents a secret with a name and value that may or may not
-// be owned by its pod.
-type SecretOptions struct {
-	PodSecret
-	// Exists determines whether or not the secret already exists or must be
-	// created before it can be used.
-	Exists *bool
-}
+// Validate checks that the image is provided and that all of its environment
+// variables are valid.
+func (d *ECSContainerDefinition) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(d.Image == nil, "must specify an image")
+	catcher.NewWhen(d.Image != nil && *d.Image == "", "cannot specify an empty image")
+	catcher.NewWhen(d.MemoryMB != nil && *d.MemoryMB <= 0, "must have positive memory value if non-default")
+	catcher.NewWhen(d.CPU != nil && *d.CPU <= 0, "must have positive CPU value if non-default")
+	for _, ev := range d.EnvVars {
+		catcher.Wrapf(ev.Validate(), "environment variable '%s'", ev.Name)
+	}
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
 
-// SetExists sets whether or not the secret already exists or or must be
-// created.
-func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
-	s.Exists = &exists
-	return s
+	if d.Name == nil {
+		d.Name = utility.ToStringPtr(utility.RandomString())
+	}
+
+	return nil
 }
 
 // EnvironmentVariable represents an environment variable, which can be
@@ -214,6 +277,11 @@ type EnvironmentVariable struct {
 	Name       *string
 	Value      *string
 	SecretOpts *SecretOptions
+}
+
+// NewEnvironmentVariable returns a new uninitialized environment variable.
+func NewEnvironmentVariable() *EnvironmentVariable {
+	return &EnvironmentVariable{}
 }
 
 // SetName sets the environment variable name.
@@ -236,6 +304,263 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 	return e
 }
 
+// Validate checks that the environment variable name is given and that either
+// the raw environment variable value or the referenced secret is given.
+func (e *EnvironmentVariable) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(e.Name == nil, "must specify a name")
+	catcher.NewWhen(e.Value == nil && e.SecretOpts == nil, "must either specify a value or reference a secret")
+	catcher.NewWhen(e.Value != nil && e.SecretOpts != nil, "cannot both specify a value and reference a secret")
+	if e.SecretOpts != nil {
+		catcher.Wrap(e.SecretOpts.Validate(), "invalid secret options")
+	}
+	return catcher.Resolve()
+}
+
+// SecretOptions represents a secret with a name and value that may or may not
+// be owned by its pod.
+type SecretOptions struct {
+	PodSecret
+	// Exists determines whether or not the secret already exists or must be
+	// created before it can be used.
+	Exists *bool
+}
+
+// NewSecretOptions returns new uninitialized options for a secret.
+func NewSecretOptions() *SecretOptions {
+	return &SecretOptions{}
+}
+
+// SetName sets the secret name.
+func (s *SecretOptions) SetName(name string) *SecretOptions {
+	s.Name = &name
+	return s
+}
+
+// SetValue sets the secret value.
+func (s *SecretOptions) SetValue(val string) *SecretOptions {
+	s.Value = &val
+	return s
+}
+
+// SetExists sets whether or not the secret already exists or or must be
+// created.
+func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
+	s.Exists = &exists
+	return s
+}
+
+// Validate validates that the secret name is given and that either the secret
+// already exists or the new secret's value is given
+func (s *SecretOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(s.Name == nil, "must specify a name")
+	catcher.NewWhen(!utility.FromBoolPtr(s.Exists) && s.Value == nil, "either a new secret's value must be given or the secret must already exist")
+	return catcher.Resolve()
+}
+
+// ECSPodExecutionOptions represent options to configure how a pod is started.
+type ECSPodExecutionOptions struct {
+	// Cluster is the name of the cluster where the pod will run. If none is
+	// specified, this will run in the default cluster.
+	Cluster *string
+	// PlacementOptions specify options that determine how a pod is assigned to
+	// a container instance.
+	PlacementOpts *ECSPodPlacementOptions
+	// SupportsDebugMode indicates that the ECS pod should support debugging, so
+	// you can run exec in the pod's containers. In order for this to work, the
+	// pod must have the correct permissions to perform this operation when it's
+	// defined. By default, this is false.
+	SupportsDebugMode *bool
+	// Tags are any tags to apply to the running pods.
+	Tags []string
+}
+
+// NewECSPodExecutionOptions returns new uninitialized options to run a pod.
+func NewECSPodExecutionOptions() *ECSPodExecutionOptions {
+	return &ECSPodExecutionOptions{}
+}
+
+// SetCluster sets the name of the cluster where the pod will run.
+func (o *ECSPodExecutionOptions) SetCluster(cluster string) *ECSPodExecutionOptions {
+	o.Cluster = &cluster
+	return o
+}
+
+// SetPlacementOptions sets the options that determine how a pod is assigned to
+// a container instance.
+func (o *ECSPodExecutionOptions) SetPlacementOptions(opts ECSPodPlacementOptions) *ECSPodExecutionOptions {
+	o.PlacementOpts = &opts
+	return o
+}
+
+// SetSupportsDebugMode sets whether or not the pod can run with debug mode
+// enabled.
+func (o *ECSPodExecutionOptions) SetSupportsDebugMode(supported bool) *ECSPodExecutionOptions {
+	o.SupportsDebugMode = &supported
+	return o
+}
+
+// SetTags sets the tags for the pod itself when it is run. This overwrites any
+// existing tags.
+func (o *ECSPodExecutionOptions) SetTags(tags []string) *ECSPodExecutionOptions {
+	o.Tags = tags
+	return o
+}
+
+// AddTags adds new tags to the existing ones for the pod itself when it is run.
+func (o *ECSPodExecutionOptions) AddTags(tags ...string) *ECSPodExecutionOptions {
+	o.Tags = append(o.Tags, tags...)
+	return o
+}
+
+// Validate checks that the placement options are valid.
+func (o *ECSPodExecutionOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	if o.PlacementOpts != nil {
+		catcher.Wrap(o.PlacementOpts.Validate(), "invalid placement options")
+	}
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	if o.PlacementOpts == nil {
+		o.PlacementOpts = NewECSPodPlacementOptions().SetStrategy(BinpackPlacement).SetStrategyParameter(BinpackMemory)
+	}
+
+	return nil
+}
+
+// ECSPodPlacementOptions represent options to control how an ECS pod is
+// assigned to a container instance.
+type ECSPodPlacementOptions struct {
+	// Strategy is the overall placement strategy. By default, it uses the
+	// binpack strategy.
+	Strategy *ECSPlacementStrategy
+
+	// StrategyParameter is the parameter that determines how the placement
+	// strategy optimizes pod placement. The default value depends on the
+	// strategy:
+	// If the strategy is spread, it defaults to "host".
+	// If the strategy is binpack, it defaults to "memory".
+	// If the strategy is random, this does not apply.
+	StrategyParameter *ECSStrategyParameter
+}
+
+// NewECSPodPlacementOptions creates new options to specify how an ECS pod
+// should be assigned to a container instance.
+func NewECSPodPlacementOptions() *ECSPodPlacementOptions {
+	return &ECSPodPlacementOptions{}
+}
+
+// SetStrategy sets the strategy for placing the pod on a container instance.
+func (o *ECSPodPlacementOptions) SetStrategy(s ECSPlacementStrategy) *ECSPodPlacementOptions {
+	o.Strategy = &s
+	return o
+}
+
+// SetStrategyParameter sets the parameter to optimize for when placing the pod
+// on a container instance.
+func (o *ECSPodPlacementOptions) SetStrategyParameter(p ECSStrategyParameter) *ECSPodPlacementOptions {
+	o.StrategyParameter = &p
+	return o
+}
+
+// Validate checks that the the strategy and its parameter to optimize are a
+// valid combination.
+//nolint:gocognit
+func (o *ECSPodPlacementOptions) Validate() error {
+	strategy := utility.FromStringPtr(o.Strategy)
+	param := utility.FromStringPtr(o.StrategyParameter)
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(strategy == "" && param == "", "must specify either a strategy, a strategy parameter, or both")
+	if strategy != "" {
+		catcher.ErrorfWhen(!utility.StringSliceContains([]string{SpreadPlacement, RandomPlacement, BinpackPlacement}, strategy), "unrecognized strategy '%s'", strategy)
+	}
+	catcher.ErrorfWhen(strategy == BinpackPlacement && o.StrategyParameter != nil && param != BinpackMemory && param != BinpackCPU, "strategy parameter cannot be '%s' when the strategy is '%s'", param, strategy)
+	catcher.ErrorfWhen(param == SpreadHost && strategy != SpreadPlacement, "strategy parameter cannot be '%s' when the strategy is not '%s'", param, SpreadPlacement)
+
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	if strategy == "" && (param == BinpackMemory || param == BinpackCPU) {
+		o.Strategy = utility.ToStringPtr(BinpackPlacement)
+	}
+
+	if strategy == "" && param == SpreadHost {
+		o.Strategy = utility.ToStringPtr(SpreadPlacement)
+	}
+
+	if param == "" && strategy == SpreadPlacement {
+		o.StrategyParameter = utility.ToStringPtr(SpreadHost)
+	}
+
+	if param == "" && strategy == BinpackPlacement {
+		o.StrategyParameter = utility.ToStringPtr(BinpackMemory)
+	}
+
+	return nil
+}
+
+// ECSPlacementStrategy represents a placement strategy for ECS pods.
+type ECSPlacementStrategy = string
+
+const (
+	// SpreadPlacement indicates that the ECS pod will be assigned in such a way
+	// to achieve an even spread based on the given ECSStrategyParameter.
+	SpreadPlacement ECSPlacementStrategy = ecs.PlacementStrategyTypeSpread
+	// RandomPlacement indicates that the ECS pod should be assigned to a
+	// container instance randomly.
+	RandomPlacement ECSPlacementStrategy = ecs.PlacementStrategyTypeRandom
+	// BinpackPlacement indicates that the the ECS pod will be placed on a
+	// container instance with the least amount of memory or CPU that will be
+	// sufficient for the pod's requirements if possible.
+	BinpackPlacement ECSPlacementStrategy = ecs.PlacementStrategyTypeBinpack
+)
+
+// ECSStrategyParameter represents the parameter that ECS will use with its
+// strategy to schedule pods on container instances.
+type ECSStrategyParameter = string
+
+const (
+	// BinpackMemory indicates ECS should optimize its binpacking strategy based
+	// on memory usage.
+	BinpackMemory ECSStrategyParameter = "memory"
+	// BinpackCPU indicates ECS should optimize its binpacking strategy based
+	// on CPU usage.
+	BinpackCPU ECSStrategyParameter = "cpu"
+	// SpreadHost indicates the ECS should spread pods evenly across all
+	// container instances (i.e. hosts).
+	SpreadHost ECSStrategyParameter = "host"
+)
+
+// ECSTaskDefinition represents options for an existing ECS task definition.
+type ECSTaskDefinition struct {
+	// ID is the ID of the task definition, which should already exist.
+	ID *string
+	// Owned determines whether or not the task definition is owned by its pod
+	// or not.
+	Owned *bool
+}
+
+// NewECSTaskDefinition returns a new uninitialized task definition.
+func NewECSTaskDefinition() *ECSTaskDefinition {
+	return &ECSTaskDefinition{}
+}
+
+// SetID sets the task definition ID.
+func (d *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
+	d.ID = &id
+	return d
+}
+
+// SetOwned sets if the task definition should be owned by its pod.
+func (d *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
+	d.Owned = &owned
+	return d
+}
+
 // BasicECSPodCreator provides an ECSPodCreator implementation to create
 // ECS pods.
 type BasicECSPodCreator struct {
@@ -244,14 +569,23 @@ type BasicECSPodCreator struct {
 }
 
 // NewBasicECSPodCreator creates a helper to create pods backed by ECS.
-func NewBasicECSPodCreator(c ECSClient, v secret.Vault) *BasicECSPodCreator {
+func NewBasicECSPodCreator(c ECSClient, v secret.Vault) (*BasicECSPodCreator, error) {
+	if c == nil {
+		return nil, errors.New("missing client")
+	}
 	return &BasicECSPodCreator{
 		client: c,
 		vault:  v,
-	}
+	}, nil
 }
 
 // CreatePod creates a new pod backed by ECS.
 func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
+	return nil, errors.New("TODO: implement")
+}
+
+// CreatePodFromExistingDefinition creates a new pod backed by ECS from an
+// existing definition.
+func (m *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def ECSTaskDefinition, opts ...*ECSPodExecutionOptions) (ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }

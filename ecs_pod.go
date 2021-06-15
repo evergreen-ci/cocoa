@@ -2,9 +2,12 @@ package cocoa
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/evergreen-ci/cocoa/secret"
+	"github.com/evergreen-ci/utility"
+	"github.com/mongodb/grip"
 )
 
 // ECSPod provides an abstraction of a pod backed by ECS.
@@ -20,15 +23,59 @@ type ECSPod interface {
 
 // BasicECSPod represents a pod that is backed by ECS.
 type BasicECSPod struct {
-	opts BasicECSPodOptions
+	client    ECSClient
+	vault     secret.Vault
+	resources ECSPodResources
+	status    ECSPodStatus
 }
 
-// BasicECSPodOptions are options to create a BasicECSPod.
+// BasicECSPodOptions are options to create a basic ECS pod.
 type BasicECSPodOptions struct {
 	Client    ECSClient
 	Vault     secret.Vault
 	Resources *ECSPodResources
 	Status    *ECSPodStatus
+}
+
+// NewBasicECSPodOptions returns new uninitialized options to create a basic ECS
+// pod.
+func NewBasicECSPodOptions() *BasicECSPodOptions {
+	return &BasicECSPodOptions{}
+}
+
+// SetClient sets the client the pod uses to communicate with ECS.
+func (o *BasicECSPodOptions) SetClient(c ECSClient) *BasicECSPodOptions {
+	o.Client = c
+	return o
+}
+
+// SetVault sets the vault that the pod uses to manage secrets.
+func (o *BasicECSPodOptions) SetVault(v secret.Vault) *BasicECSPodOptions {
+	o.Vault = v
+	return o
+}
+
+// SetResources sets the resources used by the pod.
+func (o *BasicECSPodOptions) SetResources(res ECSPodResources) *BasicECSPodOptions {
+	o.Resources = &res
+	return o
+}
+
+// SetStatus sets the current status for the pod.
+func (o *BasicECSPodOptions) SetStatus(s ECSPodStatus) *BasicECSPodOptions {
+	o.Status = &s
+	return o
+}
+
+// Validate checks that the require parameters to initialize a pod are given.
+func (o *BasicECSPodOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.Client == nil, "must specify a client")
+	catcher.NewWhen(o.Resources == nil, "must specify at least one underlying resource being used by the pod")
+	catcher.NewWhen(o.Resources != nil && o.Resources.TaskID == nil, "must specify task ID")
+	catcher.NewWhen(o.Status == nil, "must specify a status")
+	catcher.ErrorfWhen(o.Status != nil && !utility.StringSliceContains([]string{Starting, Running, Stopped, Deleted}, *o.Status), "invalid status '%s'", o.Status)
+	return catcher.Resolve()
 }
 
 // MergeECSPodOptions merges all the given options describing an ECS pod.
@@ -63,11 +110,17 @@ func MergeECSPodOptions(opts ...*BasicECSPodOptions) BasicECSPodOptions {
 }
 
 // NewBasicECSPod initializes a new pod that is backed by ECS.
-func NewBasicECSPod(opts ...*BasicECSPodOptions) *BasicECSPod {
+func NewBasicECSPod(opts ...*BasicECSPodOptions) (*BasicECSPod, error) {
 	merged := MergeECSPodOptions(opts...)
-	return &BasicECSPod{
-		opts: merged,
+	if err := merged.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid options")
 	}
+	return &BasicECSPod{
+		client:    merged.Client,
+		vault:     merged.Vault,
+		resources: *merged.Resources,
+		status:    *merged.Status,
+	}, nil
 }
 
 // Info returns information about the current state of the pod.
@@ -102,6 +155,11 @@ type PodSecret struct {
 	Owned *bool
 }
 
+// NewPodSecret creates a new uninitialized pod secret.
+func NewPodSecret() *PodSecret {
+	return &PodSecret{}
+}
+
 // SetName sets the secret's name.
 func (s *PodSecret) SetName(name string) *PodSecret {
 	s.Name = &name
@@ -122,20 +180,26 @@ func (s *PodSecret) SetOwned(owned bool) *PodSecret {
 
 // ECSPodResources are ECS-specific resources that a pod uses.
 type ECSPodResources struct {
-	TaskID         string            `bson:"-" json:"-" yaml:"-"`
-	TaskDefinition ECSTaskDefinition `bson:"-" json:"-" yaml:"-"`
-	Secrets        []PodSecret       `bson:"-" json:"-" yaml:"-"`
+	TaskID         *string            `bson:"-" json:"-" yaml:"-"`
+	TaskDefinition *ECSTaskDefinition `bson:"-" json:"-" yaml:"-"`
+	Secrets        []PodSecret        `bson:"-" json:"-" yaml:"-"`
+}
+
+// NewECSPodResources returns a new uninitialized set of resources used by a
+// pod.
+func NewECSPodResources() *ECSPodResources {
+	return &ECSPodResources{}
 }
 
 // SetTaskID sets the ECS task ID associated with the pod.
 func (r *ECSPodResources) SetTaskID(id string) *ECSPodResources {
-	r.TaskID = id
+	r.TaskID = &id
 	return r
 }
 
 // SetTaskDefinition sets the ECS task definition associated with the pod.
 func (r *ECSPodResources) SetTaskDefinition(def ECSTaskDefinition) *ECSPodResources {
-	r.TaskDefinition = def
+	r.TaskDefinition = &def
 	return r
 }
 
