@@ -3,6 +3,8 @@ package secret
 import (
 	"context"
 	"errors"
+
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
 // BasicSecretsManager provides a Vault implementation backed by Amazon Secrets
@@ -20,12 +22,15 @@ func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
 
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
-	return "", errors.New("TODO: implement")
+	newManager := NewBasicSecretsManager(m.client)
+	out, err := newManager.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{Name: s.Name, SecretString: s.Value})
+	return *out.ARN, err
 }
 
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
-	return "", errors.New("TODO: implement")
+	newManager := NewBasicSecretsManager(m.client)
+	return newManager.GetValue(ctx, id)
 }
 
 // UpdateValue updates an existing secret's value.
@@ -35,5 +40,7 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id string) error 
 
 // DeleteSecret deletes an existing secret.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
-	return errors.New("TODO: implement")
+	newManager := NewBasicSecretsManager(m.client)
+	_, err := newManager.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{SecretId: &id})
+	return err
 }
