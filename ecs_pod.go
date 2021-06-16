@@ -72,13 +72,10 @@ func (o *BasicECSPodOptions) Validate() error {
 	catcher.NewWhen(o.Client == nil, "must specify a client")
 	catcher.NewWhen(o.Resources == nil, "must specify at least one underlying resource being used by the pod")
 	catcher.NewWhen(o.Resources != nil && o.Resources.TaskID == nil, "must specify task ID")
-	catcher.NewWhen(o.Status == nil, "must specify a status")
 	if o.Status != nil {
-		switch *o.Status {
-		case Starting, Running, Stopped, Deleted:
-		default:
-			catcher.Errorf("unrecognized status '%s'", *o.Status)
-		}
+		catcher.Add(o.Status.Validate())
+	} else {
+		catcher.New("must specify a status")
 	}
 	return catcher.Resolve()
 }
@@ -236,3 +233,13 @@ const (
 	// including all of its resources.
 	Deleted ECSPodStatus = "deleted"
 )
+
+// Validate checks that the ECS pod status is one of the recognized statuses.
+func (s ECSPodStatus) Validate() error {
+	switch s {
+	case Starting, Running, Stopped, Deleted:
+		return nil
+	default:
+		return errors.Errorf("unrecognized status '%s'", s)
+	}
+}

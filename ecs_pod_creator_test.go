@@ -436,7 +436,8 @@ func TestECSPodExecutionOptions(t *testing.T) {
 			opts := NewECSPodExecutionOptions()
 			require.NoError(t, opts.Validate())
 			require.NotZero(t, opts.PlacementOpts)
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.PlacementOpts.Strategy))
+			require.NotZero(t, opts.PlacementOpts.Strategy)
+			assert.Equal(t, BinpackPlacement, *opts.PlacementOpts.Strategy)
 			assert.Equal(t, BinpackMemory, utility.FromStringPtr(opts.PlacementOpts.StrategyParameter))
 		})
 		t.Run("BadPlacementOptionsAreInvalid", func(t *testing.T) {
@@ -456,7 +457,8 @@ func TestECSPodPlacementOptions(t *testing.T) {
 	t.Run("SetStrategy", func(t *testing.T) {
 		strategy := BinpackPlacement
 		opts := NewECSPodPlacementOptions().SetStrategy(strategy)
-		assert.Equal(t, strategy, utility.FromStringPtr(opts.Strategy))
+		require.NotZero(t, opts.Strategy)
+		assert.Equal(t, strategy, *opts.Strategy)
 	})
 	t.Run("SetStrategyParameter", func(t *testing.T) {
 		param := BinpackCPU
@@ -464,26 +466,37 @@ func TestECSPodPlacementOptions(t *testing.T) {
 		assert.Equal(t, param, utility.FromStringPtr(opts.StrategyParameter))
 	})
 	t.Run("Validate", func(t *testing.T) {
-		t.Run("EmptyIsInvalid", func(t *testing.T) {
+		t.Run("EmptyIsValid", func(t *testing.T) {
 			var opts ECSPodPlacementOptions
-			assert.Error(t, opts.Validate())
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("EmptyDefaultsToBinpackMemory", func(t *testing.T) {
+			var opts ECSPodPlacementOptions
+			require.NoError(t, opts.Validate())
+			require.NotZero(t, opts.Strategy)
+			require.NotZero(t, opts.StrategyParameter)
+			assert.Equal(t, BinpackPlacement, *opts.Strategy)
+			assert.Equal(t, BinpackMemory, *opts.StrategyParameter)
 		})
 		t.Run("BinpackStrategyWithoutParameterDefaultsToMemoryBinpacking", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(BinpackPlacement)
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, BinpackPlacement, *opts.Strategy)
 			assert.Equal(t, BinpackMemory, utility.FromStringPtr(opts.StrategyParameter))
 		})
 		t.Run("BinpackStrategyWithMemoryBinpackingIsValid", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(BinpackPlacement).SetStrategyParameter(BinpackMemory)
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, BinpackPlacement, *opts.Strategy)
 			assert.Equal(t, BinpackMemory, utility.FromStringPtr(opts.StrategyParameter))
 		})
 		t.Run("BinpackStrategyWithCPUBinpackingIsValid", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(BinpackPlacement).SetStrategyParameter(BinpackCPU)
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, BinpackPlacement, *opts.Strategy)
 			assert.Equal(t, BinpackCPU, utility.FromStringPtr(opts.StrategyParameter))
 		})
 		t.Run("BinpackStrategyWithSpreadHostIsInvalid", func(t *testing.T) {
@@ -497,19 +510,22 @@ func TestECSPodPlacementOptions(t *testing.T) {
 		t.Run("SpreadStrategyWithoutParameterDefaultsToHostSpread", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(SpreadPlacement)
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, SpreadPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, SpreadPlacement, *opts.Strategy)
 			assert.Equal(t, SpreadHost, utility.FromStringPtr(opts.StrategyParameter))
 		})
 		t.Run("SpreadStrategyWithoutWithHostSpreadIsValid", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(SpreadPlacement).SetStrategyParameter(SpreadHost)
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, SpreadPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, SpreadPlacement, *opts.Strategy)
 			assert.Equal(t, SpreadHost, utility.FromStringPtr(opts.StrategyParameter))
 		})
 		t.Run("SpreadStrategyWithCustomParameterIsValid", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(SpreadPlacement).SetStrategyParameter("custom")
 			require.NoError(t, opts.Validate())
-			assert.Equal(t, SpreadPlacement, utility.FromStringPtr(opts.Strategy))
+			require.NotZero(t, opts.Strategy)
+			assert.Equal(t, SpreadPlacement, *opts.Strategy)
 			assert.Equal(t, "custom", utility.FromStringPtr(opts.StrategyParameter))
 		})
 	})

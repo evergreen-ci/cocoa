@@ -37,6 +37,10 @@ func TestNamedSecret(t *testing.T) {
 			s := NewNamedSecret().SetValue("value")
 			assert.Error(t, s.Validate())
 		})
+		t.Run("EmptyNameIsInvalid", func(t *testing.T) {
+			s := NewNamedSecret().SetName("").SetValue("value")
+			assert.Error(t, s.Validate())
+		})
 		t.Run("MissingValueIsInvalid", func(t *testing.T) {
 			s := NewNamedSecret().SetName("name")
 			assert.Error(t, s.Validate())

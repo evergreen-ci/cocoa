@@ -48,6 +48,7 @@ func (s *NamedSecret) SetValue(value string) *NamedSecret {
 func (s *NamedSecret) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(s.Name == nil, "must specify a name")
+	catcher.NewWhen(s.Name != nil && *s.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(s.Value == nil, "must specify a value")
 	return catcher.Resolve()
 }

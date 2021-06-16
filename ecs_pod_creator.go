@@ -36,7 +36,7 @@ type ECSPodCreationOptions struct {
 	MemoryMB *int
 	// CPU is the hard CPU limit (in CPU units) across all containers in the
 	// pod. 1024 CPU units is equivalent to 1 vCPU on a machine. If this is not
-	// specified, then each container is required to specify its own memory.
+	// specified, then each container is required to specify its own CPU.
 	// This is ignored for pods running Windows containers.
 	CPU *int
 	// TaskRole is the role that the pod can use. Depending on the
@@ -365,18 +365,18 @@ func (s *SecretOptions) SetValue(val string) *SecretOptions {
 	return s
 }
 
-// SetExists sets whether or not the secret already exists or or must be
-// created.
+// SetExists sets whether or not the secret already exists or must be created.
 func (s *SecretOptions) SetExists(exists bool) *SecretOptions {
 	s.Exists = &exists
 	return s
 }
 
 // Validate validates that the secret name is given and that either the secret
-// already exists or the new secret's value is given
+// already exists or the new secret's value is given.
 func (s *SecretOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(s.Name == nil, "must specify a name")
+	catcher.NewWhen(s.Name != nil && *s.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(!utility.FromBoolPtr(s.Exists) && s.Value == nil, "either a new secret's value must be given or the secret must already exist")
 	return catcher.Resolve()
 }
@@ -491,32 +491,38 @@ func (o *ECSPodPlacementOptions) SetStrategyParameter(p ECSStrategyParameter) *E
 // Validate checks that the the strategy and its parameter to optimize are a
 // valid combination.
 func (o *ECSPodPlacementOptions) Validate() error {
-	strategy := utility.FromStringPtr(o.Strategy)
-	param := utility.FromStringPtr(o.StrategyParameter)
 	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(strategy == "" && param == "", "must specify either a strategy, a strategy parameter, or both")
-	if strategy != "" {
-		catcher.ErrorfWhen(!utility.StringSliceContains([]string{SpreadPlacement, RandomPlacement, BinpackPlacement}, strategy), "unrecognized strategy '%s'", strategy)
+	if o.Strategy != nil {
+		catcher.Add(o.Strategy.Validate())
 	}
-	catcher.ErrorfWhen(strategy == BinpackPlacement && o.StrategyParameter != nil && param != BinpackMemory && param != BinpackCPU, "strategy parameter cannot be '%s' when the strategy is '%s'", param, strategy)
-	catcher.ErrorfWhen(param == SpreadHost && strategy != SpreadPlacement, "strategy parameter cannot be '%s' when the strategy is not '%s'", param, SpreadPlacement)
+	if o.Strategy != nil && o.StrategyParameter != nil {
+		catcher.ErrorfWhen(*o.Strategy == BinpackPlacement && *o.StrategyParameter != BinpackMemory && *o.StrategyParameter != BinpackCPU, "strategy parameter cannot be '%s' when the strategy is '%s'", *o.StrategyParameter, *o.Strategy)
+		catcher.ErrorfWhen(*o.Strategy != SpreadPlacement && *o.StrategyParameter == SpreadHost, "strategy parameter cannot be '%s' when the strategy is not '%s'", *o.StrategyParameter, SpreadPlacement)
+	}
 
 	if catcher.HasErrors() {
 		return catcher.Resolve()
 	}
-	if param == "" && strategy == SpreadPlacement {
-		o.StrategyParameter = utility.ToStringPtr(SpreadHost)
+
+	if o.Strategy == nil {
+		strategy := BinpackPlacement
+		o.Strategy = &strategy
 	}
 
-	if param == "" && strategy == BinpackPlacement {
-		o.StrategyParameter = utility.ToStringPtr(BinpackMemory)
+	if o.Strategy != nil && o.StrategyParameter == nil {
+		if *o.Strategy == BinpackPlacement {
+			o.StrategyParameter = utility.ToStringPtr(BinpackMemory)
+		}
+		if *o.Strategy == SpreadPlacement {
+			o.StrategyParameter = utility.ToStringPtr(SpreadHost)
+		}
 	}
 
 	return nil
 }
 
 // ECSPlacementStrategy represents a placement strategy for ECS pods.
-type ECSPlacementStrategy = string
+type ECSPlacementStrategy string
 
 const (
 	// SpreadPlacement indicates that the ECS pod will be assigned in such a way
@@ -530,6 +536,17 @@ const (
 	// sufficient for the pod's requirements if possible.
 	BinpackPlacement ECSPlacementStrategy = ecs.PlacementStrategyTypeBinpack
 )
+
+// Validate checks that the ECS pod status is one of the recognized placement
+// strategies.
+func (s ECSPlacementStrategy) Validate() error {
+	switch s {
+	case SpreadPlacement, RandomPlacement, BinpackPlacement:
+		return nil
+	default:
+		return errors.Errorf("unrecognized placement strategy '%s'", s)
+	}
+}
 
 // ECSStrategyParameter represents the parameter that ECS will use with its
 // strategy to schedule pods on container instances.
