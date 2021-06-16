@@ -109,6 +109,7 @@ func TestSecretsManagerCRUDSecret(t *testing.T) {
 				require.NoError(t, err)
 				require.NotZero(t, out)
 				assert.Equal(t, "barfoo", *out.SecretString)
+				assert.Equal(t, aws.String(os.Getenv("AWS_SECRET_PREFIX")+"foobar"), *out.Name)
 			}
 		}()
 
@@ -116,7 +117,7 @@ func TestSecretsManagerCRUDSecret(t *testing.T) {
 		require.NotZero(t, out.ARN)
 	})
 
-	t.Run("UpdateSucceed", func(t *testing.T) {
+	t.Run("CreateAndUpdateAndGetSucceed", func(t *testing.T) {
 		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
 			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "mongodb"),
 			SecretString: aws.String("dbmongo"),
