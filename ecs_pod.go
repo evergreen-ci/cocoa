@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/evergreen-ci/cocoa/secret"
-	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 )
 
@@ -67,14 +66,20 @@ func (o *BasicECSPodOptions) SetStatus(s ECSPodStatus) *BasicECSPodOptions {
 	return o
 }
 
-// Validate checks that the require parameters to initialize a pod are given.
+// Validate checks that the required parameters to initialize a pod are given.
 func (o *BasicECSPodOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(o.Client == nil, "must specify a client")
 	catcher.NewWhen(o.Resources == nil, "must specify at least one underlying resource being used by the pod")
 	catcher.NewWhen(o.Resources != nil && o.Resources.TaskID == nil, "must specify task ID")
 	catcher.NewWhen(o.Status == nil, "must specify a status")
-	catcher.ErrorfWhen(o.Status != nil && !utility.StringSliceContains([]string{Starting, Running, Stopped, Deleted}, *o.Status), "invalid status '%s'", o.Status)
+	if o.Status != nil {
+		switch *o.Status {
+		case Starting, Running, Stopped, Deleted:
+		default:
+			catcher.Errorf("unrecognized status '%s'", *o.Status)
+		}
+	}
 	return catcher.Resolve()
 }
 
@@ -217,7 +222,7 @@ func (r *ECSPodResources) AddSecrets(secrets ...PodSecret) *ECSPodResources {
 }
 
 // ECSPodStatus represents the different statuses possible for an ECS pod.
-type ECSPodStatus = string
+type ECSPodStatus string
 
 const (
 	// Starting indicates that the ECS pod is being prepared to run.

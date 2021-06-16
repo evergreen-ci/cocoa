@@ -69,9 +69,12 @@ func TestECSPodCreationOptions(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
 			assert.Error(t, NewECSPodCreationOptions().Validate())
 		})
-		t.Run("OnlyContainerDefinitionIsValid", func(t *testing.T) {
+		t.Run("MemoryCPUAndContainerDefinitionIsValid", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			def := NewECSPodCreationOptions().AddContainerDefinitions(*containerDef)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128)
 			assert.NoError(t, def.Validate())
 		})
 		t.Run("MissingContainerDefinitionsIsInvalid", func(t *testing.T) {
@@ -82,12 +85,15 @@ func TestECSPodCreationOptions(t *testing.T) {
 		})
 		t.Run("NameIsGenerated", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			def := NewECSPodCreationOptions().AddContainerDefinitions(*containerDef)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128)
 			assert.NoError(t, def.Validate())
 			assert.NotZero(t, utility.FromStringPtr(def.Name))
 		})
 		t.Run("BadContainerDefinitionIsInvalid", func(t *testing.T) {
-			def := NewECSPodCreationOptions().AddContainerDefinitions(*NewECSContainerDefinition())
+			def := NewECSPodCreationOptions().AddContainerDefinitions(*NewECSContainerDefinition()).SetMemoryMB(128).SetCPU(128)
 			assert.Error(t, def.Validate())
 		})
 		t.Run("AllFieldsPopulatedIsValid", func(t *testing.T) {
@@ -102,18 +108,64 @@ func TestECSPodCreationOptions(t *testing.T) {
 				SetExecutionOptions(*NewECSPodExecutionOptions())
 			assert.NoError(t, def.Validate())
 		})
+		t.Run("MissingCPUIsInvalid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128)
+			assert.Error(t, def.Validate())
+		})
+		t.Run("MissingPodCPUWithContainerCPUIsValid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image").SetCPU(128)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128)
+			assert.NoError(t, def.Validate())
+		})
+		t.Run("TotalContainerCPUCannotExceedPodCPU", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image").SetCPU(256)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(1024).
+				SetCPU(128)
+			assert.Error(t, def.Validate())
+		})
 		t.Run("ZeroCPUIsInvalid", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
 			def := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
 				SetCPU(0)
+			assert.Error(t, def.Validate())
+		})
+		t.Run("MissingMemoryIsInvalid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetCPU(128)
+			assert.Error(t, def.Validate())
+		})
+		t.Run("MissingPodMemoryWithContainerMemoryIsValid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image").SetMemoryMB(128)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetCPU(128)
+			assert.NoError(t, def.Validate())
+		})
+		t.Run("TotalContainerMemoryCannotExceedPodMemory", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image").SetMemoryMB(256)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(1024)
 			assert.Error(t, def.Validate())
 		})
 		t.Run("ZeroMemoryIsInvalid", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
 			def := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(0)
+				SetMemoryMB(0).
+				SetCPU(128)
 			assert.Error(t, def.Validate())
 		})
 		t.Run("BadExecutionOptionsIsInvalid", func(t *testing.T) {
@@ -122,6 +174,8 @@ func TestECSPodCreationOptions(t *testing.T) {
 			execOpts := NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
 			def := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
 				SetExecutionOptions(*execOpts)
 			assert.Error(t, def.Validate())
 		})
@@ -457,18 +511,6 @@ func TestECSPodPlacementOptions(t *testing.T) {
 			require.NoError(t, opts.Validate())
 			assert.Equal(t, SpreadPlacement, utility.FromStringPtr(opts.Strategy))
 			assert.Equal(t, "custom", utility.FromStringPtr(opts.StrategyParameter))
-		})
-		t.Run("BinpackingMemoryParameterWithoutBinpackingStrategyDefaultsToBinpackingMemory", func(t *testing.T) {
-			opts := NewECSPodPlacementOptions().SetStrategyParameter(BinpackMemory)
-			require.NoError(t, opts.Validate())
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.Strategy))
-			assert.Equal(t, BinpackMemory, utility.FromStringPtr(opts.StrategyParameter))
-		})
-		t.Run("BinpackingCPUParameterWithoutBinpackingStrategyDefaultsToBinpackingCPU", func(t *testing.T) {
-			opts := NewECSPodPlacementOptions().SetStrategyParameter(BinpackCPU)
-			require.NoError(t, opts.Validate())
-			assert.Equal(t, BinpackPlacement, utility.FromStringPtr(opts.Strategy))
-			assert.Equal(t, BinpackCPU, utility.FromStringPtr(opts.StrategyParameter))
 		})
 	})
 }

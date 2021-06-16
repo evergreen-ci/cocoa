@@ -43,7 +43,8 @@ func TestBasicECSPodOptions(t *testing.T) {
 	t.Run("SetStatus", func(t *testing.T) {
 		stat := Starting
 		opts := NewBasicECSPodOptions().SetStatus(stat)
-		assert.Equal(t, stat, utility.FromStringPtr(opts.Status))
+		require.NotNil(t, opts.Status)
+		assert.Equal(t, stat, *opts.Status)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {

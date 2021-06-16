@@ -30,12 +30,14 @@ type ECSPodCreationOptions struct {
 	// ContainerDefinitions defines settings that apply to individual containers
 	// within the pod. This is required.
 	ContainerDefinitions []ECSContainerDefinition
-	// MemoryMB is the memory limit (in MB) across all containers in the pod.
-	// This is ignored for pods running Windows containers.
+	// MemoryMB is the hard memory limit (in MB) across all containers in the
+	// pod. If this is not specified, then each container is required to specify
+	// its own memory. This is ignored for pods running Windows containers.
 	MemoryMB *int
-	// CPU is the CPU limit (in CPU units) across all containers in the pod.
-	// 1024 CPU units is equivalent to 1 vCPU on a machine. This is ignored for
-	// pods running Windows containers.
+	// CPU is the hard CPU limit (in CPU units) across all containers in the
+	// pod. 1024 CPU units is equivalent to 1 vCPU on a machine. If this is not
+	// specified, then each container is required to specify its own memory.
+	// This is ignored for pods running Windows containers.
 	CPU *int
 	// TaskRole is the role that the pod can use. Depending on the
 	// configuration, this may be required if
@@ -119,8 +121,26 @@ func (o *ECSPodCreationOptions) Validate() error {
 	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
 	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
+	var totalContainerMemMB, totalContainerCPU int
 	for _, def := range o.ContainerDefinitions {
 		catcher.Wrapf(def.Validate(), "container definition '%s'", def.Name)
+		if def.MemoryMB != nil {
+			totalContainerMemMB += *def.MemoryMB
+		} else if o.MemoryMB == nil {
+			catcher.Errorf("must specify container-level memory to allocate for each container if pod-level memory is not specified")
+		}
+
+		if def.CPU != nil {
+			totalContainerCPU += *def.CPU
+		} else if o.CPU == nil {
+			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
+		}
+	}
+	if o.MemoryMB != nil {
+		catcher.ErrorfWhen(*o.MemoryMB < totalContainerMemMB, "total memory requested for the individual containers (%d MB) is greater than the memory available for the entire task (%d MB)", totalContainerMemMB, *o.MemoryMB)
+	}
+	if o.CPU != nil {
+		catcher.ErrorfWhen(*o.CPU < totalContainerCPU, "total CPU requested for the individual containers (%d units) is greater than the memory available for the entire task (%d units)", totalContainerCPU, *o.CPU)
 	}
 
 	if o.ExecutionOpts != nil {
@@ -177,10 +197,12 @@ type ECSContainerDefinition struct {
 	// Command is the command to run, separated into individual arguments. By
 	// default, there is no command.
 	Command []string
-	// MemoryMB is the amount of memory (in MB) to allocate.
+	// MemoryMB is the amount of memory (in MB) to allocate. This must be
+	// set if a pod-level memory limit is not given.
 	MemoryMB *int
 	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
-	// to 1 vCPU on a machine.
+	// to 1 vCPU on a machine. This must be set if a pod-level CPU limit is not
+	// given.
 	CPU *int
 	// EnvVars are environment variables to make available in the container.
 	EnvVars []EnvironmentVariable
@@ -468,7 +490,6 @@ func (o *ECSPodPlacementOptions) SetStrategyParameter(p ECSStrategyParameter) *E
 
 // Validate checks that the the strategy and its parameter to optimize are a
 // valid combination.
-//nolint:gocognit
 func (o *ECSPodPlacementOptions) Validate() error {
 	strategy := utility.FromStringPtr(o.Strategy)
 	param := utility.FromStringPtr(o.StrategyParameter)
@@ -483,15 +504,6 @@ func (o *ECSPodPlacementOptions) Validate() error {
 	if catcher.HasErrors() {
 		return catcher.Resolve()
 	}
-
-	if strategy == "" && (param == BinpackMemory || param == BinpackCPU) {
-		o.Strategy = utility.ToStringPtr(BinpackPlacement)
-	}
-
-	if strategy == "" && param == SpreadHost {
-		o.Strategy = utility.ToStringPtr(SpreadPlacement)
-	}
-
 	if param == "" && strategy == SpreadPlacement {
 		o.StrategyParameter = utility.ToStringPtr(SpreadHost)
 	}
