@@ -15,7 +15,9 @@ import (
 )
 
 func TestSecretsManager(t *testing.T) {
-	assert.Implements(t, (*Vault)(nil), &BasicSecretsManager{})
+	assert.Implements(t, (*Vault)(nil), &NamedSecret{})
+	assert.Implements(t, (*Vault)(nil), BasicSecretsManager{}.client)
+
 }
 
 func TestVaultCreateAndDeleteSecret(t *testing.T) {

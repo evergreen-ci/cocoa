@@ -32,7 +32,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
 	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
-	if out != nil {
+	if err != nil {
 		return "", err
 	}
 	return *out.SecretString, err
