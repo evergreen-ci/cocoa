@@ -351,6 +351,13 @@ func TestEnvironmentVariable(t *testing.T) {
 			}
 			assert.Error(t, ev.Validate())
 		})
+		t.Run("EmptyNameIsInvalid", func(t *testing.T) {
+			ev := EnvironmentVariable{
+				Name:  utility.ToStringPtr(""),
+				Value: utility.ToStringPtr("value"),
+			}
+			assert.Error(t, ev.Validate())
+		})
 		t.Run("SettingValueAndSecretIsInvalid", func(t *testing.T) {
 			ev := EnvironmentVariable{
 				Name:       utility.ToStringPtr("name"),

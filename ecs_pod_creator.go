@@ -331,6 +331,7 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 func (e *EnvironmentVariable) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(e.Name == nil, "must specify a name")
+	catcher.NewWhen(e.Name != nil && *e.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(e.Value == nil && e.SecretOpts == nil, "must either specify a value or reference a secret")
 	catcher.NewWhen(e.Value != nil && e.SecretOpts != nil, "cannot both specify a value and reference a secret")
 	if e.SecretOpts != nil {
