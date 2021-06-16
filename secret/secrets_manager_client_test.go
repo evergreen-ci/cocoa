@@ -109,7 +109,7 @@ func TestSecretsManagerCRUDSecret(t *testing.T) {
 				require.NoError(t, err)
 				require.NotZero(t, out)
 				assert.Equal(t, "barfoo", *out.SecretString)
-				assert.Equal(t, aws.String(os.Getenv("AWS_SECRET_PREFIX")+"foobar"), *out.Name)
+				assert.Equal(t, os.Getenv("AWS_SECRET_PREFIX")+"foobar", *out.Name)
 			}
 		}()
 
