@@ -48,6 +48,18 @@ func TestVaultCreateAndDeleteSecret(t *testing.T) {
 		}
 	}
 
+	t.Run("VaultNamedSecretSetName", func(t *testing.T) {
+		ns := NamedSecret{}
+		ns = *ns.SetName(os.Getenv("AWS_SECRET_PREFIX") + "avocado")
+		assert.Equal(t, os.Getenv("AWS_SECRET_PREFIX")+"avocado", *ns.Name)
+	})
+
+	t.Run("VaultNamedSecretSetValue", func(t *testing.T) {
+		ns := NamedSecret{}
+		ns = *ns.SetValue("toast")
+		assert.Equal(t, "toast", *ns.Value)
+	})
+
 	// Temporarily commented out because waiting for input validation
 	// t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
 	// 	out, err := m.CreateSecret(ctx, NamedSecret{})
