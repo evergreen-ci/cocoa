@@ -29,7 +29,7 @@ func (m *Vault) GetValue(ctx context.Context, id string) (val string, err error)
 // UpdateValue saves the input options and updates an existing mock secret. The
 // mock output can be customized. By default, it will update a cached mock
 // secret if it exists.
-func (m *Vault) UpdateValue(ctx context.Context, id string) error {
+func (m *Vault) UpdateValue(ctx context.Context, id, val string) error {
 	return errors.New("TODO: implement")
 }
 
