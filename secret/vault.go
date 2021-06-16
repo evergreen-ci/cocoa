@@ -14,7 +14,7 @@ type Vault interface {
 	// GetValue returns the value of the secret identified by ID.
 	GetValue(ctx context.Context, id string) (val string, err error)
 	// UpdateValue updates an existing secret's value by ID.
-	UpdateValue(ctx context.Context, id string) error
+	UpdateValue(ctx context.Context, id, val string) error
 	// DeleteSecret deletes a secret by ID.
 	DeleteSecret(ctx context.Context, id string) error
 }
