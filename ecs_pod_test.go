@@ -1,6 +1,7 @@
 package cocoa
 
 import (
+	"context"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -12,7 +13,32 @@ import (
 )
 
 func TestECSPod(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	assert.Implements(t, (*ECSPod)(nil), &BasicECSPod{})
+
+	t.Run("InfoIsPopulated", func(t *testing.T) {
+		hc := utility.GetHTTPClient()
+		defer utility.PutHTTPClient(hc)
+
+		// kim: TODO: wait until EVG-14841 is merged to make credentials
+		// optional
+		awsOpts := awsutil.NewClientOptions().SetHTTPClient(hc).SetRegion("us-east-1")
+
+		c, err := NewBasicECSClient(*awsOpts)
+		require.NoError(t, err)
+
+		res := NewECSPodResources().SetTaskID("task_id")
+		stat := Starting
+		opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatus(stat)
+		p, err := NewBasicECSPod(opts)
+		require.NoError(t, err)
+
+		info, err := p.Info(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, res, info.Resources)
+		assert.Equal(t, stat, info.Status)
+	})
 }
 
 func TestBasicECSPodOptions(t *testing.T) {
