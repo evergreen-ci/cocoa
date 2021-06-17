@@ -127,7 +127,10 @@ func NewBasicECSPod(opts ...*BasicECSPodOptions) (*BasicECSPod, error) {
 
 // Info returns information about the current state of the pod.
 func (p *BasicECSPod) Info(ctx context.Context) (*ECSPodInfo, error) {
-	return nil, errors.New("TODO: implement")
+	return &ECSPodInfo{
+		Status:    p.status,
+		Resources: p.resources,
+	}, nil
 }
 
 // Stop stops the running pod without cleaning up any of its underlying
