@@ -98,7 +98,6 @@ func TestSecretsManagerClient(t *testing.T) {
 			require.NotZero(t, outCreate.ARN)
 			require.NotZero(t, &outCreate.ARN)
 
-			// if out != nil && out.ARN != nil {
 			out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 				SecretId: outCreate.ARN,
 			})
@@ -106,7 +105,6 @@ func TestSecretsManagerClient(t *testing.T) {
 			require.NotZero(t, out)
 			assert.Equal(t, "foo", *out.SecretString)
 			assert.Equal(t, secretName, *out.Name)
-			// }
 		},
 		"UpdateSecretModifiesValue": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
 			secretName := makeTestSecret(t.Name())

@@ -120,7 +120,7 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // GetSecretValue gets the decrypted value of an existing secret.
@@ -147,7 +147,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // UpdateSecretValue updates the value of an existing secret.
@@ -174,7 +174,7 @@ func (c *BasicSecretsManagerClient) UpdateSecretValue(ctx context.Context, in *s
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // DeleteSecret deletes an existing secret.
@@ -201,7 +201,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // Close closes the client.

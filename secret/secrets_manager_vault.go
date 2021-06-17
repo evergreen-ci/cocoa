@@ -2,7 +2,8 @@ package secret
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
@@ -24,7 +25,7 @@ func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
 	if err := s.Validate(); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "invalid secret")
 	}
 	out, err := m.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
 		Name:         s.Name,
