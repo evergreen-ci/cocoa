@@ -152,18 +152,78 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 }
 
 // RunTask runs a new task.
-func (c *BasicECSClient) RunTask(context.Context, *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
-	return nil, errors.New("TODO: implement")
+func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
+
+	// do i still have to check for setup?
+
+	var out *ecs.RunTaskOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("RunTask", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.RunTaskWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, err
 }
 
 // DescribeTasks describes one or more existing tasks.
 func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
-	return nil, errors.New("TODO: implement")
+
+	// check for setup?
+
+	var out *ecs.DescribeTasksOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("DescribeTask", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.DescribeTasksWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, err
 }
 
 // StopTask stops a running task.
 func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
-	return nil, errors.New("TODO: implement")
+
+	// do i still have to check for setup?
+
+	var out *ecs.StopTaskOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("StopTask", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.StopTaskWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, err
 }
 
 // Close closes the client and cleans up its resources.
