@@ -31,6 +31,11 @@ func TestSecretsManagerVault(t *testing.T) {
 	}
 
 	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicSecretsManager){
+		"CreateFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.CreateSecret(ctx, NamedSecret{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
 		"DeleteFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
 			err := m.DeleteSecret(ctx, "")
 			assert.Error(t, err)

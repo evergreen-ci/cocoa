@@ -23,6 +23,7 @@ func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
 
 // CreateSecret creates a new secret.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
+	s.Validate()
 	out, err := m.client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
 		Name:         s.Name,
 		SecretString: s.Value,
