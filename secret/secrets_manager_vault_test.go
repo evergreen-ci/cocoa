@@ -98,9 +98,9 @@ func TestSecretsManagerVault(t *testing.T) {
 				assert.Equal(t, "ham", out)
 			}
 		},
-		"DeleteSecretWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+		"DeleteSecretWithValidNonexistentInputWillNoop": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
 			err := m.DeleteSecret(ctx, makeTestSecret(utility.RandomString()))
-			assert.Error(t, err)
+			assert.NoError(t, err)
 		},
 		"GetValueWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
 			out, err := m.GetValue(ctx, makeTestSecret(utility.RandomString()))

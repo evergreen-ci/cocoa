@@ -62,15 +62,12 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) e
 }
 
 // DeleteSecret deletes an existing secret.
+// If the secret does not exist, this will perform no operation.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("must specify a non-empty id")
 	}
-	_, err := m.GetValue(ctx, id)
-	if err != nil {
-		return err
-	}
-	_, err = m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+	_, err := m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 		ForceDeleteWithoutRecovery: aws.Bool(true),
 		SecretId:                   &id,
 	})
