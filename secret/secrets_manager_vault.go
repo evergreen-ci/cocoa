@@ -45,7 +45,7 @@ func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val stri
 
 	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
 	if out != nil && out.SecretString != nil {
-		return *out.SecretString, err
+		return *out.SecretString, nil
 	}
 	return "", err
 }
