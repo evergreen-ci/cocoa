@@ -24,7 +24,7 @@ type SecretsManagerClient interface {
 	CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
 	// GetSecretValue gets the decrypted value of a secret.
 	GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
-	// UpdateSecret updates the decrypted value of an existing secret.
+	// UpdateSecret updates the value of an existing secret.
 	UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
 	// DeleteSecret deletes an existing secret.
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
@@ -131,7 +131,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 
 	var out *secretsmanager.GetSecretValueOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("GetSecret", in)
+	msg := awsutil.MakeAPILogMessage("GetSecretValue", in)
 	if err := utility.Retry(
 		ctx,
 		func() (bool, error) {
@@ -150,7 +150,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 	return out, err
 }
 
-// UpdateSecret updates the decrypted value of an existing secret.
+// UpdateSecret updates the value of an existing secret.
 func (c *BasicSecretsManagerClient) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
@@ -201,7 +201,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return out, err
 }
 
 // Close closes the client.

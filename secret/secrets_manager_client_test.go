@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -18,128 +19,99 @@ import (
 
 func TestSecretsManagerClient(t *testing.T) {
 	assert.Implements(t, (*SecretsManagerClient)(nil), &BasicSecretsManagerClient{})
-}
 
-func TestSecretsManagerCRUDSecret(t *testing.T) {
 	checkAWSEnvVars(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(os.Getenv("AWS_REGION")),
-		Role:   aws.String(os.Getenv("AWS_ROLE")),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
+	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicSecretsManagerClient){
+		"CreateSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
 		},
-		HTTPClient: hc,
-	})
-	require.NoError(t, err)
-
-	Cleanup := func(out *secretsmanager.CreateSecretOutput) {
-		if out != nil && out.Name != nil && out.ARN != nil {
+		"DeleteSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"CreateAndDeleteSecretSucceed": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			createSecretOut, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+				Name:         aws.String(makeTestSecret(t.Name())),
+				SecretString: aws.String("hello"),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, createSecretOut)
+			require.NotZero(t, createSecretOut.ARN)
 			out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 				ForceDeleteWithoutRecovery: aws.Bool(true),
-				SecretId:                   out.ARN,
+				SecretId:                   createSecretOut.ARN,
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
-		}
-	}
 
-	t.Run("CreateFailsWithInvalidInput", func(t *testing.T) {
-		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
+		},
+		"GetValueFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"GetValueFailsWithValidNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+				SecretId: aws.String(utility.RandomString()),
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"UpdateValueFailsWithValidNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			out, err := c.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+				SecretId:     aws.String(utility.RandomString()),
+				SecretString: aws.String("hello"),
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"CreateAndGetSucceed": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			secretName := makeTestSecret(t.Name())
+			out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+				Name:         aws.String(secretName),
+				SecretString: aws.String("foo"),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, out)
+			require.NotZero(t, &out)
 
-	t.Run("DeleteFailsWithInvalidInput", func(t *testing.T) {
-		out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
+			defer cleanupSecret(ctx, t, c, out)
 
-	t.Run("CreateAndDeleteSucceed", func(t *testing.T) {
-		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
-			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hello_world"),
-			Description:  aws.String("foo"),
-			SecretString: aws.String("bar"),
-		})
-		require.NoError(t, err)
-		require.NotZero(t, out)
+			require.NotZero(t, out.ARN)
+			require.NotZero(t, &out.ARN)
 
-		defer Cleanup(out)
-
-		require.NotZero(t, out.Name)
-		require.NotZero(t, out.ARN)
-
-	})
-
-	t.Run("GetFailsWithInvalidInput", func(t *testing.T) {
-		out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
-
-	t.Run("UpdateFailsWithInvalidInput", func(t *testing.T) {
-		out, err := c.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{})
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
-
-	t.Run("CreateAndGetSucceed", func(t *testing.T) {
-		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
-			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "foobar"),
-			SecretString: aws.String("barfoo"),
-		})
-		require.NoError(t, err)
-		require.NotZero(t, out)
-
-		defer Cleanup(out)
-
-		defer func() {
-			if out != nil && out.Name != nil && out.ARN != nil {
+			if out != nil && out.ARN != nil {
 				out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 					SecretId: out.ARN,
 				})
 				require.NoError(t, err)
 				require.NotZero(t, out)
-				assert.Equal(t, "barfoo", *out.SecretString)
-				assert.Equal(t, os.Getenv("AWS_SECRET_PREFIX")+"foobar", *out.Name)
+				assert.Equal(t, "foo", *out.SecretString)
+				assert.Equal(t, secretName, *out.Name)
 			}
-		}()
+		},
+		"UpdateSecretModifiesValue": func(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient) {
+			secretName := makeTestSecret(t.Name())
+			out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+				Name:         aws.String(secretName),
+				SecretString: aws.String("bar"),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, out)
+			require.NotZero(t, &out)
 
-		require.NotZero(t, out.Name)
-		require.NotZero(t, out.ARN)
-	})
+			defer cleanupSecret(ctx, t, c, out)
 
-	t.Run("CreateAndUpdateAndGetSucceed", func(t *testing.T) {
-		out, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
-			Name:         aws.String(os.Getenv("AWS_SECRET_PREFIX") + "mongodb"),
-			SecretString: aws.String("dbmongo"),
-		})
-		require.NoError(t, err)
-		require.NotZero(t, out)
+			require.NotZero(t, out.ARN)
 
-		defer Cleanup(out)
-
-		defer func() {
-			if out != nil && out.Name != nil && out.ARN != nil {
-				out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-					SecretId: out.ARN,
-				})
-				require.NoError(t, err)
-				require.NotZero(t, out)
-				assert.Equal(t, "leaf", *out.SecretString)
-			}
-		}()
-
-		defer func() {
-			if out != nil && out.Name != nil && out.ARN != nil {
+			if out != nil && out.ARN != nil {
 				out, err := c.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
 					SecretId:     out.ARN,
 					SecretString: aws.String("leaf"),
@@ -147,12 +119,42 @@ func TestSecretsManagerCRUDSecret(t *testing.T) {
 				require.NoError(t, err)
 				require.NotZero(t, out)
 			}
-		}()
 
-		require.NotZero(t, out.Name)
-		require.NotZero(t, out.ARN)
+			if out != nil && out.ARN != nil {
+				out, err := c.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+					SecretId: out.ARN,
+				})
+				require.NoError(t, err)
+				require.NotZero(t, out)
+				assert.Equal(t, "leaf", *out.SecretString)
+				assert.Equal(t, secretName, *out.Name)
+			}
+		},
+	} {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			defer tcancel()
 
-	})
+			hc := utility.GetHTTPClient()
+			defer utility.PutHTTPClient(hc)
+
+			c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
+				Creds:  credentials.NewEnvCredentials(),
+				Region: aws.String(os.Getenv("AWS_REGION")),
+				Role:   aws.String(os.Getenv("AWS_ROLE")),
+				RetryOpts: &utility.RetryOptions{
+					MaxAttempts: 5,
+				},
+				HTTPClient: hc,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, c)
+
+			defer c.Close(tctx)
+
+			tCase(tctx, t, c)
+		})
+	}
 
 }
 
@@ -174,4 +176,18 @@ func checkAWSEnvVars(t *testing.T) {
 	if len(missing) > 0 {
 		assert.FailNow(t, fmt.Sprintf("missing required AWS environment variables: %s", missing))
 	}
+}
+
+func cleanupSecret(ctx context.Context, t *testing.T, c *BasicSecretsManagerClient, out *secretsmanager.CreateSecretOutput) {
+	if out != nil && out.ARN != nil {
+		out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+			ForceDeleteWithoutRecovery: aws.Bool(true),
+			SecretId:                   out.ARN,
+		})
+		require.NoError(t, err)
+		require.NotZero(t, out)
+	}
+}
+func makeTestSecret(name string) string {
+	return fmt.Sprint(path.Join(os.Getenv("AWS_SECRET_PREFIX"), "cocoa", name, utility.RandomString()))
 }
