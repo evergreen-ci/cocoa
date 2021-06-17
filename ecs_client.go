@@ -154,7 +154,9 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 // RunTask runs a new task.
 func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
 
-	// do i still have to check for setup?
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
 
 	var out *ecs.RunTaskOutput
 	var err error
