@@ -24,18 +24,13 @@ func TestSecretsManagerVault(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	cleanupSecret := func(ctx context.Context, t *testing.T, m *BasicSecretsManager, id string) {
+		if id != "" {
+			require.NoError(t, m.DeleteSecret(ctx, id))
+		}
+	}
+
 	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicSecretsManager){
-		"VaultNamedSecretSetName": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			ns := NamedSecret{}
-			newName := makeTestSecret("avocado")
-			ns = *ns.SetName(newName)
-			assert.Equal(t, newName, *ns.Name)
-		},
-		"VaultNamedSecretSetValue": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			ns := NamedSecret{}
-			ns = *ns.SetValue("toast")
-			assert.Equal(t, "toast", *ns.Value)
-		},
 		"DeleteFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
 			err := m.DeleteSecret(ctx, "")
 			assert.Error(t, err)
@@ -48,7 +43,7 @@ func TestSecretsManagerVault(t *testing.T) {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 
-			defer cleanupVaultSecret(ctx, t, m, out)
+			defer cleanupSecret(ctx, t, m, out)
 		},
 		"GetValueFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
 			out, err := m.GetValue(ctx, "")
@@ -67,7 +62,7 @@ func TestSecretsManagerVault(t *testing.T) {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 
-			defer cleanupVaultSecret(ctx, t, m, out)
+			defer cleanupSecret(ctx, t, m, out)
 
 			if out != "" {
 				out, err := m.GetValue(ctx, out)
@@ -84,7 +79,7 @@ func TestSecretsManagerVault(t *testing.T) {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 
-			defer cleanupVaultSecret(ctx, t, m, out)
+			defer cleanupSecret(ctx, t, m, out)
 
 			if out != "" {
 				err := m.UpdateValue(ctx, out, "ham")
@@ -136,11 +131,5 @@ func TestSecretsManagerVault(t *testing.T) {
 
 			tCase(tctx, t, m)
 		})
-	}
-}
-
-func cleanupVaultSecret(ctx context.Context, t *testing.T, m *BasicSecretsManager, id string) {
-	if id != "" {
-		require.NoError(t, m.DeleteSecret(ctx, id))
 	}
 }

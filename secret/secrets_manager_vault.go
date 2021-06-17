@@ -51,7 +51,7 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) e
 	if id == "" {
 		return errors.New("must specify a non-empty id")
 	}
-	_, err := m.client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
+	_, err := m.client.UpdateSecretValue(ctx, &secretsmanager.UpdateSecretInput{
 		SecretId:     aws.String(id),
 		SecretString: aws.String(val),
 	})
@@ -63,11 +63,11 @@ func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error
 	if id == "" {
 		return errors.New("must specify a non-empty id")
 	}
-	_, getErr := m.GetValue(ctx, id)
-	if getErr != nil {
-		return getErr
+	_, err := m.GetValue(ctx, id)
+	if err != nil {
+		return err
 	}
-	_, err := m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
+	_, err = m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 		ForceDeleteWithoutRecovery: aws.Bool(true),
 		SecretId:                   &id,
 	})

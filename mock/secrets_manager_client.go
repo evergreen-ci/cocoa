@@ -27,10 +27,10 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 	return nil, errors.New("TODO: implement")
 }
 
-// UpdateSecret saves the input options and returns an updated mock secret
+// UpdateSecretValue saves the input options and returns an updated mock secret
 // value. The mock output can be customized. By default, it will update a cached
 // mock secret if it exists.
-func (c *SecretsManagerClient) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 

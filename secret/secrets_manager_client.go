@@ -25,7 +25,7 @@ type SecretsManagerClient interface {
 	// GetSecretValue gets the decrypted value of a secret.
 	GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
 	// UpdateSecret updates the value of an existing secret.
-	UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
+	UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
 	// DeleteSecret deletes an existing secret.
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
 	// Close closes the client and cleans up its resources. Implementations
@@ -150,8 +150,8 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 	return out, err
 }
 
-// UpdateSecret updates the value of an existing secret.
-func (c *BasicSecretsManagerClient) UpdateSecret(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
+// UpdateSecretValue updates the value of an existing secret.
+func (c *BasicSecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -201,7 +201,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // Close closes the client.
