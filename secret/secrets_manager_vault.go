@@ -2,6 +2,7 @@ package secret
 
 import (
 	"context"
+	"errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
@@ -26,20 +27,30 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (
 		Name:         s.Name,
 		SecretString: s.Value,
 	})
-	return *out.ARN, err
+	if out != nil && out.ARN != nil {
+		return *out.ARN, err
+	}
+	return "", err
 }
 
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
-	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
-	if err != nil {
-		return "", err
+	if id == "" {
+		return "", errors.New("must specify a non-empty id")
 	}
-	return *out.SecretString, err
+
+	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
+	if out != nil && out.SecretString != nil {
+		return *out.SecretString, err
+	}
+	return "", err
 }
 
 // UpdateValue updates an existing secret's value.
 func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) error {
+	if id == "" {
+		return errors.New("must specify a non-empty id")
+	}
 	_, err := m.client.UpdateSecret(ctx, &secretsmanager.UpdateSecretInput{
 		SecretId:     aws.String(id),
 		SecretString: aws.String(val),
@@ -49,6 +60,13 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) e
 
 // DeleteSecret deletes an existing secret.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
+	if id == "" {
+		return errors.New("must specify a non-empty id")
+	}
+	_, getErr := m.GetValue(ctx, id)
+	if getErr != nil {
+		return getErr
+	}
 	_, err := m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 		ForceDeleteWithoutRecovery: aws.Bool(true),
 		SecretId:                   &id,

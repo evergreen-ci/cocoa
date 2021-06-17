@@ -16,130 +16,131 @@ import (
 
 func TestSecretsManager(t *testing.T) {
 	assert.Implements(t, (*Vault)(nil), &BasicSecretsManager{})
-
 }
 
-func TestVaultCreateAndDeleteSecret(t *testing.T) {
+func TestSecretsManagerVault(t *testing.T) {
 	checkAWSEnvVars(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(os.Getenv("AWS_REGION")),
-		Role:   aws.String(os.Getenv("AWS_ROLE")),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
+	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicSecretsManager){
+		"VaultNamedSecretSetName": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			ns := NamedSecret{}
+			newName := makeTestSecret("avocado")
+			ns = *ns.SetName(newName)
+			assert.Equal(t, newName, *ns.Name)
 		},
-		HTTPClient: hc,
-	})
-	require.NoError(t, err)
+		"VaultNamedSecretSetValue": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			ns := NamedSecret{}
+			ns = *ns.SetValue("toast")
+			assert.Equal(t, "toast", *ns.Value)
+		},
+		"DeleteFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			err := m.DeleteSecret(ctx, "")
+			assert.Error(t, err)
+		},
+		"DeleteSecretWithExistingSecretSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.CreateSecret(ctx, NamedSecret{
+				Name:  aws.String(makeTestSecret(t.Name())),
+				Value: aws.String("hello")})
 
-	m := NewBasicSecretsManager(c)
-
-	Cleanup := func(out string) {
-		if out != "" {
-			err := m.DeleteSecret(ctx, out)
 			require.NoError(t, err)
-		}
-	}
+			require.NotZero(t, out)
 
-	t.Run("VaultNamedSecretSetName", func(t *testing.T) {
-		ns := NamedSecret{}
-		ns = *ns.SetName(os.Getenv("AWS_SECRET_PREFIX") + "avocado")
-		assert.Equal(t, os.Getenv("AWS_SECRET_PREFIX")+"avocado", *ns.Name)
-	})
+			defer cleanupVaultSecret(ctx, t, m, out)
+		},
+		"GetValueFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.GetValue(ctx, "")
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"UpdateFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			err := m.UpdateValue(ctx, "", "")
+			assert.Error(t, err)
+		},
+		"GetValueWithExistingSecretSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.CreateSecret(ctx, NamedSecret{
+				Name:  aws.String(makeTestSecret(t.Name())),
+				Value: aws.String("eggs")})
 
-	t.Run("VaultNamedSecretSetValue", func(t *testing.T) {
-		ns := NamedSecret{}
-		ns = *ns.SetValue("toast")
-		assert.Equal(t, "toast", *ns.Value)
-	})
+			require.NoError(t, err)
+			require.NotZero(t, out)
 
-	// Temporarily commented out because waiting for input validation
-	// t.Run("VaultCreateFailsWithInvalidInput", func(t *testing.T) {
-	// 	out, err := m.CreateSecret(ctx, NamedSecret{})
-	// 	assert.Error(t, err)
-	// 	assert.Zero(t, out)
-	// })
+			defer cleanupVaultSecret(ctx, t, m, out)
 
-	t.Run("VaultDeleteFailsWithInvalidInput", func(t *testing.T) {
-		err := m.DeleteSecret(ctx, "")
-		assert.Error(t, err)
-	})
-
-	t.Run("VaultCreateAndDeleteSucceed", func(t *testing.T) {
-		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "hi"),
-			Value: aws.String("world")})
-
-		require.NoError(t, err)
-		require.NotZero(t, out)
-
-		defer Cleanup(out)
-	})
-
-	t.Run("VaultGetFailsWithInvalidInput", func(t *testing.T) {
-		out, err := m.GetValue(ctx, "")
-		assert.Error(t, err)
-		assert.Zero(t, out)
-	})
-
-	t.Run("VaultUpdateFailsWithInvalidInput", func(t *testing.T) {
-		err := m.UpdateValue(ctx, "", "")
-		assert.Error(t, err)
-	})
-
-	t.Run("VaultCreateAndGetSucceed", func(t *testing.T) {
-
-		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "ham"),
-			Value: aws.String("eggs")})
-
-		require.NoError(t, err)
-		require.NotZero(t, out)
-
-		defer Cleanup(out)
-
-		defer func() {
 			if out != "" {
 				out, err := m.GetValue(ctx, out)
 				require.NoError(t, err)
 				require.NotZero(t, out)
 				assert.Equal(t, "eggs", out)
 			}
-		}()
-	})
+		},
+		"UpdateValueSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.CreateSecret(ctx, NamedSecret{
+				Name:  aws.String(makeTestSecret(t.Name())),
+				Value: aws.String("eggs"),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, out)
 
-	t.Run("VaultUpdateSucceed", func(t *testing.T) {
-		out, err := m.CreateSecret(ctx, NamedSecret{
-			Name:  aws.String(os.Getenv("AWS_SECRET_PREFIX") + "spam"),
-			Value: aws.String("eggs"),
-		})
-		require.NoError(t, err)
-		require.NotZero(t, out)
+			defer cleanupVaultSecret(ctx, t, m, out)
 
-		defer Cleanup(out)
+			if out != "" {
+				err := m.UpdateValue(ctx, out, "ham")
+				require.NoError(t, err)
+			}
 
-		defer func() {
 			if out != "" {
 				out, err := m.GetValue(ctx, out)
 				require.NoError(t, err)
 				require.NotZero(t, out)
 				assert.Equal(t, "ham", out)
 			}
-		}()
+		},
+		"DeleteSecretWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			err := m.DeleteSecret(ctx, makeTestSecret(utility.RandomString()))
+			assert.Error(t, err)
+		},
+		"GetValueWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			out, err := m.GetValue(ctx, makeTestSecret(utility.RandomString()))
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"UpdateValueWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
+			err := m.UpdateValue(ctx, makeTestSecret(utility.RandomString()), "leaf")
+			assert.Error(t, err)
+		},
+	} {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			defer tcancel()
 
-		defer func() {
-			if out != "" {
-				err := m.UpdateValue(ctx, out, "ham")
-				require.NoError(t, err)
-			}
-		}()
+			hc := utility.GetHTTPClient()
+			defer utility.PutHTTPClient(hc)
 
-	})
+			c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
+				Creds:  credentials.NewEnvCredentials(),
+				Region: aws.String(os.Getenv("AWS_REGION")),
+				Role:   aws.String(os.Getenv("AWS_ROLE")),
+				RetryOpts: &utility.RetryOptions{
+					MaxAttempts: 5,
+				},
+				HTTPClient: hc,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, c)
+
+			m := NewBasicSecretsManager(c)
+			require.NotNil(t, m)
+
+			tCase(tctx, t, m)
+		})
+	}
+}
+
+func cleanupVaultSecret(ctx context.Context, t *testing.T, m *BasicSecretsManager, id string) {
+	if id != "" {
+		require.NoError(t, m.DeleteSecret(ctx, id))
+	}
 }
