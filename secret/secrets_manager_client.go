@@ -201,7 +201,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return out, err
 }
 
 // Close closes the client.
