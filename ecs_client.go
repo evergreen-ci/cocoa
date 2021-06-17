@@ -153,7 +153,6 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 
 // RunTask runs a new task.
 func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
-
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -175,7 +174,7 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 		}, *c.opts.RetryOpts); err != nil {
 		return nil, err
 	}
-	return out, err
+	return out, nil
 }
 
 // DescribeTasks describes one or more existing tasks.
