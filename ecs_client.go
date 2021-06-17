@@ -152,8 +152,29 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 }
 
 // RunTask runs a new task.
-func (c *BasicECSClient) RunTask(context.Context, *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
-	return nil, errors.New("TODO: implement")
+func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *ecs.RunTaskOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("RunTask", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.RunTaskWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // DescribeTasks describes one or more existing tasks.
