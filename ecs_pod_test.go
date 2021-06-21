@@ -33,7 +33,7 @@ func TestECSPod(t *testing.T) {
 
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
-			assert.Equal(t, res, info.Resources)
+			assert.Equal(t, *res, info.Resources)
 			assert.Equal(t, stat, info.Status)
 		},
 	} {
