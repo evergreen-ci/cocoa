@@ -76,7 +76,24 @@ func TestClientOptions(t *testing.T) {
 			assert.Equal(t, hc, opts.HTTPClient)
 			assert.False(t, opts.ownsHTTPClient)
 		})
-		t.Run("SucceedsWithoutRole", func(t *testing.T) {
+		t.Run("SucceedsWithoutCredentialsWhenRoleIsGiven", func(t *testing.T) {
+			role := "role"
+			region := "region"
+			retryOpts := utility.RetryOptions{
+				MaxAttempts: 10,
+				MinDelay:    100 * time.Millisecond,
+				MaxDelay:    time.Second,
+			}
+			hc := http.DefaultClient
+			opts := NewClientOptions().
+				SetRole(role).
+				SetRegion(region).
+				SetRetryOptions(retryOpts).
+				SetHTTPClient(hc)
+
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithoutRoleWhenCredentialsAreGiven", func(t *testing.T) {
 			creds := credentials.NewEnvCredentials()
 			region := "region"
 			retryOpts := utility.RetryOptions{
@@ -91,17 +108,9 @@ func TestClientOptions(t *testing.T) {
 				SetRetryOptions(retryOpts).
 				SetHTTPClient(hc)
 
-			require.NoError(t, opts.Validate())
-
-			assert.Equal(t, creds, opts.Creds)
-			assert.Equal(t, region, *opts.Region)
-			assert.Zero(t, opts.Role)
-			assert.Equal(t, retryOpts, *opts.RetryOpts)
-			assert.Equal(t, hc, opts.HTTPClient)
-			assert.False(t, opts.ownsHTTPClient)
+			assert.NoError(t, opts.Validate())
 		})
-		t.Run("FailsWithoutCredentials", func(t *testing.T) {
-			role := "role"
+		t.Run("FailsWithNeitherCredentialsNorRoleAreGiven", func(t *testing.T) {
 			region := "region"
 			retryOpts := utility.RetryOptions{
 				MaxAttempts: 10,
@@ -110,7 +119,6 @@ func TestClientOptions(t *testing.T) {
 			}
 			hc := http.DefaultClient
 			opts := NewClientOptions().
-				SetRole(role).
 				SetRegion(region).
 				SetRetryOptions(retryOpts).
 				SetHTTPClient(hc)

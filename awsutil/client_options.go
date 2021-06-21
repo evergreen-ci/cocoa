@@ -79,7 +79,7 @@ func (o *ClientOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 
 	catcher.NewWhen(o.Region == nil, "must provide geographical region")
-	catcher.NewWhen(o.Creds == nil, "must provide credentials")
+	catcher.NewWhen(o.Role == nil && o.Creds == nil, "must provide either explicit credentials, role to assume, or both")
 
 	if catcher.HasErrors() {
 		return catcher.Resolve()
@@ -100,6 +100,9 @@ func (o *ClientOptions) Validate() error {
 
 // GetCredentials retrieves the appropriate credentials to use for the client.
 func (o *ClientOptions) GetCredentials() (*credentials.Credentials, error) {
+	if o.Role == nil && o.Creds == nil {
+		return nil, errors.New("cannot get client credentials when neither explicit credentials are given, nor the role to assume is given")
+	}
 	if o.Role == nil {
 		return o.Creds, nil
 	}
