@@ -20,20 +20,6 @@ func TestECSClientInterface(t *testing.T) {
 	assert.Implements(t, (*ECSClient)(nil), &BasicECSClient{})
 }
 
-// TODO: change structure to test matrix
-/* Tests (Run, Describe, Stop)
-- RunTaskFailsWithInvalidInput
-- DescribeTaskFailsWithInvalidInput
-- StopTaskFailsWithInvalidInput
-- RunTaskFailsWithValidButNonexistentInput
-- DescribeTaskFailsWithValidButNonexistentInput
-- StopTaskFailsWithValidButNonexistentInput
-- StopTaskFailsWithNonrunningInput
-- RunTaskSucceedsWithRegisteredTask
-- DescribeTaskSucceedsWithRegisteredTask
-- StopTaskSucceedsWithRunningTask
-*/
-
 func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 	checkAWSEnvVarsForECS(t)
 
@@ -82,6 +68,42 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			assert.Equal(t, "ACTIVE", *out.TaskDefinition.Status)
 			require.NotZero(t, out.TaskDefinition.RegisteredAt)
 			assert.NotZero(t, *out.TaskDefinition.RegisteredAt)
+		},
+		"RunTaskFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.RunTask(ctx, &ecs.RunTaskInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"DescribeTaskFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"StopTaskFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.StopTask(ctx, &ecs.StopTaskInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"RunTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.RunTask(ctx, &ecs.RunTaskInput{
+				TaskDefinition: aws.String(utility.RandomString()),
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"DescribeTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+				Tasks: []*string{aws.String(utility.RandomString())},
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"StopTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
+				Task: aws.String(utility.RandomString()),
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
