@@ -16,9 +16,7 @@ import (
 
 func TestSecretsManager(t *testing.T) {
 	assert.Implements(t, (*Vault)(nil), &BasicSecretsManager{})
-}
 
-func TestSecretsManagerVault(t *testing.T) {
 	checkAWSEnvVars(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
