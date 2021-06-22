@@ -1,7 +1,10 @@
 package cocoa
 
 import (
+	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/evergreen-ci/cocoa/awsutil"
@@ -13,6 +16,45 @@ import (
 
 func TestECSPod(t *testing.T) {
 	assert.Implements(t, (*ECSPod)(nil), &BasicECSPod{})
+
+	checkAWSEnvVarsForECSAndSecretsManager(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c ECSClient){
+		"InfoIsPopulated": func(ctx context.Context, t *testing.T, c ECSClient) {
+			res := NewECSPodResources().SetTaskID("task_id")
+			stat := Starting
+			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatus(stat)
+
+			p, err := NewBasicECSPod(opts)
+			require.NoError(t, err)
+
+			info, err := p.Info(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, *res, info.Resources)
+			assert.Equal(t, stat, info.Status)
+		},
+	} {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			defer tcancel()
+
+			hc := utility.GetHTTPClient()
+			defer utility.PutHTTPClient(hc)
+			awsOpts := awsutil.NewClientOptions().
+				SetHTTPClient(hc).
+				SetCredentials(credentials.NewEnvCredentials()).
+				SetRole(os.Getenv("AWS_ROLE")).
+				SetRegion(os.Getenv("AWS_REGION"))
+
+			c, err := NewBasicECSClient(*awsOpts)
+			require.NoError(t, err)
+
+			tCase(tctx, t, c)
+		})
+	}
 }
 
 func TestBasicECSPodOptions(t *testing.T) {

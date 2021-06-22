@@ -21,7 +21,7 @@ func TestECSClientInterface(t *testing.T) {
 }
 
 func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
-	checkAWSEnvVars(t)
+	checkAWSEnvVarsForECS(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -84,16 +84,31 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 	})
 }
 
-func checkAWSEnvVars(t *testing.T) {
-	missing := []string{}
-
-	for _, envVar := range []string{
+func checkAWSEnvVarsForECS(t *testing.T) {
+	checkEnvVars(t,
 		"AWS_ACCESS_KEY",
 		"AWS_SECRET_ACCESS_KEY",
 		"AWS_ROLE",
 		"AWS_REGION",
 		"AWS_ECS_CLUSTER",
-	} {
+	)
+}
+
+func checkAWSEnvVarsForECSAndSecretsManager(t *testing.T) {
+	checkEnvVars(t,
+		"AWS_ACCESS_KEY",
+		"AWS_SECRET_ACCESS_KEY",
+		"AWS_ROLE",
+		"AWS_REGION",
+		"AWS_ECS_CLUSTER",
+		"AWS_SECRET_PREFIX",
+	)
+}
+
+func checkEnvVars(t *testing.T, envVars ...string) {
+	var missing []string
+
+	for _, envVar := range envVars {
 		if os.Getenv(envVar) == "" {
 			missing = append(missing, envVar)
 		}
