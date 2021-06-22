@@ -70,10 +70,9 @@ func TestECSClientTaskDefinition(t *testing.T) {
 				Name:    aws.String("print_foo"),
 			},
 		},
-		Cpu:         aws.String("128"),
-		Memory:      aws.String("4"),
-		Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
-		TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
+		Cpu:    aws.String("128"),
+		Memory: aws.String("4"),
+		Family: aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
 	})
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)
@@ -104,10 +103,9 @@ func TestECSClientTaskDefinition(t *testing.T) {
 						Name:    aws.String("hello_world"),
 					},
 				},
-				Cpu:         aws.String("128"),
-				Memory:      aws.String("4"),
-				Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "foo"),
-				TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
+				Cpu:    aws.String("128"),
+				Memory: aws.String("4"),
+				Family: aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "foo"),
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
@@ -185,10 +183,9 @@ func TestECSClientTaskDefinition(t *testing.T) {
 						Name:    aws.String("print_foo"),
 					},
 				},
-				Cpu:         aws.String("128"),
-				Memory:      aws.String("4"),
-				Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
-				TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
+				Cpu:    aws.String("128"),
+				Memory: aws.String("4"),
+				Family: aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
 			})
 
 			require.NoError(t, err)
