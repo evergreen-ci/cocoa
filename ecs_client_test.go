@@ -20,8 +20,8 @@ import (
 func TestECSClient(t *testing.T) {
 	assert.Implements(t, (*ECSClient)(nil), &BasicECSClient{})
 }
-
 func TestECSClientTaskDefinition(t *testing.T) {
+
 	cleanupTaskDefinition := func(ctx context.Context, t *testing.T, c *BasicECSClient, out *ecs.RegisterTaskDefinitionOutput) {
 		if out != nil && out.TaskDefinition != nil && out.TaskDefinition.TaskDefinitionArn != nil {
 			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
