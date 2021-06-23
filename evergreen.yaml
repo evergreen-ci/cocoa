@@ -72,9 +72,6 @@ tasks:
     tags: ["test"]
     name: test-secret
     must_have_test_results: true
-  - <<: *run-target
-    tags: ["test"]
-    name: test-
 
   - <<: *run-target
     tags: ["lint"]

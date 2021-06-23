@@ -14,7 +14,6 @@ import (
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
-	"github.com/k0kubun/pp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +24,6 @@ func TestECSClientInterface(t *testing.T) {
 
 func TestECSClient(t *testing.T) {
 	testutil.CheckAWSEnvVarsForECS(t)
-	pp.Println("continuing the test")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
