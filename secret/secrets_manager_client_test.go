@@ -52,23 +52,3 @@ func TestSecretsManagerClient(t *testing.T) {
 	}
 
 }
-
-// func checkAWSEnvVars(t *testing.T) {
-//     missing := []string{}
-//
-//     for _, envVar := range []string{
-//         "AWS_ACCESS_KEY",
-//         "AWS_SECRET_ACCESS_KEY",
-//         "AWS_SECRET_PREFIX",
-//         "AWS_ROLE",
-//         "AWS_REGION",
-//     } {
-//         if os.Getenv(envVar) == "" {
-//             missing = append(missing, envVar)
-//         }
-//     }
-//
-//     if len(missing) > 0 {
-//         assert.FailNow(t, fmt.Sprintf("missing required AWS environment variables: %s", missing))
-//     }
-// }
