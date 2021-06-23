@@ -54,11 +54,15 @@ functions:
 tasks:
   - <<: *run-target
     tags: ["test"]
-    name: test-awsutil
+    name: test-cocoa
     must_have_test_results: true
   - <<: *run-target
     tags: ["test"]
-    name: test-cocoa
+    name: test-ecs
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["test"]
+    name: test-internal-awsutil
     must_have_test_results: true
   - <<: *run-target
     tags: ["test"]
@@ -68,14 +72,29 @@ tasks:
     tags: ["test"]
     name: test-secret
     must_have_test_results: true
+  - <<: *run-target
+    tags: ["test"]
+    name: test-
 
   - <<: *run-target
     tags: ["lint"]
-    name: lint-awsutil
+    name: lint-cocoa
     must_have_test_results: true
   - <<: *run-target
     tags: ["lint"]
-    name: lint-cocoa
+    name: lint-ecs
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-internal-awsutil
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-internal-testcase
+    must_have_test_results: true
+  - <<: *run-target
+    tags: ["lint"]
+    name: lint-internal-testutil
     must_have_test_results: true
   - <<: *run-target
     tags: ["lint"]

@@ -8,16 +8,20 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/evergreen-ci/cocoa/awsutil"
+	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/cocoa/internal/awsutil"
+	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSecretsManager(t *testing.T) {
-	assert.Implements(t, (*Vault)(nil), &BasicSecretsManager{})
+func TestVaultInterface(t *testing.T) {
+	assert.Implements(t, (*cocoa.Vault)(nil), &BasicSecretsManager{})
+}
 
-	checkAWSEnvVars(t)
+func TestSecretsManager(t *testing.T) {
+	testutil.CheckAWSEnvVarsForSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -30,7 +34,7 @@ func TestSecretsManager(t *testing.T) {
 
 	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicSecretsManager){
 		"CreateFailsWithInvalidInput": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			out, err := m.CreateSecret(ctx, NamedSecret{})
+			out, err := m.CreateSecret(ctx, cocoa.NamedSecret{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
@@ -39,8 +43,8 @@ func TestSecretsManager(t *testing.T) {
 			assert.Error(t, err)
 		},
 		"DeleteSecretWithExistingSecretSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			out, err := m.CreateSecret(ctx, NamedSecret{
-				Name:  aws.String(makeTestSecret(t.Name())),
+			out, err := m.CreateSecret(ctx, cocoa.NamedSecret{
+				Name:  aws.String(testutil.NewSecretName(t.Name())),
 				Value: aws.String("hello")})
 
 			require.NoError(t, err)
@@ -58,8 +62,8 @@ func TestSecretsManager(t *testing.T) {
 			assert.Error(t, err)
 		},
 		"GetValueWithExistingSecretSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			out, err := m.CreateSecret(ctx, NamedSecret{
-				Name:  aws.String(makeTestSecret(t.Name())),
+			out, err := m.CreateSecret(ctx, cocoa.NamedSecret{
+				Name:  aws.String(testutil.NewSecretName(t.Name())),
 				Value: aws.String("eggs")})
 
 			require.NoError(t, err)
@@ -75,8 +79,8 @@ func TestSecretsManager(t *testing.T) {
 			}
 		},
 		"UpdateValueSucceeds": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			out, err := m.CreateSecret(ctx, NamedSecret{
-				Name:  aws.String(makeTestSecret(t.Name())),
+			out, err := m.CreateSecret(ctx, cocoa.NamedSecret{
+				Name:  aws.String(testutil.NewSecretName(t.Name())),
 				Value: aws.String("eggs"),
 			})
 			require.NoError(t, err)
@@ -97,16 +101,16 @@ func TestSecretsManager(t *testing.T) {
 			}
 		},
 		"DeleteSecretWithValidNonexistentInputWillNoop": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			err := m.DeleteSecret(ctx, makeTestSecret(utility.RandomString()))
+			err := m.DeleteSecret(ctx, testutil.NewSecretName(t.Name()))
 			assert.NoError(t, err)
 		},
 		"GetValueWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			out, err := m.GetValue(ctx, makeTestSecret(utility.RandomString()))
+			out, err := m.GetValue(ctx, testutil.NewSecretName(t.Name()))
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"UpdateValueWithValidNonexistentInputFails": func(ctx context.Context, t *testing.T, m *BasicSecretsManager) {
-			err := m.UpdateValue(ctx, makeTestSecret(utility.RandomString()), "leaf")
+			err := m.UpdateValue(ctx, testutil.NewSecretName(t.Name()), "leaf")
 			assert.Error(t, err)
 		},
 	} {

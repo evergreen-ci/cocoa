@@ -8,7 +8,7 @@ import (
 )
 
 // SecretsManagerClient provides a mock implementation of a
-// secret.SecretsManagerClient. This makes it possible to introspect on inputs
+// cocoa.SecretsManagerClient. This makes it possible to introspect on inputs
 // to the client and control the client's output. It provides some default
 // implementations where possible.
 type SecretsManagerClient struct{}
