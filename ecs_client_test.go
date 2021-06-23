@@ -282,9 +282,5 @@ func checkEnvVars(t *testing.T, envVars ...string) {
 }
 
 func makeFamily(name string) string {
-	test := strings.Split(name, "/")
-	if len(test) > 1 {
-		return fmt.Sprintf("%v-%v-%v-%v-%v", os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX"), "cocoa", test[0], test[1], utility.RandomString())
-	}
-	return fmt.Sprintf("%v-%v-%v-%v", os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX"), "cocoa", test[0], utility.RandomString())
+	return strings.Join([]string{os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX"), "cocoa", strings.Replace(name, "/", "-", 1), utility.RandomString()}, "-")
 }
