@@ -39,7 +39,7 @@ func TestECSClientTaskDefinition(t *testing.T) {
 		require.NoError(t, err)
 		require.NotZero(t, out)
 		require.NotZero(t, out.Task)
-		assert.Equal(t, *runOut.Tasks[0].TaskArn, out.Task.TaskArn)
+		assert.Equal(t, *runOut.Tasks[0].TaskArn, *out.Task.TaskArn)
 	}
 
 func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
@@ -71,9 +71,10 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				Name:    aws.String("print_foo"),
 			},
 		},
-		Cpu:    aws.String("128"),
-		Memory: aws.String("4"),
-		Family: aws.String("bar"),
+		Cpu:         aws.String("128"),
+		Memory:      aws.String("4"),
+		Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
+		TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
 	})
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)
@@ -104,9 +105,10 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 						Name:    aws.String("hello_world"),
 					},
 				},
-				Cpu:    aws.String("128"),
-				Memory: aws.String("4"),
-				Family: aws.String("foo"),
+				Cpu:         aws.String("128"),
+				Memory:      aws.String("4"),
+				Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "foo"),
+				TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
@@ -179,14 +181,15 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			outDuplicate, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
 				ContainerDefinitions: []*ecs.ContainerDefinition{
 					{
-						Command: []*string{aws.String("echo"), aws.String("hello")},
+						Command: []*string{aws.String("echo"), aws.String("foo")},
 						Image:   aws.String("ubuntu"),
-						Name:    aws.String("hello_world"),
+						Name:    aws.String("print_foo"),
 					},
 				},
-				Cpu:    aws.String("128"),
-				Memory: aws.String("4"),
-				Family: aws.String("foo"),
+				Cpu:         aws.String("128"),
+				Memory:      aws.String("4"),
+				Family:      aws.String(os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + "bar"),
+				TaskRoleArn: aws.String("arn:aws:iam::579766882180:role/dev.task.role"),
 			})
 
 			require.NoError(t, err)
@@ -219,7 +222,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				require.NoError(t, err)
 				require.NotZero(t, out)
 				require.NotZero(t, out.Task)
-				assert.Equal(t, *runOut.Tasks[0].TaskArn, out.Task.TaskArn)
+				assert.Equal(t, runOut.Tasks[0].TaskArn, out.Task.TaskArn)
 			}()
 
 			require.Empty(t, runOut.Failures)
@@ -249,7 +252,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 			require.NotEmpty(t, out.Tasks)
-			assert.Equal(t, out.Tasks[0].TaskDefinitionArn, registerOut.TaskDefinition.TaskDefinitionArn)
+			assert.Equal(t, *out.Tasks[0].TaskDefinitionArn, *registerOut.TaskDefinition.TaskDefinitionArn)
 			assert.Equal(t, out.Tasks[0].TaskArn, runOut.Tasks[0].TaskArn)
 		},
 	} {
@@ -280,6 +283,7 @@ func checkAWSEnvVarsForECSAndSecretsManager(t *testing.T) {
 		"AWS_REGION",
 		"AWS_ECS_CLUSTER",
 		"AWS_SECRET_PREFIX",
+		"AWS_ECS_TASK_DEFINITION_PREFIX",
 	)
 }
 
