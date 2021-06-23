@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,8 +20,8 @@ import (
 func TestECSClient(t *testing.T) {
 	assert.Implements(t, (*ECSClient)(nil), &BasicECSClient{})
 }
-func TestECSClientTaskDefinition(t *testing.T) {
 
+func TestECSClientTaskDefinition(t *testing.T) {
 	cleanupTaskDefinition := func(ctx context.Context, t *testing.T, c *BasicECSClient, out *ecs.RegisterTaskDefinitionOutput) {
 		if out != nil && out.TaskDefinition != nil && out.TaskDefinition.TaskDefinitionArn != nil {
 			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
@@ -42,11 +43,6 @@ func TestECSClientTaskDefinition(t *testing.T) {
 		}
 	}
 
-	makeFamily := func() string {
-		return os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX") + utility.RandomString()
-	}
-
-func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 	checkAWSEnvVarsForECS(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,7 +85,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				},
 				Cpu:    aws.String("128"),
 				Memory: aws.String("4"),
-				Family: aws.String(makeFamily()),
+				Family: aws.String(makeFamily(t.Name())),
 			})
 			require.NoError(t, err)
 			require.NotNil(t, registerOut)
@@ -105,7 +101,6 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
-
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
@@ -128,7 +123,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 		},
 		Cpu:    aws.String("128"),
 		Memory: aws.String("4"),
-		Family: aws.String(makeFamily()),
+		Family: aws.String(makeFamily(t.Name())),
 	}
 
 	registerOut, err := c.RegisterTaskDefinition(ctx, registerIn)
@@ -138,8 +133,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 
 	defer func() {
 		cleanupTaskDefinition(ctx, t, c, registerOut)
-		err := c.Close(ctx)
-		require.NoError(t, err)
+		require.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range map[string]func(context.Context, *testing.T, *BasicECSClient){
@@ -166,37 +160,15 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
-		"RunTaskFailsWithoutCluster": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
-			require.NotZero(t, registerOut.TaskDefinition.Status)
-			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
-
-			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
-				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
-			})
-
-			require.Error(t, err)
-			require.Zero(t, runOut)
-
-			defer cleanupTask(ctx, t, c, runOut)
-		},
-		"DescribeTasksFailsWithNoClusterAndValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
-			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-				Tasks: []*string{aws.String(utility.RandomString())},
-			})
-			assert.Error(t, err)
-			assert.Zero(t, out)
-		},
-		"DescribeTasksReturnsFailureWithClusterAndValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
+		"DescribeTasksReturnsFailureWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
 			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
 				Tasks:   []*string{aws.String(utility.RandomString())},
 			})
-
 			assert.NoError(t, err)
 			assert.NotZero(t, out)
 			assert.NotZero(t, out.Failures)
 			assert.Empty(t, out.Tasks)
-
 		},
 		"StopTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
 			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
@@ -208,7 +180,6 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 		},
 		"RegisterSucceedsWithDuplicateTaskDefinition": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
 			outDuplicate, err := c.RegisterTaskDefinition(ctx, registerIn)
-
 			require.NoError(t, err)
 			require.NotZero(t, outDuplicate)
 			require.NotZero(t, outDuplicate.TaskDefinition)
@@ -216,10 +187,8 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			defer cleanupTaskDefinition(ctx, t, c, outDuplicate)
 
 			assert.True(t, *outDuplicate.TaskDefinition.Revision > *registerOut.TaskDefinition.Revision)
-
 		},
 		"RunAndStopTaskSucceedsWithRegisteredTaskDefinition": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
-
 			require.NotZero(t, registerOut.TaskDefinition.Status)
 			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
 
@@ -227,7 +196,6 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				Cluster:        aws.String(os.Getenv("AWS_ECS_CLUSTER")),
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
-
 			require.NoError(t, err)
 			require.NotZero(t, runOut)
 			require.Empty(t, runOut.Failures)
@@ -242,9 +210,7 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 			require.NotZero(t, out)
 			require.NotZero(t, out.Task)
 			assert.Equal(t, runOut.Tasks[0].TaskArn, out.Task.TaskArn)
-
 		},
-
 		"DescribeTaskSucceedsWithRunningTask": func(ctx context.Context, t *testing.T, c *BasicECSClient) {
 			require.NotZero(t, registerOut.TaskDefinition.Status)
 			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
@@ -253,7 +219,6 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				Cluster:        aws.String(os.Getenv("AWS_ECS_CLUSTER")),
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
-
 			require.NoError(t, err)
 			require.NotZero(t, runOut)
 			require.NotEmpty(t, runOut.Tasks)
@@ -264,7 +229,6 @@ func TestECSClientRegisterAndDeregisterTaskDefinition(t *testing.T) {
 				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
 				Tasks:   []*string{aws.String(*runOut.Tasks[0].TaskArn)},
 			})
-
 			require.NoError(t, err)
 			require.NotZero(t, out)
 			require.NotEmpty(t, out.Tasks)
@@ -315,4 +279,12 @@ func checkEnvVars(t *testing.T, envVars ...string) {
 	if len(missing) > 0 {
 		assert.FailNow(t, fmt.Sprintf("missing required AWS environment variables: %s", missing))
 	}
+}
+
+func makeFamily(name string) string {
+	test := strings.Split(name, "/")
+	if len(test) > 1 {
+		return fmt.Sprintf("%v-%v-%v-%v-%v", os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX"), "cocoa", test[0], test[1], utility.RandomString())
+	}
+	return fmt.Sprintf("%v-%v-%v-%v", os.Getenv("AWS_ECS_TASK_DEFINITION_PREFIX"), "cocoa", test[0], utility.RandomString())
 }
