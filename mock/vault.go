@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/evergreen-ci/cocoa/secret"
+	"github.com/evergreen-ci/cocoa"
 )
 
-// Vault provides a mock implementation of a secret.Vault. This makes it
+// Vault provides a mock implementation of a cocoa.Vault. This makes it
 // possible to introspect on inputs to the vault and control the vault's output.
 // It provides some default implementations where possible.
 type Vault struct{}
@@ -15,7 +15,7 @@ type Vault struct{}
 // CreateSecret saves the input options and returns a mock secret ID. The mock
 // output can be customized. By default, it will create a cached mock secret
 // based on the input.
-func (m *Vault) CreateSecret(ctx context.Context, s secret.NamedSecret) (id string, err error) {
+func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	return "", errors.New("TODO: implement")
 }
 

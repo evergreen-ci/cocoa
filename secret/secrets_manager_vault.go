@@ -3,27 +3,28 @@ package secret
 import (
 	"context"
 
+	"github.com/evergreen-ci/cocoa"
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
-// BasicSecretsManager provides a Vault implementation backed by Amazon Secrets
-// Manager.
+// BasicSecretsManager provides a cocoa.Vault implementation backed by AWS
+// Secrets Manager.
 type BasicSecretsManager struct {
-	client SecretsManagerClient
+	client cocoa.SecretsManagerClient
 }
 
-// NewBasicSecretsManager creates a Vault backed by Secrets Manager.
-func NewBasicSecretsManager(c SecretsManagerClient) *BasicSecretsManager {
+// NewBasicSecretsManager creates a Vault backed by AWS Secrets Manager.
+func NewBasicSecretsManager(c cocoa.SecretsManagerClient) *BasicSecretsManager {
 	return &BasicSecretsManager{
 		client: c,
 	}
 }
 
 // CreateSecret creates a new secret.
-func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s NamedSecret) (id string, err error) {
+func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	if err := s.Validate(); err != nil {
 		return "", errors.Wrap(err, "invalid secret")
 	}

@@ -6,12 +6,11 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/evergreen-ci/cocoa/secret"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 )
 
-// ECSPodCreator provides a means to create a new pod backed by ECS.
+// ECSPodCreator provides a means to create a new pod backed by AWS ECS.
 type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
@@ -589,33 +588,4 @@ func (d *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
 func (d *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
 	d.Owned = &owned
 	return d
-}
-
-// BasicECSPodCreator provides an ECSPodCreator implementation to create
-// ECS pods.
-type BasicECSPodCreator struct {
-	client ECSClient
-	vault  secret.Vault
-}
-
-// NewBasicECSPodCreator creates a helper to create pods backed by ECS.
-func NewBasicECSPodCreator(c ECSClient, v secret.Vault) (*BasicECSPodCreator, error) {
-	if c == nil {
-		return nil, errors.New("missing client")
-	}
-	return &BasicECSPodCreator{
-		client: c,
-		vault:  v,
-	}, nil
-}
-
-// CreatePod creates a new pod backed by ECS.
-func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error) {
-	return nil, errors.New("TODO: implement")
-}
-
-// CreatePodFromExistingDefinition creates a new pod backed by ECS from an
-// existing definition.
-func (m *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def ECSTaskDefinition, opts ...*ECSPodExecutionOptions) (ECSPod, error) {
-	return nil, errors.New("TODO: implement")
 }

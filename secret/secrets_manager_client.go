@@ -12,38 +12,21 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/evergreen-ci/cocoa/awsutil"
+	"github.com/evergreen-ci/cocoa/internal/awsutil"
 	"github.com/evergreen-ci/utility"
 )
 
-// SecretsManagerClient provides a common interface to interact with a Secrets
-// Manager client and its mock implementation for testing. Implementations must
-// handle retrying and backoff.
-type SecretsManagerClient interface {
-	// CreateSecret creates a new secret.
-	CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
-	// GetSecretValue gets the decrypted value of a secret.
-	GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
-	// UpdateSecret updates the value of an existing secret.
-	UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
-	// DeleteSecret deletes an existing secret.
-	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
-	// Close closes the client and cleans up its resources. Implementations
-	// should ensure that this is idempotent.
-	Close(ctx context.Context) error
-}
-
-// BasicSecretsManagerClient provides a SecretsManagerClient implementation that
-// wraps the Secrets Manager API. It supports retrying requests using
-// exponential backoff and jitter.
+// BasicSecretsManagerClient provides a cocoa.SecretsManagerClient
+// implementation that wraps the AWS Secrets Manager API. It supports
+// retrying requests using exponential backoff and jitter.
 type BasicSecretsManagerClient struct {
 	sm      *secretsmanager.SecretsManager
 	opts    awsutil.ClientOptions
 	session *session.Session
 }
 
-// NewBasicSecretsManagerClient creates a new Secrets Manager client from the
-// given options.
+// NewBasicSecretsManagerClient creates a new AWS Secrets Manager client from
+// the given options.
 func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
 	c := &BasicSecretsManagerClient{
 		opts: opts,

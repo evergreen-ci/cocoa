@@ -8,10 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSPodCreator(t *testing.T) {
-	assert.Implements(t, (*ECSPodCreator)(nil), &BasicECSPodCreator{})
-}
-
 func TestECSPodCreationOptions(t *testing.T) {
 	t.Run("NewECSPodCreationOptions", func(t *testing.T) {
 		opts := NewECSPodCreationOptions()

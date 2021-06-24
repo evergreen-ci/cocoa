@@ -2,13 +2,13 @@ package awsutil
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -171,7 +171,7 @@ func TestClientOptions(t *testing.T) {
 }
 
 func TestClientOptionsGetCredentials(t *testing.T) {
-	checkAWSEnvVars(t)
+	testutil.CheckAWSEnvVars(t)
 
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
@@ -196,23 +196,4 @@ func TestClientOptionsGetCredentials(t *testing.T) {
 	assert.NotZero(t, resolved.AccessKeyID)
 	assert.NotZero(t, resolved.SecretAccessKey)
 	assert.NotZero(t, resolved.SessionToken)
-}
-
-func checkAWSEnvVars(t *testing.T) {
-	missing := []string{}
-
-	for _, envVar := range []string{
-		"AWS_ACCESS_KEY",
-		"AWS_SECRET_ACCESS_KEY",
-		"AWS_ROLE",
-		"AWS_REGION",
-	} {
-		if os.Getenv(envVar) == "" {
-			missing = append(missing, envVar)
-		}
-	}
-
-	if len(missing) > 0 {
-		assert.FailNow(t, fmt.Sprintf("missing required AWS environment variables: %s", missing))
-	}
 }

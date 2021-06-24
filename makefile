@@ -1,8 +1,8 @@
 name := cocoa
 projectPath := github.com/evergreen-ci/cocoa
 buildDir := build
-allPackages := $(name) secret mock awsutil
-testPackages := $(allPackages)
+testPackages := $(name) ecs secret mock internal-awsutil
+allPackages := $(testPackages) internal-testcase internal-testutil
 lintPackages := $(allPackages)
 
 # start environment setup
