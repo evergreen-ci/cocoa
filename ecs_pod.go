@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ECSPod provides an abstraction of a pod backed by ECS.
+// ECSPod provides an abstraction of a pod backed by AWS ECS.
 type ECSPod interface {
 	// Info returns information about the current state of the pod.
 	Info(ctx context.Context) (*ECSPodInfo, error)

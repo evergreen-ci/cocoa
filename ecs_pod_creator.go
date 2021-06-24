@@ -10,7 +10,7 @@ import (
 	"github.com/mongodb/grip"
 )
 
-// ECSPodCreator provides a means to create a new pod backed by ECS.
+// ECSPodCreator provides a means to create a new pod backed by AWS ECS.
 type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are

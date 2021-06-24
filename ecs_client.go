@@ -7,7 +7,7 @@ import (
 )
 
 // ECSClient provides a common interface to interact with a client backed by
-// ECS. Implementations must handle retrying and backoff.
+// AWS ECS. Implementations must handle retrying and backoff.
 type ECSClient interface {
 	// RegisterTaskDefinition registers the definition for a new task with ECS.
 	RegisterTaskDefinition(context.Context, *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error)

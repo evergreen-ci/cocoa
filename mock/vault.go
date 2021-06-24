@@ -7,7 +7,7 @@ import (
 	"github.com/evergreen-ci/cocoa"
 )
 
-// Vault provides a mock implementation of a secret.Vault. This makes it
+// Vault provides a mock implementation of a cocoa.Vault. This makes it
 // possible to introspect on inputs to the vault and control the vault's output.
 // It provides some default implementations where possible.
 type Vault struct{}

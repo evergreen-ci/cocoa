@@ -20,7 +20,7 @@ func CheckAWSEnvVars(t *testing.T) {
 }
 
 // CheckAWSEnvVarsForECS checks that the required environment variables are
-// defined for testing against ECS.
+// defined for testing against AWS ECS.
 func CheckAWSEnvVarsForECS(t *testing.T) {
 	CheckEnvVars(t,
 		"AWS_ACCESS_KEY",
@@ -33,7 +33,7 @@ func CheckAWSEnvVarsForECS(t *testing.T) {
 }
 
 // CheckAWSEnvVarsForSecretsManager checks that the required environment
-// variables are defined for testing against Secrets Manager.
+// variables are defined for testing against AWS Secrets Manager.
 func CheckAWSEnvVarsForSecretsManager(t *testing.T) {
 	CheckEnvVars(t,
 		"AWS_ACCESS_KEY",
@@ -45,7 +45,7 @@ func CheckAWSEnvVarsForSecretsManager(t *testing.T) {
 }
 
 // CheckAWSEnvVarsForECSAndSecretsManager checks that the required environment
-// variables are defined for testing against both ECS and Secrets Manager.
+// variables are defined for testing against both AWS ECS and Secrets Manager.
 func CheckAWSEnvVarsForECSAndSecretsManager(t *testing.T) {
 	CheckEnvVars(t,
 		"AWS_ACCESS_KEY",

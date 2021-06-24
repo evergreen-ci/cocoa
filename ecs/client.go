@@ -15,15 +15,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BasicECSClient provides an ECSClient implementation that wraps the ECS API.
-// It supports retrying requests using exponential backoff and jitter.
+// BasicECSClient provides a cocoa.ECSClient implementation that wraps the AWS
+// ECS API. It supports retrying requests using exponential backoff and jitter.
 type BasicECSClient struct {
 	ecs     *ecs.ECS
 	opts    *awsutil.ClientOptions
 	session *session.Session
 }
 
-// NewBasicECSClient creates a new ECS client from the given options.
+// NewBasicECSClient creates a new AWS ECS client from the given options.
 func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
 	c := &BasicECSClient{
 		opts: &opts,

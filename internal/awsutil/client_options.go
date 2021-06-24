@@ -16,12 +16,12 @@ import (
 // requests.
 type ClientOptions struct {
 	// Creds are the client credentials, which may be used to either connect to
-	// the ECS API directly, or authenticate to STS to retrieve temporary
-	// credentials to access the ECS API.
+	// the AWS API directly, or authenticate to STS to retrieve temporary
+	// credentials to access the API (if Role is specified).
 	Creds *credentials.Credentials
 	// Role is the STS role that should be used to perform authorized actions.
-	// If specified, the Creds will be used to retrieve temporary credentials
-	// from STS.
+	// If specified, Creds will be used to retrieve temporary credentials from
+	// STS.
 	Role *string
 	// Region is the geographical region where API calls should be made.
 	Region *string

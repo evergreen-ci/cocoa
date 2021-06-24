@@ -10,13 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
-// BasicSecretsManager provides a Vault implementation backed by Amazon Secrets
-// Manager.
+// BasicSecretsManager provides a cocoa.Vault implementation backed by AWS
+// Secrets Manager.
 type BasicSecretsManager struct {
 	client cocoa.SecretsManagerClient
 }
 
-// NewBasicSecretsManager creates a Vault backed by Secrets Manager.
+// NewBasicSecretsManager creates a Vault backed by AWS Secrets Manager.
 func NewBasicSecretsManager(c cocoa.SecretsManagerClient) *BasicSecretsManager {
 	return &BasicSecretsManager{
 		client: c,

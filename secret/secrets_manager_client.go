@@ -17,16 +17,16 @@ import (
 )
 
 // BasicSecretsManagerClient provides a cocoa.SecretsManagerClient
-// implementation that wraps the Secrets Manager API. It supports retrying
-// requests using exponential backoff and jitter.
+// implementation that wraps the AWS Secrets Manager API. It supports
+// retrying requests using exponential backoff and jitter.
 type BasicSecretsManagerClient struct {
 	sm      *secretsmanager.SecretsManager
 	opts    awsutil.ClientOptions
 	session *session.Session
 }
 
-// NewBasicSecretsManagerClient creates a new Secrets Manager client from the
-// given options.
+// NewBasicSecretsManagerClient creates a new AWS Secrets Manager client from
+// the given options.
 func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
 	c := &BasicSecretsManagerClient{
 		opts: opts,

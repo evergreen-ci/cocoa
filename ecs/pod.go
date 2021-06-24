@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BasicECSPod represents a pod that is backed by ECS.
+// BasicECSPod represents a pod that is backed by AWS ECS.
 type BasicECSPod struct {
 	client    cocoa.ECSClient
 	vault     cocoa.Vault

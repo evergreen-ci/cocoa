@@ -7,7 +7,8 @@ import (
 )
 
 // SecretsManagerClient provides a common interface to interact with a client
-// backed by Secrets Manager. Implementations must handle retrying and backoff.
+// backed by AWS Secrets Manager. Implementations must handle retrying and
+// backoff.
 type SecretsManagerClient interface {
 	// CreateSecret creates a new secret.
 	CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error)
