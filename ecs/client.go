@@ -103,6 +103,33 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 	return out, nil
 }
 
+// ListTaskDefinitions returns the ARNs for the task definitions that match the
+// input filters.
+func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *ecs.ListTaskDefinitionsOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.ListTaskDefinitionsWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DeregisterTaskDefinition deregisters an existing task definition.
 func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	if err := c.setup(); err != nil {
@@ -168,6 +195,32 @@ func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTask
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
 			out, err = c.ecs.DescribeTasksWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				switch awsErr.Code() {
+				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListTasks returns the ARNs for the task that match the input filters.
+func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *ecs.ListTasksOutput
+	var err error
+	msg := awsutil.MakeAPILogMessage("ListTasks", in)
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			out, err = c.ecs.ListTasksWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
 				switch awsErr.Code() {

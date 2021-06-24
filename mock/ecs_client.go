@@ -26,6 +26,13 @@ func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.Deregi
 	return nil, errors.New("TODO: implement")
 }
 
+// ListTaskDefinitions saves the input and lists all matching task definitions.
+// The mock output can be customized. By default, it will list all cached task
+// definitions that match the input filters.
+func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
+	return nil, errors.New("TODO: implement")
+}
+
 // RunTask saves the input options and returns the mock result of running a task
 // definition. The mock output can be customized. By default, it will create
 // mock output based on the input.
@@ -37,6 +44,13 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 // tasks. The mock output can be customized. By default, it will describe all
 // cached tasks that match.
 func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
+	return nil, errors.New("TODO: implement")
+}
+
+// ListTasks saves the input and lists all matching tasks. The mock output can
+// be customized. By default, it will list all cached task definitions that
+// match the input filters.
+func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
 	return nil, errors.New("TODO: implement")
 }
 

@@ -189,3 +189,20 @@ func cleanupTask(ctx context.Context, t *testing.T, c cocoa.ECSClient, runOut *e
 		require.NotZero(t, out)
 	}
 }
+
+// kim: TODO: need to wait for EVG-14861 merge before we can use this in tests
+func cleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{})
+	require.NoError(t, err)
+	require.NotZero(t, out)
+
+	for _, arn := range out.TaskDefinitionArns {
+		if arn == nil {
+			continue
+		}
+		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			TaskDefinition: arn,
+		})
+		require.NoError(t, err)
+	}
+}
