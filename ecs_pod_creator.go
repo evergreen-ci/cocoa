@@ -173,8 +173,59 @@ func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOp
 			continue
 		}
 
+		if opt.Name != nil {
+			merged.Name = opt.Name
+		}
+
 		if opt.ContainerDefinitions != nil {
 			merged.ContainerDefinitions = opt.ContainerDefinitions
+		}
+
+		if opt.MemoryMB != nil {
+			merged.MemoryMB = opt.MemoryMB
+		}
+
+		if opt.CPU != nil {
+			merged.CPU = opt.CPU
+		}
+
+		if opt.TaskRole != nil {
+			merged.TaskRole = opt.TaskRole
+		}
+
+		if opt.Tags != nil {
+			merged.Tags = opt.Tags
+		}
+
+		if opt.ExecutionOpts != nil {
+			merged.ExecutionOpts = opt.ExecutionOpts
+		}
+	}
+
+	return merged
+}
+
+// MergeECSPodExecutionOptions merges all the given options to execute an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutionOptions {
+	merged := ECSPodExecutionOptions{}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		if opt.Cluster != nil {
+			merged.Cluster = opt.Cluster
+		}
+
+		if opt.PlacementOpts != nil {
+			merged.PlacementOpts = opt.PlacementOpts
+		}
+
+		if opt.SupportsDebugMode != nil {
+			merged.SupportsDebugMode = opt.SupportsDebugMode
 		}
 
 		if opt.Tags != nil {
