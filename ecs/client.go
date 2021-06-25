@@ -90,8 +90,7 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 			out, err = c.ecs.RegisterTaskDefinitionWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -118,8 +117,7 @@ func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTa
 			out, err = c.ecs.ListTaskDefinitionsWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -144,8 +142,7 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 			out, err = c.ecs.DeregisterTaskDefinitionWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -171,8 +168,7 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 			out, err = c.ecs.RunTaskWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -197,8 +193,7 @@ func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTask
 			out, err = c.ecs.DescribeTasksWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -223,8 +218,7 @@ func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) 
 			out, err = c.ecs.ListTasksWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -249,8 +243,7 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 			out, err = c.ecs.StopTaskWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -265,4 +258,20 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 func (c *BasicECSClient) Close(ctx context.Context) error {
 	c.opts.Close()
 	return nil
+}
+
+// isNonRetryableErrorCode returns whether or not the error code from ECS is
+// known to be not retryable.
+func (c *BasicECSClient) isNonRetryableErrorCode(code string) bool {
+	switch code {
+	case ecs.ErrCodeAccessDeniedException,
+		ecs.ErrCodeClientException,
+		ecs.ErrCodeInvalidParameterException,
+		ecs.ErrCodeClusterNotFoundException,
+		request.InvalidParameterErrCode,
+		request.ParamRequiredErrCode:
+		return true
+	default:
+		return false
+	}
 }
