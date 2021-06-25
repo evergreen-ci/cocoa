@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,8 +105,7 @@ func TestECSClient(t *testing.T) {
 // teardown.
 func cleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) []string {
 	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
-		Status:       aws.String("ACTIVE"),
-		FamilyPrefix: aws.String(testutil.TaskDefinitionPrefix()),
+		Status: aws.String("ACTIVE"),
 	})
 	require.NoError(t, err)
 	require.NotZero(t, out)
@@ -114,6 +114,12 @@ func cleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient
 
 	for _, arn := range out.TaskDefinitionArns {
 		if arn == nil {
+			continue
+		}
+		taskDefArn := *arn
+		// Ignore task definitions that were not generated with testutil.NewTaskDefinitionFamily.
+		name := strings.Join([]string{testutil.TaskDefinitionPrefix(), "cocoa", t.Name()}, "-")
+		if !strings.Contains(taskDefArn, name) {
 			continue
 		}
 		taskDefs = append(taskDefs, *arn)
