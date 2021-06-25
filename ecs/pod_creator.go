@@ -36,13 +36,11 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 	mergedPodOptions := cocoa.MergeECSPodCreationOptions(opts...)
 
 	translatedIn, secrets, err := m.TranslateRegisterTaskDefinitionInput(ctx, mergedPodOptions)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "translating the register task definition input to the correct type")
 	}
 
 	registerOut, err := m.client.RegisterTaskDefinition(ctx, translatedIn)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "registering task definition")
 	}
@@ -56,7 +54,6 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		Cluster:        cocoa.MergeECSPodExecutionOptions(mergedPodOptions.ExecutionOpts).Cluster,
 		TaskDefinition: taskDef.ID,
 	})
-
 	if err != nil || runOut.Failures != nil || runOut.Tasks == nil {
 		return nil, errors.Wrap(err, "running task")
 	}
@@ -71,7 +68,6 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		},
 		status: cocoa.Starting,
 	}
-
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod")
 	}
@@ -114,23 +110,19 @@ func (m *BasicECSPodCreator) EnvVarArrayToKeyValuePairsAndSecrets(ctx context.Co
 func (m *BasicECSPodCreator) TranslateRegisterTaskDefinitionInput(ctx context.Context, merged cocoa.ECSPodCreationOptions) (*ecs.RegisterTaskDefinitionInput, []cocoa.PodSecret, error) {
 	StringArrayToPtr := func(command []string) []*string {
 		ptrArray := []*string{}
-
 		for _, str := range command {
 			ptrArray = append(ptrArray, &str)
 		}
-
 		return ptrArray
 	}
 
 	TranslateStringArrayToECSTagArray := func(tags []string) []*ecs.Tag {
 		ecsTags := []*ecs.Tag{}
-
 		for _, tag := range tags {
 			ecsTags = append(ecsTags, &ecs.Tag{
 				Key: &tag,
 			})
 		}
-
 		return ecsTags
 	}
 
