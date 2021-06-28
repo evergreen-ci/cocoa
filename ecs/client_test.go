@@ -105,7 +105,7 @@ func TestECSClient(t *testing.T) {
 // teardown.
 func cleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) []string {
 	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
-		Status: aws.String("ACTIVE"),
+		Status: aws.String(ecs.TaskDefinitionStatusActive),
 	})
 	require.NoError(t, err)
 	require.NotZero(t, out)
