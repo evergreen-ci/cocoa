@@ -2,7 +2,6 @@ package secret
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -123,8 +122,8 @@ func TestSecretsManager(t *testing.T) {
 
 			c, err := NewBasicSecretsManagerClient(awsutil.ClientOptions{
 				Creds:  credentials.NewEnvCredentials(),
-				Region: aws.String(os.Getenv("AWS_REGION")),
-				Role:   aws.String(os.Getenv("AWS_ROLE")),
+				Region: aws.String(testutil.AWSRegion()),
+				Role:   aws.String(testutil.AWSRole()),
 				RetryOpts: &utility.RetryOptions{
 					MaxAttempts: 5,
 				},

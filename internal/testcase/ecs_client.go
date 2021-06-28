@@ -2,7 +2,6 @@ package testcase
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -83,7 +82,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 		},
 		"RunTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.RunTask(ctx, &ecs.RunTaskInput{
-				Cluster:        aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: aws.String(utility.RandomString()),
 			})
 			assert.Error(t, err)
@@ -91,7 +90,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 		},
 		"DescribeTasksReturnsFailureWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster: aws.String(testutil.ECSClusterName()),
 				Tasks:   []*string{aws.String(utility.RandomString())},
 			})
 			assert.NoError(t, err)
@@ -101,7 +100,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 		},
 		"StopTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
-				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster: aws.String(testutil.ECSClusterName()),
 				Task:    aws.String(utility.RandomString()),
 			})
 			assert.Error(t, err)
@@ -122,7 +121,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
 
 			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
-				Cluster:        aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
@@ -132,7 +131,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 			assert.Equal(t, runOut.Tasks[0].TaskDefinitionArn, registerOut.TaskDefinition.TaskDefinitionArn)
 
 			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
-				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster: aws.String(testutil.ECSClusterName()),
 				Task:    aws.String(*runOut.Tasks[0].TaskArn),
 			})
 			require.NoError(t, err)
@@ -145,7 +144,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
 
 			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
-				Cluster:        aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
@@ -155,13 +154,18 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 			defer cleanupTask(ctx, t, c, runOut)
 
 			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-				Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+				Cluster: aws.String(testutil.ECSClusterName()),
 				Tasks:   []*string{aws.String(*runOut.Tasks[0].TaskArn)},
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
 			require.NotEmpty(t, out.Tasks)
+			require.NotZero(t, out.Tasks[0].TaskDefinitionArn)
+			require.NotZero(t, registerOut.TaskDefinition)
+			require.NotZero(t, registerOut.TaskDefinition.TaskDefinitionArn)
 			assert.Equal(t, *out.Tasks[0].TaskDefinitionArn, *registerOut.TaskDefinition.TaskDefinitionArn)
+			require.NotZero(t, out.Tasks[0].TaskArn)
+			require.NotZero(t, runOut.Tasks[0].TaskArn)
 			assert.Equal(t, out.Tasks[0].TaskArn, runOut.Tasks[0].TaskArn)
 		},
 	}
@@ -182,7 +186,7 @@ func cleanupTaskDefinition(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 func cleanupTask(ctx context.Context, t *testing.T, c cocoa.ECSClient, runOut *ecs.RunTaskOutput) {
 	if runOut != nil && len(runOut.Tasks) > 0 && runOut.Tasks[0].TaskArn != nil {
 		out, err := c.StopTask(ctx, &ecs.StopTaskInput{
-			Cluster: aws.String(os.Getenv("AWS_ECS_CLUSTER")),
+			Cluster: aws.String(testutil.ECSClusterName()),
 			Task:    aws.String(*runOut.Tasks[0].TaskArn),
 		})
 		require.NoError(t, err)

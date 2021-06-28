@@ -94,8 +94,7 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 			out, err = c.sm.CreateSecretWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -121,8 +120,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 			out, err = c.sm.GetSecretValueWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -148,8 +146,7 @@ func (c *BasicSecretsManagerClient) UpdateSecretValue(ctx context.Context, in *s
 			out, err = c.sm.UpdateSecretWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -175,8 +172,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 			out, err = c.sm.DeleteSecretWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
-				switch awsErr.Code() {
-				case request.InvalidParameterErrCode, request.ParamRequiredErrCode:
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
 			}
@@ -191,4 +187,19 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 	c.opts.Close()
 	return nil
+}
+
+// isNonRetryableErrorCode returns whether or not the error code from Secrets
+// Manager is known to be not retryable.
+func (c *BasicSecretsManagerClient) isNonRetryableErrorCode(code string) bool {
+	switch code {
+	case "AccessDeniedException",
+		secretsmanager.ErrCodeInvalidParameterException,
+		secretsmanager.ErrCodeInvalidRequestException,
+		request.InvalidParameterErrCode,
+		request.ParamRequiredErrCode:
+		return true
+	default:
+		return false
+	}
 }

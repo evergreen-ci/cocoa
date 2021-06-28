@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -50,8 +49,8 @@ func TestECSPod(t *testing.T) {
 			awsOpts := awsutil.NewClientOptions().
 				SetHTTPClient(hc).
 				SetCredentials(credentials.NewEnvCredentials()).
-				SetRole(os.Getenv("AWS_ROLE")).
-				SetRegion(os.Getenv("AWS_REGION"))
+				SetRole(testutil.AWSRole()).
+				SetRegion(testutil.AWSRegion())
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
