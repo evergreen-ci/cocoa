@@ -7,22 +7,52 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
+// ECSCluster represents a mock ECS cluster running tasks.
+type ECSCluster map[string]ECSTask
+
+// ECSTask represents a mock ECS task.
 type ECSTask struct {
+	ID          string
+	Cluster     string
+	ExecEnabled bool
+	Tags        []string
 }
 
+// ECSTask represents a mock ECS task definition.
 type ECSTaskDefinition struct {
+	ID            string
+	ContainerDefs []ECSContainerDefinition
+	MemoryMB      int
+	CPU           int
+	TaskRole      string
+	Tags          []string
 }
 
+// ECSContainerDefinition represents a mock ECS container definition.
+type ECSContainerDefinition struct {
+	Name     string
+	Image    string
+	Command  []string
+	MemoryMB int
+	CPU      int
+	EnvVars  map[string]string
+	Secrets  map[string]string
+	Tags     []string
+}
+
+// ECSService represents an in-memory fake implementation of ECS for testing and
+// integration with the mock ECSClient.
 type ECSService struct {
-	Tasks    map[string]ECSTask
+	Clusters map[string]ECSCluster
 	TaskDefs map[string]ECSTaskDefinition
 }
 
+// GlobalECSService represents the global fake ECS service state.
 var GlobalECSService ECSService
 
 func init() {
 	GlobalECSService = ECSService{
-		Tasks:    map[string]ECSTask{},
+		Clusters: map[string]ECSCluster{},
 		TaskDefs: map[string]ECSTaskDefinition{},
 	}
 }
@@ -36,6 +66,7 @@ type ECSClient struct{}
 // definition. The mock output can be customized. By default, it will create a
 // cached task definition based on the input.
 func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
+	// kim: TODO: implement on top of mock ECS service
 	return nil, errors.New("TODO: implement")
 }
 
