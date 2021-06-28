@@ -7,6 +7,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
+type ECSTask struct {
+}
+
+type ECSTaskDefinition struct {
+}
+
+type ECSService struct {
+	Tasks    map[string]ECSTask
+	TaskDefs map[string]ECSTaskDefinition
+}
+
+var GlobalECSService ECSService
+
+func init() {
+	GlobalECSService = ECSService{
+		Tasks:    map[string]ECSTask{},
+		TaskDefs: map[string]ECSTaskDefinition{},
+	}
+}
+
 // ECSClient provides a mock implementation of a cocoa.ECSClient. This makes
 // it possible to introspect on inputs to the client and control the client's
 // output. It provides some default implementations where possible.
