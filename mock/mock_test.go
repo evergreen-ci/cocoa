@@ -13,5 +13,4 @@ func TestInterfaces(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSClient)(nil), &ECSClient{})
 
 	assert.Implements(t, (*cocoa.Vault)(nil), &Vault{})
-	assert.Implements(t, (*cocoa.SecretsManagerClient)(nil), &SecretsManagerClient{})
 }
