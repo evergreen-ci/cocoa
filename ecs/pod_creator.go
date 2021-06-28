@@ -33,9 +33,10 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 	var out cocoa.ECSPod
 	var err error
 
-	mergedPodOptions := cocoa.MergeECSPodCreationOptions(opts...)
+	mergedPodCreationOpts := cocoa.MergeECSPodCreationOptions(opts...)
+	mergedPodExecutionOpts := cocoa.MergeECSPodExecutionOptions(mergedPodCreationOpts.ExecutionOpts)
 
-	translatedIn, secrets, err := m.TranslateRegisterTaskDefinitionInput(ctx, mergedPodOptions)
+	translatedIn, secrets, err := m.TranslateRegisterTaskDefinitionInput(ctx, mergedPodCreationOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "translating the register task definition input to the correct type")
 	}
@@ -51,7 +52,7 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 	}
 
 	runOut, err := m.client.RunTask(ctx, &ecs.RunTaskInput{
-		Cluster:        cocoa.MergeECSPodExecutionOptions(mergedPodOptions.ExecutionOpts).Cluster,
+		Cluster:        mergedPodExecutionOpts.Cluster,
 		TaskDefinition: taskDef.ID,
 	})
 	if err != nil || runOut.Failures != nil || runOut.Tasks == nil {
@@ -64,6 +65,7 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		resources: cocoa.ECSPodResources{
 			TaskID:         runOut.Tasks[0].TaskArn,
 			TaskDefinition: &taskDef,
+			Cluster:        mergedPodExecutionOpts.Cluster,
 			Secrets:        secrets,
 		},
 		status: cocoa.Starting,
