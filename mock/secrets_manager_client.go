@@ -65,17 +65,10 @@ func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmana
 		return nil, errors.New("must specify either secret binary or secret string")
 	}
 
-	if in.SecretBinary != nil {
-		GlobalSecretCache[*in.Name] = StoredSecret{
-			BinaryValue: in.SecretBinary,
-			Created:     time.Now(),
-		}
-	}
-	if in.SecretString != nil {
-		GlobalSecretCache[*in.Name] = StoredSecret{
-			Value:   *in.SecretString,
-			Created: time.Now(),
-		}
+	GlobalSecretCache[*in.Name] = StoredSecret{
+		BinaryValue: in.SecretBinary,
+		Created:     time.Now(),
+		Value:       utility.FromStringPtr(in.SecretString),
 	}
 
 	return &secretsmanager.CreateSecretOutput{
