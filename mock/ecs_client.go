@@ -126,6 +126,10 @@ type ECSTask struct {
 	ExecEnabled *bool
 	Status      *string
 	GoalStatus  *string
+	Created     *time.Time
+	StopCode    *string
+	StopReason  *string
+	Stopped     *time.Time
 	Tags        map[string]string
 }
 
@@ -142,6 +146,7 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		ExecEnabled: in.EnableExecuteCommand,
 		Status:      utility.ToStringPtr(ecs.DesiredStatusRunning),
 		GoalStatus:  utility.ToStringPtr(ecs.DesiredStatusRunning),
+		Created:     utility.ToTimePtr(time.Now()),
 		TaskDef:     taskDef,
 		Tags:        newTags(in.Tags),
 	}
@@ -155,14 +160,19 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 
 func (t *ECSTask) export() *ecs.Task {
 	exported := ecs.Task{
-		TaskArn:           t.ARN,
-		ClusterArn:        t.Cluster,
-		Tags:              exportTags(t.Tags),
-		TaskDefinitionArn: t.TaskDef.ARN,
-		Cpu:               t.TaskDef.CPU,
-		Memory:            t.TaskDef.MemoryMB,
-		LastStatus:        t.Status,
-		DesiredStatus:     t.GoalStatus,
+		TaskArn:              t.ARN,
+		ClusterArn:           t.Cluster,
+		EnableExecuteCommand: t.ExecEnabled,
+		Tags:                 exportTags(t.Tags),
+		TaskDefinitionArn:    t.TaskDef.ARN,
+		Cpu:                  t.TaskDef.CPU,
+		Memory:               t.TaskDef.MemoryMB,
+		LastStatus:           t.Status,
+		DesiredStatus:        t.GoalStatus,
+		CreatedAt:            t.Created,
+		StopCode:             t.StopCode,
+		StoppedReason:        t.StopReason,
+		StoppedAt:            t.Stopped,
 	}
 
 	for _, container := range t.Containers {
@@ -641,6 +651,9 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 
 	task.Status = utility.ToStringPtr(ecs.DesiredStatusStopped)
 	task.GoalStatus = utility.ToStringPtr(ecs.DesiredStatusStopped)
+	task.StopCode = utility.ToStringPtr(ecs.TaskStopCodeUserInitiated)
+	task.StopReason = in.Reason
+	task.Stopped = utility.ToTimePtr(time.Now())
 
 	cluster[utility.FromStringPtr(in.Task)] = task
 
