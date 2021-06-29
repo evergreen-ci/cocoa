@@ -110,6 +110,7 @@ func (d *ECSContainerDefinition) export() *ecs.ContainerDefinition {
 		Memory:      d.MemoryMB,
 		Cpu:         d.CPU,
 		Environment: exportEnvVars(d.EnvVars),
+		Secrets:     exportSecrets(d.Secrets),
 	}
 }
 
