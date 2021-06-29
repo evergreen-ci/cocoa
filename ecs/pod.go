@@ -142,6 +142,8 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 		return errors.Wrap(err, "stopping pod")
 	}
 
+	p.status = cocoa.Stopped
+
 	return nil
 }
 
