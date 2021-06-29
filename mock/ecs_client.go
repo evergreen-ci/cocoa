@@ -87,7 +87,6 @@ type ECSContainerDefinition struct {
 	CPU      *int64
 	EnvVars  map[string]string
 	Secrets  map[string]string
-	Tags     map[string]string
 }
 
 func newECSContainerDefinition(def *ecs.ContainerDefinition) ECSContainerDefinition {
@@ -518,9 +517,8 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 		}, nil
 	}
 
-	family, revNum, err := parseFamilyAndRevision(taskDefID)
-
 	var taskDef ECSTaskDefinition
+	family, revNum, err := parseFamilyAndRevision(taskDefID)
 	if err == nil {
 		revisions, ok := GlobalECSService.TaskDefs[family]
 		if !ok {
@@ -539,8 +537,7 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 			return nil, errors.New("task definition family not found")
 		}
 
-		revNum = len(revisions)
-		taskDef = revisions[revNum-1]
+		taskDef = revisions[len(revisions)-1]
 	}
 
 	task := newECSTask(in, taskDef)
