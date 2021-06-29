@@ -129,10 +129,15 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 		return errors.New("pod is not running")
 	}
 
-	_, err := p.client.StopTask(ctx, &ecs.StopTaskInput{
-		Cluster: p.resources.Cluster,
-		Task:    p.resources.TaskID,
-	})
+	if p.resources.Cluster == nil || p.resources.TaskID == nil {
+		return errors.New("missing pod resources field")
+	}
+
+	stopTask := &ecs.StopTaskInput{}
+	stopTask.SetCluster(*p.resources.Cluster)
+	stopTask.SetTask(*p.resources.TaskID)
+
+	_, err := p.client.StopTask(ctx, stopTask)
 	if err != nil {
 		return errors.Wrap(err, "stopping pod")
 	}
