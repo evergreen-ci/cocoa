@@ -144,5 +144,31 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 
 // Delete deletes the pod and its owned resources.
 func (p *BasicECSPod) Delete(ctx context.Context) error {
-	return errors.New("TODO: implement")
+	// TODO: stop pod
+	err := p.Stop(ctx)
+	if err != nil {
+		return errors.Wrap(err, "deleting pod")
+	}
+
+	// TODO: delete task def
+	deregisterDef := ecs.DeregisterTaskDefinitionInput{}
+	deregisterDef.SetTaskDefinition(*p.resources.TaskDefinition.ID)
+
+	p.client.DeregisterTaskDefinition(ctx, &deregisterDef)
+
+	// TODO: delete secrets stored in Vault
+	for _, secret := range p.resources.Secrets {
+		if *secret.Owned {
+			err = p.vault.DeleteSecret(ctx, *secret.NamedSecret.Name)
+			// not sure if Name == ARN/unique id
+			if err != nil {
+				return errors.Wrap(err, "deleting pod")
+			}
+		}
+	}
+
+	// TODO: update status to "deleted" IF all resources successfuly cleaned up
+	p.status = cocoa.Deleted
+
+	return nil
 }
