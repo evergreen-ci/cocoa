@@ -168,16 +168,15 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.
 
 	for _, secret := range secrets {
 		if !utility.FromBoolPtr(secret.Exists) {
+			if m.vault == nil {
+				return errors.New("no vault was specified")
+			}
 			arn, err := m.vault.CreateSecret(ctx, secret.PodSecret.NamedSecret)
 			if err != nil {
 				return err
 			}
 			secret.SetName(arn)
 		}
-	}
-
-	if m.vault == nil {
-		return errors.New("no vault was specified")
 	}
 
 	return nil
