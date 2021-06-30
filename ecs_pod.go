@@ -30,6 +30,7 @@ type ECSPodInfo struct {
 type ECSPodResources struct {
 	TaskID         *string            `bson:"-" json:"-" yaml:"-"`
 	TaskDefinition *ECSTaskDefinition `bson:"-" json:"-" yaml:"-"`
+	Cluster        *string            `bson:"-" json:"-" yaml:"-"`
 	Secrets        []PodSecret        `bson:"-" json:"-" yaml:"-"`
 }
 
@@ -48,6 +49,12 @@ func (r *ECSPodResources) SetTaskID(id string) *ECSPodResources {
 // SetTaskDefinition sets the ECS task definition associated with the pod.
 func (r *ECSPodResources) SetTaskDefinition(def ECSTaskDefinition) *ECSPodResources {
 	r.TaskDefinition = &def
+	return r
+}
+
+// SetCluster sets the cluster associated with the pod.
+func (r *ECSPodResources) SetCluster(cluster string) *ECSPodResources {
+	r.Cluster = &cluster
 	return r
 }
 
