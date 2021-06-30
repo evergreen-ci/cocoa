@@ -165,9 +165,6 @@ func (m *BasicECSPodCreator) getSecrets(merged cocoa.ECSPodCreationOptions) []co
 
 // createSecrets creates secrets that do not already exist.
 func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.SecretOptions) error {
-	if m.vault == nil {
-		return errors.New("no vault was specified")
-	}
 
 	for _, secret := range secrets {
 		if !utility.FromBoolPtr(secret.Exists) {
@@ -177,6 +174,10 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.
 			}
 			secret.SetName(arn)
 		}
+	}
+
+	if m.vault == nil {
+		return errors.New("no vault was specified")
 	}
 
 	return nil
