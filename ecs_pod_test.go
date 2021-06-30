@@ -57,4 +57,10 @@ func TestECSPodResources(t *testing.T) {
 		assert.Equal(t, *s0, res.Secrets[0])
 		assert.Equal(t, *s1, res.Secrets[1])
 	})
+	t.Run("SetCluster", func(t *testing.T) {
+		cluster := "cluster"
+		res := NewECSPodResources().SetCluster(cluster)
+		require.NotZero(t, res.Cluster)
+		assert.Equal(t, cluster, *res.Cluster)
+	})
 }
