@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
@@ -129,13 +130,9 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 		return errors.New("pod is not running")
 	}
 
-	if p.resources.Cluster == nil || p.resources.TaskID == nil {
-		return errors.New("missing pod resources field")
-	}
-
 	stopTask := &ecs.StopTaskInput{}
-	stopTask.SetCluster(*p.resources.Cluster)
-	stopTask.SetTask(*p.resources.TaskID)
+	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster))
+	stopTask.SetTask(utility.FromStringPtr(p.resources.TaskID))
 
 	_, err := p.client.StopTask(ctx, stopTask)
 	if err != nil {
