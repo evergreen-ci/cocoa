@@ -144,28 +144,27 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 
 // Delete deletes the pod and its owned resources.
 func (p *BasicECSPod) Delete(ctx context.Context) error {
-	// TODO: stop pod
-	
 	if err := p.Stop(ctx); err != nil {
-		return errors.Wrap(err, "deleting pod")
+		return errors.Wrap(err, "stopping pod")
 	}
 
-	// TODO: delete task def
-	deregisterDef := ecs.DeregisterTaskDefinitionInput{}
-	deregisterDef.SetTaskDefinition(*p.resources.TaskDefinition.ID)
+	if utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
+		deregisterDef := ecs.DeregisterTaskDefinitionInput{}
+		deregisterDef.SetTaskDefinition(utility.FromStringPtr(p.resources.TaskDefinition.ID))
 
-	p.client.DeregisterTaskDefinition(ctx, &deregisterDef)
+		if _, err := p.client.DeregisterTaskDefinition(ctx, &deregisterDef); err != nil {
+			return errors.Wrap(err, "deregistering task definition")
+		}
+	}
 
-	// TODO: delete secrets stored in Vault
 	for _, secret := range p.resources.Secrets {
-		if *secret.Owned {
-			if err := p.vault.DeleteSecret(ctx, *secret.Name); err != nil {
-				return errors.Wrap(err, "deleting pod")
+		if utility.FromBoolPtr(secret.Owned) {
+			if err := p.vault.DeleteSecret(ctx, utility.FromStringPtr(secret.Name)); err != nil {
+				return errors.Wrap(err, "deleting secret")
 			}
 		}
 	}
 
-	// TODO: update status to "deleted" IF all resources successfuly cleaned up
 	p.status = cocoa.Deleted
 
 	return nil
