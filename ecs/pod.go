@@ -127,7 +127,7 @@ func (p *BasicECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
 // resources.
 func (p *BasicECSPod) Stop(ctx context.Context) error {
 	if p.status != cocoa.Running {
-		return errors.Errorf( "pod can only be stopped when status is '%s', but current status is '%s'", cocoa.Running, p.status)
+		return errors.Errorf("pod can only be stopped when status is '%s', but current status is '%s'", cocoa.Running, p.status)
 	}
 
 	stopTask := &ecs.StopTaskInput{}
