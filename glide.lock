@@ -23,7 +23,7 @@ imports:
 
     # utility and its dependent libraries
   - name: github.com/evergreen-ci/utility
-    version: 9a40a71c1784193533247813b8361f534fe4101b
+    version: 05c74e17438dda266dd99e593054c0a9db6d86c1
   - name: github.com/evergreen-ci/gimlet
     version: ca35738ff88824eab0bbbe7950a81b30b6bfde9e
   - name: github.com/mongodb/grip

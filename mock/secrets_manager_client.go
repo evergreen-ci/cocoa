@@ -19,8 +19,9 @@ type StoredSecret struct {
 }
 
 // GlobalSecretCache is a global secret storage cache that provides a simplified
-// in-memory implementation of a secrets storage service. This can be used with
-// the SecretsManagerClient to access and modify secrets, or used directly.
+// in-memory implementation of a secrets storage service. This can be used
+// indirectly with the SecretsManagerClient to access and modify secrets, or
+// used directly.
 var GlobalSecretCache map[string]StoredSecret
 
 func init() {

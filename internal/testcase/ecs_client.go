@@ -48,7 +48,7 @@ func ECSClientTaskDefinitionTests() map[string]ECSClientTestCase {
 			require.NotNil(t, registerOut.TaskDefinition)
 			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
 			require.NotZero(t, registerOut.TaskDefinition.Status)
-			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
+			assert.Equal(t, ecs.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
 			require.NotZero(t, registerOut.TaskDefinition.RegisteredAt)
 			assert.NotZero(t, *registerOut.TaskDefinition.RegisteredAt)
 
@@ -118,7 +118,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 		},
 		"RunAndStopTaskSucceedsWithRegisteredTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			require.NotZero(t, registerOut.TaskDefinition.Status)
-			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
+			assert.Equal(t, ecs.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
 
 			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),
@@ -141,7 +141,7 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 		},
 		"DescribeTaskSucceedsWithRunningTask": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			require.NotZero(t, registerOut.TaskDefinition.Status)
-			assert.Equal(t, "ACTIVE", *registerOut.TaskDefinition.Status)
+			assert.Equal(t, ecs.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
 
 			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),

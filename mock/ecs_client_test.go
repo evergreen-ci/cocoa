@@ -1,4 +1,4 @@
-package ecs
+package mock
 
 import (
 	"context"
@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/cocoa/internal/awsutil"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -21,37 +19,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSClientInterface(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
-}
-
 func TestECSClient(t *testing.T) {
-	testutil.CheckAWSEnvVarsForECS(t)
+	assert.Implements(t, (*cocoa.ECSClient)(nil), &ECSClient{})
+
+	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	c, err := NewBasicECSClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(testutil.AWSRegion()),
-		Role:   aws.String(testutil.AWSRole()),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
-		},
-		HTTPClient: hc,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, c)
+	c := &ECSClient{}
+	defer func() {
+		assert.NoError(t, c.Close(ctx))
+	}()
 
 	for tName, tCase := range testcase.ECSClientTaskDefinitionTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
-
-			defer c.Close(tctx)
 
 			tCase(tctx, t, c)
 		})
@@ -93,7 +77,7 @@ func TestECSClient(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(*registerIn, *registerOut) {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
 
 			tCase(tctx, t, c)
