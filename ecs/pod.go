@@ -145,8 +145,8 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 // Delete deletes the pod and its owned resources.
 func (p *BasicECSPod) Delete(ctx context.Context) error {
 	// TODO: stop pod
-	err := p.Stop(ctx)
-	if err != nil {
+	
+	if err := p.Stop(ctx); err != nil {
 		return errors.Wrap(err, "deleting pod")
 	}
 
@@ -159,9 +159,7 @@ func (p *BasicECSPod) Delete(ctx context.Context) error {
 	// TODO: delete secrets stored in Vault
 	for _, secret := range p.resources.Secrets {
 		if *secret.Owned {
-			err = p.vault.DeleteSecret(ctx, *secret.NamedSecret.Name)
-			// not sure if Name == ARN/unique id
-			if err != nil {
+			if err := p.vault.DeleteSecret(ctx, *secret.Name); err != nil {
 				return errors.Wrap(err, "deleting pod")
 			}
 		}
