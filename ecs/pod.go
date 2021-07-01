@@ -3,7 +3,9 @@ package ecs
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
@@ -124,7 +126,20 @@ func (p *BasicECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
 // Stop stops the running pod without cleaning up any of its underlying
 // resources.
 func (p *BasicECSPod) Stop(ctx context.Context) error {
-	return errors.New("TODO: implement")
+	if p.status != cocoa.Running {
+		return errors.Errorf("pod can only be stopped when status is '%s', but current status is '%s'", cocoa.Running, p.status)
+	}
+
+	stopTask := &ecs.StopTaskInput{}
+	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
+
+	if _, err := p.client.StopTask(ctx, stopTask); err != nil {
+		return errors.Wrap(err, "stopping pod")
+	}
+
+	p.status = cocoa.Stopped
+
+	return nil
 }
 
 // Delete deletes the pod and its owned resources.
