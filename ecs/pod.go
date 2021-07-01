@@ -127,15 +127,13 @@ func (p *BasicECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
 // resources.
 func (p *BasicECSPod) Stop(ctx context.Context) error {
 	if p.status != cocoa.Running {
-		return errors.New("pod is not running")
+		return errors.Errorf( "pod can only be stopped when status is '%s', but current status is '%s'", cocoa.Running, p.status)
 	}
 
 	stopTask := &ecs.StopTaskInput{}
-	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster))
-	stopTask.SetTask(utility.FromStringPtr(p.resources.TaskID))
+	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
 
-	_, err := p.client.StopTask(ctx, stopTask)
-	if err != nil {
+	if _, err := p.client.StopTask(ctx, stopTask); err != nil {
 		return errors.Wrap(err, "stopping pod")
 	}
 
