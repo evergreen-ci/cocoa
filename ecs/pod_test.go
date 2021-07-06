@@ -39,6 +39,60 @@ func TestECSPod(t *testing.T) {
 			assert.Equal(t, *res, info.Resources)
 			assert.Equal(t, stat, info.Status)
 		},
+		"StopFailsOnIncorrectPodStatus": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			res := cocoa.NewECSPodResources().SetTaskID(utility.RandomString()).SetCluster(testutil.ECSClusterName())
+			stat := cocoa.Starting
+			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatus(stat)
+
+			p, err := NewBasicECSPod(opts)
+			require.NoError(t, err)
+
+			err = p.Stop(ctx)
+			require.Error(t, err)
+		},
+		// "StopSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+		// 	// TODO: referenced task was not found --> start task (create pod?)
+		// 	res := cocoa.NewECSPodResources().SetTaskID(utility.RandomString()).SetCluster(testutil.ECSClusterName())
+		// 	stat := cocoa.Starting
+		// 	opts := cocoa.NewECSPodCreationOptions().
+		// 		SetCPU().
+		// 		SetContainerDefinitions().
+		// 		SetExecutionOptions().
+		// 		SetMemoryMB().
+		// 		SetName().
+		// 		SetTags().
+		// 		SetTaskRole()
+
+		// 	// TODO: create pod
+		// 	podCreator, err := NewBasicECSPodCreator(c, NewBasicECSPodOptions().Vault)
+		// 	require.NoError(t, err)
+
+		// 	p, err := podCreator.CreatePod(ctx, opts)
+		// 	require.NoError(t, err)
+
+		// 	info, err := p.Info(ctx)
+		// 	require.NoError(t, err)
+		// 	assert.Equal(t, info.Status, cocoa.Running)
+
+		// 	err = p.Stop(ctx)
+		// 	require.NoError(t, err)
+		// 	assert.Equal(t, *res, p.resources)
+		// 	assert.Equal(t, stat, cocoa.Stopped)
+		// },
+		// "DeleteIsCalled": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+		// 	// TODO
+		// 	res := cocoa.NewECSPodResources().SetTaskID("task_id")
+		// 	stat := cocoa.Starting
+		// 	opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatus(stat)
+
+		// 	p, err := NewBasicECSPod(opts)
+		// 	require.NoError(t, err)
+
+		// 	info, err := p.Info(ctx)
+		// 	require.NoError(t, err)
+		// 	assert.Equal(t, *res, info.Resources)
+		// 	assert.Equal(t, stat, info.Status)
+		// },
 	} {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)

@@ -33,3 +33,13 @@ func AWSRegion() string {
 func AWSRole() string {
 	return os.Getenv("AWS_ROLE")
 }
+
+// TaskRole returns the AWS task role from the environment variable.
+func TaskRole() string {
+	return os.Getenv("AWS_ECS_TASK_ROLE")
+}
+
+// ExecutionRole returns the AWS execution role from the environment variable.
+func ExecutionRole() string {
+	return os.Getenv("AWS_ECS_EXECUTION_ROLE")
+}

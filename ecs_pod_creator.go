@@ -231,6 +231,10 @@ func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutio
 		if opt.Tags != nil {
 			merged.Tags = opt.Tags
 		}
+
+		if opt.ExecutionRole != nil {
+			merged.ExecutionRole = opt.ExecutionRole
+		}
 	}
 
 	return merged
@@ -447,6 +451,9 @@ type ECSPodExecutionOptions struct {
 	SupportsDebugMode *bool
 	// Tags are any tags to apply to the running pods.
 	Tags []string
+	// ExecutionRole is the role that the pod can use to execute tasks. Depending on
+	// the configuration, this may be required if the container uses secrets.
+	ExecutionRole *string
 }
 
 // NewECSPodExecutionOptions returns new uninitialized options to run a pod.
@@ -484,6 +491,13 @@ func (o *ECSPodExecutionOptions) SetTags(tags []string) *ECSPodExecutionOptions 
 // AddTags adds new tags to the existing ones for the pod itself when it is run.
 func (o *ECSPodExecutionOptions) AddTags(tags ...string) *ECSPodExecutionOptions {
 	o.Tags = append(o.Tags, tags...)
+	return o
+}
+
+// SetExecutionRole sets the execution role for the pod itself when it is run. This overwrites any
+// existing execution roles.
+func (o *ECSPodExecutionOptions) SetExecutionRole(role string) *ECSPodExecutionOptions {
+	o.ExecutionRole = &role
 	return o
 }
 

@@ -430,6 +430,11 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		opts.AddTags()
 		assert.Len(t, opts.Tags, 2)
 	})
+	t.Run("SetExecutionRole", func(t *testing.T) {
+		role := "role"
+		opts := NewECSPodExecutionOptions().SetExecutionRole(role)
+		assert.Equal(t, role, opts.ExecutionRole)
+	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsValid", func(t *testing.T) {
 			opts := NewECSPodExecutionOptions()
