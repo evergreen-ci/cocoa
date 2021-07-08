@@ -450,7 +450,7 @@ type ECSPodExecutionOptions struct {
 	// defined. By default, this is false.
 	SupportsDebugMode *bool
 	// Tags are any tags to apply to the running pods.
-	Tags []string
+	Tags map[string]string
 	// ExecutionRole is the role that the pod can use to execute tasks. Depending on
 	// the configuration, this may be required if the container uses secrets.
 	ExecutionRole *string
@@ -483,14 +483,21 @@ func (o *ECSPodExecutionOptions) SetSupportsDebugMode(supported bool) *ECSPodExe
 
 // SetTags sets the tags for the pod itself when it is run. This overwrites any
 // existing tags.
-func (o *ECSPodExecutionOptions) SetTags(tags []string) *ECSPodExecutionOptions {
+func (o *ECSPodExecutionOptions) SetTags(tags map[string]string) *ECSPodExecutionOptions {
 	o.Tags = tags
 	return o
 }
 
 // AddTags adds new tags to the existing ones for the pod itself when it is run.
-func (o *ECSPodExecutionOptions) AddTags(tags ...string) *ECSPodExecutionOptions {
-	o.Tags = append(o.Tags, tags...)
+func (o *ECSPodExecutionOptions) AddTags(tags map[string]string) *ECSPodExecutionOptions {
+	if o.Tags == nil {
+		o.Tags = make(map[string]string)
+	}
+
+	for k, v := range tags {
+		o.Tags[k] = v
+	}
+
 	return o
 }
 

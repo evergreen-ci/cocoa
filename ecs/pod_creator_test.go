@@ -26,13 +26,6 @@ func TestECSPodCreator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cleanupPod := func(ctx context.Context, t *testing.T, p cocoa.ECSPod) error {
-		if err := p.Delete(ctx); err != nil {
-			return err
-		}
-		return nil
-	}
-
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault){
 		"NewPodCreatorFailsWithMissingClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
 			podCreator, err := NewBasicECSPodCreator(nil, nil)
@@ -43,25 +36,6 @@ func TestECSPodCreator(t *testing.T) {
 			opts := cocoa.NewECSPodCreationOptions()
 			require.NotZero(t, opts)
 			assert.Zero(t, *opts)
-
-			podCreator, err := NewBasicECSPodCreator(c, nil)
-			require.NoError(t, err)
-
-			p, err := podCreator.CreatePod(ctx, opts)
-			require.Error(t, err)
-			require.Zero(t, p)
-		},
-		"CreatePodFailsWithInvalidExecutionOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			containerDef := cocoa.NewECSContainerDefinition().SetImage("image")
-			opts := cocoa.NewECSPodCreationOptions().SetName("name").
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetTaskRole("role").
-				AddTags("tag").
-				SetExecutionOptions(*cocoa.NewECSPodExecutionOptions())
-			require.NotZero(t, opts)
-			assert.NotZero(t, *opts)
 
 			podCreator, err := NewBasicECSPodCreator(c, nil)
 			require.NoError(t, err)
@@ -224,7 +198,9 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, p)
 
-			defer cleanupPod(ctx, t, p)
+			defer func() {
+				require.NoError(t, p.Delete(ctx))
+			}()
 
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
@@ -240,7 +216,8 @@ func TestECSPodCreator(t *testing.T) {
 			require.NotNil(t, containerDef.EnvVars)
 
 			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
+				SetCluster(testutil.ECSClusterName()).
+				AddTags(map[string]string{"k0": "v0", "k1": "v1"})
 			assert.NoError(t, execOpts.Validate())
 
 			opts := cocoa.NewECSPodCreationOptions().
@@ -248,7 +225,6 @@ func TestECSPodCreator(t *testing.T) {
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole(testutil.TaskRole()).
-				AddTags("tag").
 				SetExecutionOptions(*execOpts)
 			require.NotZero(t, opts)
 			assert.NotZero(t, *opts)
@@ -262,7 +238,9 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, p)
 
-			defer cleanupPod(ctx, t, p)
+			defer func() {
+				require.NoError(t, p.Delete(ctx))
+			}()
 
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
@@ -305,5 +283,4 @@ func TestECSPodCreator(t *testing.T) {
 			tCase(tctx, t, c, m)
 		})
 	}
-
 }

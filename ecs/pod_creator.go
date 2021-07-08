@@ -128,7 +128,6 @@ func (m *BasicECSPodCreator) getSecrets(merged cocoa.ECSPodCreationOptions) []co
 
 // createSecrets creates secrets that do not already exist.
 func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.SecretOptions) error {
-
 	for _, secret := range secrets {
 		if !utility.FromBoolPtr(secret.Exists) {
 			if m.vault == nil {
@@ -139,6 +138,7 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.
 				return err
 			}
 			secret.SetName(arn)
+			secret.PodSecret.SetName(arn)
 		}
 	}
 
@@ -146,12 +146,13 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.
 }
 
 // exportTags converts strings into ECS tags.
-func exportTags(tags []string) []*ecs.Tag {
+func exportTags(tags map[string]string) []*ecs.Tag {
 	var ecsTags []*ecs.Tag
 
-	for _, tag := range tags {
+	for k, v := range tags {
 		ecsTag := &ecs.Tag{}
-		ecsTag.SetKey(tag)
+		ecsTag.SetKey(k)
+		ecsTag.SetValue(v)
 		ecsTags = append(ecsTags, ecsTag)
 	}
 
@@ -250,5 +251,6 @@ func (m *BasicECSPodCreator) exportTaskExecution(merged cocoa.ECSPodExecutionOpt
 		SetTags(exportTags(merged.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(merged.SupportsDebugMode)).
 		SetPlacementStrategy(exportStrategy(merged.PlacementOpts.Strategy, merged.PlacementOpts.StrategyParameter))
+
 	return runTask
 }
