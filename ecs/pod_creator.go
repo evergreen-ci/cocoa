@@ -63,14 +63,13 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		return nil, errors.New("expected a task definition from ECS, but none was returned")
 	}
 
-	taskDef := cocoa.NewECSTaskDefinition().SetID(*registerOut.TaskDefinition.TaskDefinitionArn).SetOwned(true)
+	taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(registerOut.TaskDefinition.TaskDefinitionArn)).SetOwned(true)
 
 	runTask := m.exportTaskExecution(mergedPodExecutionOpts, *taskDef)
 
 	runOut, err := m.client.RunTask(ctx, runTask)
 	if err != nil {
-		errOut := fmt.Sprintf("running task-- Cluster: %s, Task: %s", *runTask.Cluster, *runTask.TaskDefinition)
-		return nil, errors.Wrap(err, errOut)
+		return nil, errors.Wrap(err, fmt.Sprintf("running task-- Cluster: %s, Task: %s", utility.FromStringPtr(runTask.Cluster), utility.FromStringPtr(runTask.TaskDefinition)))
 	}
 
 	if len(runOut.Failures) > 0 {
@@ -98,10 +97,10 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		SetResources(*resources)
 
 	p, err := NewBasicECSPod(options)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod")
 	}
+
 	return p, nil
 }
 
@@ -145,7 +144,7 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.
 	return nil
 }
 
-// exportTags converts strings into ECS tags.
+// exportTags converts a mapping of string-string into ECS tags.
 func exportTags(tags map[string]string) []*ecs.Tag {
 	var ecsTags []*ecs.Tag
 
@@ -162,14 +161,13 @@ func exportTags(tags map[string]string) []*ecs.Tag {
 // exportStrategy converts the strategy and parameter into an ECS placement strategy.
 func exportStrategy(strategy *cocoa.ECSPlacementStrategy, param *cocoa.ECSStrategyParameter) []*ecs.PlacementStrategy {
 	placementStrat := ecs.PlacementStrategy{}
-
 	placementStrat.SetType(string(*strategy)).SetField(utility.FromStringPtr(param))
 
 	return []*ecs.PlacementStrategy{&placementStrat}
 }
 
 // exportEnvVars converts the non-secret environment variables into ECS environment variables.
-func (m *BasicECSPodCreator) exportEnvVars(variables []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
+func exportEnvVars(variables []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
 	var keyValuePairs []*ecs.KeyValuePair
 
 	for _, variable := range variables {
@@ -215,18 +213,14 @@ func (m *BasicECSPodCreator) exportPodCreationOptions(ctx context.Context, merge
 	var containerDefs []*ecs.ContainerDefinition
 
 	for _, def := range merged.ContainerDefinitions {
-
-		envVars := m.exportEnvVars(def.EnvVars)
-		secrets := exportSecrets(def.EnvVars)
-
 		containerDef := ecs.ContainerDefinition{}
 		containerDef.SetCommand(utility.ToStringPtrSlice(def.Command)).
 			SetCpu(int64(utility.FromIntPtr(def.CPU))).
 			SetImage(utility.FromStringPtr(def.Image)).
 			SetName(utility.FromStringPtr(def.Name)).
 			SetMemory(int64(utility.FromIntPtr(def.MemoryMB))).
-			SetEnvironment(envVars).
-			SetSecrets(secrets)
+			SetEnvironment(exportEnvVars(def.EnvVars)).
+			SetSecrets(exportSecrets(def.EnvVars))
 
 		containerDefs = append(containerDefs, &containerDef)
 	}

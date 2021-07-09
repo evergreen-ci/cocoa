@@ -28,7 +28,7 @@ func TestECSPodBasics(t *testing.T) {
 	defer cancel()
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient){
-		"InvalidPodOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+		"InvalidPodOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			opts := NewBasicECSPodOptions()
 			p, err := NewBasicECSPod(opts)
 			require.Error(t, err)
@@ -63,8 +63,6 @@ func TestECSPodBasics(t *testing.T) {
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
-			require.NotNil(t, c)
-
 			defer c.Close(ctx)
 
 			tCase(tctx, t, c)
@@ -87,6 +85,7 @@ func TestECSPod(t *testing.T) {
 
 			hc := utility.GetHTTPClient()
 			defer utility.PutHTTPClient(hc)
+
 			awsOpts := awsutil.NewClientOptions().
 				SetHTTPClient(hc).
 				SetCredentials(credentials.NewEnvCredentials()).
