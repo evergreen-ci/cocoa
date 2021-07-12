@@ -196,6 +196,8 @@ func (c *BasicSecretsManagerClient) isNonRetryableErrorCode(code string) bool {
 	case "AccessDeniedException",
 		secretsmanager.ErrCodeInvalidParameterException,
 		secretsmanager.ErrCodeInvalidRequestException,
+		secretsmanager.ErrCodeResourceNotFoundException,
+		secretsmanager.ErrCodeResourceExistsException,
 		request.InvalidParameterErrCode,
 		request.ParamRequiredErrCode:
 		return true

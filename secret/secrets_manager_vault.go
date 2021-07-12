@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -32,10 +33,13 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		Name:         s.Name,
 		SecretString: s.Value,
 	})
-	if out != nil && out.ARN != nil {
-		return *out.ARN, err
+	if err != nil {
+		return "", err
 	}
-	return "", err
+	if out == nil || out.ARN == nil {
+		return "", errors.New("expected an ID, but nont was returned from Secrets Manager")
+	}
+	return *out.ARN, nil
 }
 
 // GetValue returns an existing secret's decrypted value.
@@ -45,20 +49,23 @@ func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val stri
 	}
 
 	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
-	if out != nil && out.SecretString != nil {
-		return *out.SecretString, nil
+	if err != nil {
+		return "", err
 	}
-	return "", err
+	if out == nil || out.SecretString == nil {
+		return "", errors.New("expected a value, but none was returned from Secrets Manager")
+	}
+	return *out.SecretString, nil
 }
 
 // UpdateValue updates an existing secret's value.
-func (m *BasicSecretsManager) UpdateValue(ctx context.Context, id, val string) error {
-	if id == "" {
+func (m *BasicSecretsManager) UpdateValue(ctx context.Context, s cocoa.NamedSecret) error {
+	if utility.FromStringPtr(s.Name) == "" {
 		return errors.New("must specify a non-empty id")
 	}
 	_, err := m.client.UpdateSecretValue(ctx, &secretsmanager.UpdateSecretInput{
-		SecretId:     aws.String(id),
-		SecretString: aws.String(val),
+		SecretId:     s.Name,
+		SecretString: s.Value,
 	})
 	return err
 }

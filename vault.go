@@ -14,14 +14,15 @@ type Vault interface {
 	// GetValue returns the value of the secret identified by ID.
 	GetValue(ctx context.Context, id string) (val string, err error)
 	// UpdateValue updates an existing secret's value by ID.
-	UpdateValue(ctx context.Context, id, val string) error
+	UpdateValue(ctx context.Context, s NamedSecret) error
 	// DeleteSecret deletes a secret by ID.
 	DeleteSecret(ctx context.Context, id string) error
 }
 
 // NamedSecret represents a secret with a name.
 type NamedSecret struct {
-	// Name is the friendly human-readable name of the secret.
+	// Name is either the friendly human-readable name to assign to the secret
+	// or the resource name.
 	Name *string
 	// Value is the stored value of the secret.
 	Value *string

@@ -2,40 +2,75 @@ package mock
 
 import (
 	"context"
-	"errors"
 
 	"github.com/evergreen-ci/cocoa"
 )
 
-// Vault provides a mock implementation of a cocoa.Vault. This makes it
-// possible to introspect on inputs to the vault and control the vault's output.
-// It provides some default implementations where possible.
-type Vault struct{}
+// Vault provides a mock implementation of a cocoa.Vault backed by any vault by
+// default. This makes it possible to introspect on inputs to the vault and
+// control the vault's output. It provides some default implementations where
+// possible.
+type Vault struct {
+	cocoa.Vault
+
+	CreateSecretInput  *cocoa.NamedSecret
+	CreateSecretOutput *string
+
+	GetValueInput  *string
+	GetValueOutput *string
+
+	UpdateValueInput *cocoa.NamedSecret
+
+	DeleteSecretInput *string
+}
+
+// NewVault creates a mock Vault backed by the given Vault.
+func NewVault(v cocoa.Vault) *Vault {
+	return &Vault{
+		Vault: v,
+	}
+}
 
 // CreateSecret saves the input options and returns a mock secret ID. The mock
-// output can be customized. By default, it will create a cached mock secret
-// based on the input.
+// output can be customized. By default, it will call the backing Vault
+// implementation's CreateSecret.
 func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
-	return "", errors.New("TODO: implement")
+	m.CreateSecretInput = &s
+
+	if m.CreateSecretOutput != nil {
+		return *m.CreateSecretOutput, nil
+	}
+
+	return m.Vault.CreateSecret(ctx, s)
 }
 
 // GetValue saves the input options and returns an existing mock secret's value.
-// The mock output can be customized. By default, it will return a cached mock
-// secret's value if it exists.
+// The mock output can be customized. By default, it will call the backing Vault
+// implementation's GetValue.
 func (m *Vault) GetValue(ctx context.Context, id string) (val string, err error) {
-	return "", errors.New("TODO: implement")
+	m.GetValueInput = &id
+
+	if m.GetValueOutput != nil {
+		return *m.GetValueOutput, nil
+	}
+
+	return m.Vault.GetValue(ctx, id)
 }
 
 // UpdateValue saves the input options and updates an existing mock secret. The
-// mock output can be customized. By default, it will update a cached mock
-// secret if it exists.
-func (m *Vault) UpdateValue(ctx context.Context, id, val string) error {
-	return errors.New("TODO: implement")
+// mock output can be customized. By default, it will call the backing Vault
+// implementation's UpdateValue.
+func (m *Vault) UpdateValue(ctx context.Context, s cocoa.NamedSecret) error {
+	m.UpdateValueInput = &s
+
+	return m.Vault.UpdateValue(ctx, s)
 }
 
 // DeleteSecret saves the input options and deletes an existing mock secret. The
-// mock output can be customized. By default, it will delete a cached mock
-// secret if it exists.
+// mock output can be customized. By default, it will call the backing Vault
+// implementation's DeleteSecret.
 func (m *Vault) DeleteSecret(ctx context.Context, id string) error {
-	return errors.New("TODO: implement")
+	m.DeleteSecretInput = &id
+
+	return m.Vault.DeleteSecret(ctx, id)
 }
