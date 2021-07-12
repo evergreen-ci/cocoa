@@ -43,7 +43,7 @@ type ECSPodCreationOptions struct {
 	// (ECSPodExecutionOptions).SupportsDebugMode is true.
 	TaskRole *string
 	// Tags are resource tags to apply to the pod definition.
-	Tags []string
+	Tags map[string]string
 	// ExecutionOpts specify options to configure how the pod executes.
 	ExecutionOpts *ECSPodExecutionOptions
 }
@@ -95,14 +95,21 @@ func (o *ECSPodCreationOptions) SetTaskRole(role string) *ECSPodCreationOptions 
 
 // SetTags sets the tags for the pod definition. This overwrites any existing
 // tags.
-func (o *ECSPodCreationOptions) SetTags(tags []string) *ECSPodCreationOptions {
+func (o *ECSPodCreationOptions) SetTags(tags map[string]string) *ECSPodCreationOptions {
 	o.Tags = tags
 	return o
 }
 
 // AddTags adds new tags to the existing ones for the pod definition.
-func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
-	o.Tags = append(o.Tags, tags...)
+func (o *ECSPodCreationOptions) AddTags(tags map[string]string) *ECSPodCreationOptions {
+	if o.Tags == nil {
+		o.Tags = make(map[string]string)
+	}
+
+	for k, v := range tags {
+		o.Tags[k] = v
+	}
+
 	return o
 }
 
@@ -451,7 +458,7 @@ type ECSPodExecutionOptions struct {
 	SupportsDebugMode *bool
 	// Tags are any tags to apply to the running pods.
 	Tags map[string]string
-	// ExecutionRole is the role that the pod can use to execute tasks. Depending on
+	// ExecutionRole is the role that ECS container agent can use. Depending on
 	// the configuration, this may be required if the container uses secrets.
 	ExecutionRole *string
 }

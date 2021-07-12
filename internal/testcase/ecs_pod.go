@@ -15,37 +15,33 @@ type ECSPodTestCase func(ctx context.Context, t *testing.T, v cocoa.Vault, pc co
 
 // ECSPodTests returns common test cases that a cocoa.ECSPod should support.
 func ECSPodTests() map[string]ECSPodTestCase {
-	envVar := cocoa.NewEnvironmentVariable().SetName("name").SetValue("value")
-	secret := cocoa.NewEnvironmentVariable().SetName("secret1").
-		SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name1")).SetValue("value1"))
-	secretOwned := cocoa.NewEnvironmentVariable().SetName("secret2").
-		SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name2")).SetValue("value2"))
-	secretOwned.SecretOpts.SetOwned(true)
 
-	containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
+	envVar := cocoa.NewEnvironmentVariable().SetName("name").SetValue("value")
+
+	containerDef := cocoa.NewECSContainerDefinition().
+		SetImage("image").
 		SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
-		SetName("container").
 		SetMemoryMB(128).
-		SetCPU(128)
+		SetCPU(128).
+		SetName("container")
 
 	execOpts := cocoa.NewECSPodExecutionOptions().
 		SetCluster(testutil.ECSClusterName()).
 		SetExecutionRole(testutil.ExecutionRole())
 
 	opts := cocoa.NewECSPodCreationOptions().
+		SetName(testutil.NewTaskDefinitionFamily("name")).
 		AddContainerDefinitions(*containerDef).
 		SetMemoryMB(128).
 		SetCPU(128).
 		SetTaskRole(testutil.TaskRole()).
-		AddTags("tag").
 		SetExecutionOptions(*execOpts)
 
 	optsSecret := cocoa.NewECSPodCreationOptions().
-		AddContainerDefinitions(*containerDef.AddEnvironmentVariables(*secret, *secretOwned)).
+		SetName(testutil.NewTaskDefinitionFamily("name")).
 		SetMemoryMB(128).
 		SetCPU(128).
 		SetTaskRole(testutil.TaskRole()).
-		AddTags("tag").
 		SetExecutionOptions(*execOpts)
 
 	return map[string]ECSPodTestCase{
@@ -54,16 +50,24 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.NoError(t, err)
 			require.NotZero(t, p)
 
-			err = p.Stop(ctx)
-			require.NoError(t, err)
+			require.NoError(t, p.Stop(ctx))
 
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, info)
-
 			assert.Equal(t, cocoa.Stopped, info.Status)
 		},
 		"StopSucceedsWithSecrets": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
+			secret := cocoa.NewEnvironmentVariable().SetName("secret1").
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name1")).SetValue("value1"))
+			secretOwned := cocoa.NewEnvironmentVariable().SetName("secret2").
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name2")).SetValue("value2"))
+			secretOwned.SecretOpts.SetOwned(true)
+
+			optsSecret := optsSecret.SetContainerDefinitions(
+				[]cocoa.ECSContainerDefinition{*containerDef.SetEnvironmentVariables(
+					[]cocoa.EnvironmentVariable{*secret, *secretOwned})})
+
 			p, err := pc.CreatePod(ctx, optsSecret)
 			require.NoError(t, err)
 			require.NotZero(t, p)
@@ -71,18 +75,16 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, info)
-			require.NotNil(t, info.Resources)
 			assert.Equal(t, cocoa.Running, info.Status)
-			assert.Equal(t, 2, len(info.Resources.Secrets))
+			assert.Len(t, info.Resources.Secrets, 2)
 
-			err = p.Stop(ctx)
-			require.NoError(t, err)
+			require.NoError(t, p.Stop(ctx))
 
 			info, err = p.Info(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, info)
 			assert.Equal(t, cocoa.Stopped, info.Status)
-			require.Equal(t, 2, len(info.Resources.Secrets))
+			require.Len(t, info.Resources.Secrets, 2)
 
 			arn := info.Resources.Secrets[0].Name
 			id, err := v.GetValue(ctx, *arn)
@@ -94,16 +96,14 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.NoError(t, err)
 			require.NotZero(t, p)
 
-			err = p.Stop(ctx)
-			require.NoError(t, err)
+			require.NoError(t, p.Stop(ctx))
 
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
 			require.NotZero(t, info)
 			assert.Equal(t, cocoa.Stopped, info.Status)
 
-			err = p.Stop(ctx)
-			require.Error(t, err)
+			require.Error(t, p.Stop(ctx))
 		},
 		"DeleteSucceeds": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
 			p, err := pc.CreatePod(ctx, opts)
@@ -115,8 +115,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.NotNil(t, info)
 			assert.Equal(t, cocoa.Running, info.Status)
 
-			err = p.Delete(ctx)
-			require.NoError(t, err)
+			require.NoError(t, p.Delete(ctx))
 
 			info, err = p.Info(ctx)
 			require.NoError(t, err)
@@ -124,6 +123,16 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			assert.Equal(t, cocoa.Deleted, info.Status)
 		},
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
+			secret := cocoa.NewEnvironmentVariable().SetName("secret1").
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name1")).SetValue("value1"))
+			secretOwned := cocoa.NewEnvironmentVariable().SetName("secret2").
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name2")).SetValue("value2"))
+			secretOwned.SecretOpts.SetOwned(true)
+
+			optsSecret := optsSecret.SetContainerDefinitions(
+				[]cocoa.ECSContainerDefinition{*containerDef.SetEnvironmentVariables(
+					[]cocoa.EnvironmentVariable{*secret, *secretOwned})})
+
 			p, err := pc.CreatePod(ctx, optsSecret)
 			require.NoError(t, err)
 			require.NotZero(t, p)
@@ -131,29 +140,26 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			info, err := p.Info(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, info)
-			require.NotNil(t, info.Resources)
-			require.NotNil(t, info.Resources.Secrets)
 			assert.Equal(t, cocoa.Running, info.Status)
-			require.Equal(t, 2, len(info.Resources.Secrets))
+			require.Len(t, info.Resources.Secrets, 2)
 
-			err = p.Delete(ctx)
-			require.NoError(t, err)
+			require.NoError(t, p.Delete(ctx))
 
 			info, err = p.Info(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, info)
 			assert.Equal(t, cocoa.Deleted, info.Status)
-			require.Equal(t, 2, len(info.Resources.Secrets))
+			require.Len(t, info.Resources.Secrets, 2)
 
 			arn0 := info.Resources.Secrets[0].Name
-			id, err := v.GetValue(ctx, *arn0)
+			val, err := v.GetValue(ctx, *arn0)
 			require.NoError(t, err)
-			require.NotZero(t, id)
+			require.NotZero(t, val)
+			assert.Equal(t, *info.Resources.Secrets[0].NamedSecret.Value, *secret.SecretOpts.NamedSecret.Value)
 
 			arn1 := info.Resources.Secrets[1].Name
 			_, err = v.GetValue(ctx, *arn1)
 			require.Error(t, err)
-
 		},
 	}
 }

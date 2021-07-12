@@ -2,13 +2,10 @@ package ecs
 
 import (
 	"context"
-	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
@@ -69,7 +66,7 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 
 	runOut, err := m.client.RunTask(ctx, runTask)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("running task-- Cluster: %s, Task: %s", utility.FromStringPtr(runTask.Cluster), utility.FromStringPtr(runTask.TaskDefinition)))
+		return nil, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(runTask.TaskDefinition), utility.FromStringPtr(runTask.Cluster))
 	}
 
 	if len(runOut.Failures) > 0 {
@@ -150,8 +147,7 @@ func exportTags(tags map[string]string) []*ecs.Tag {
 
 	for k, v := range tags {
 		ecsTag := &ecs.Tag{}
-		ecsTag.SetKey(k)
-		ecsTag.SetValue(v)
+		ecsTag.SetKey(k).SetValue(v)
 		ecsTags = append(ecsTags, ecsTag)
 	}
 
@@ -231,7 +227,7 @@ func (m *BasicECSPodCreator) exportPodCreationOptions(ctx context.Context, merge
 		SetCpu(strconv.Itoa(utility.FromIntPtr(merged.CPU))).
 		SetTaskRoleArn(utility.FromStringPtr(merged.TaskRole)).
 		SetTags(exportTags(merged.ExecutionOpts.Tags)).
-		SetFamily(strings.Join([]string{testutil.TaskDefinitionPrefix(), "cocoa", utility.FromStringPtr(merged.Name)}, "-")).
+		SetFamily(utility.FromStringPtr(merged.Name)).
 		SetExecutionRoleArn(utility.FromStringPtr(merged.ExecutionOpts.ExecutionRole))
 
 	return taskDef

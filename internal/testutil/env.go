@@ -29,6 +29,8 @@ func CheckAWSEnvVarsForECS(t *testing.T) {
 		"AWS_REGION",
 		"AWS_ECS_CLUSTER",
 		"AWS_ECS_TASK_DEFINITION_PREFIX",
+		"AWS_ECS_TASK_ROLE",
+		"AWS_ECS_EXECUTION_ROLE",
 	)
 }
 
@@ -55,6 +57,8 @@ func CheckAWSEnvVarsForECSAndSecretsManager(t *testing.T) {
 		"AWS_ECS_CLUSTER",
 		"AWS_SECRET_PREFIX",
 		"AWS_ECS_TASK_DEFINITION_PREFIX",
+		"AWS_ECS_TASK_ROLE",
+		"AWS_ECS_EXECUTION_ROLE",
 	)
 }
 

@@ -72,6 +72,7 @@ func TestECSPodBasics(t *testing.T) {
 
 }
 
+// TODO (EVG-14979): clean up resources in ECS tests more thoroughly
 func TestECSPod(t *testing.T) {
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
