@@ -41,7 +41,7 @@ functions:
         AWS_SECRET_PREFIX: ${aws_secret_prefix}
         AWS_ECS_TASK_DEFINITION_PREFIX: ${aws_ecs_task_definition_prefix}
         AWS_ECS_TASK_ROLE: ${aws_ecs_task_role}
-		    AWS_ECS_EXECUTION_ROLE: ${aws_ecs_execution_role}
+        AWS_ECS_EXECUTION_ROLE: ${aws_ecs_execution_role}
         GOPATH: ${workdir}/gopath
   parse-results:
     command: gotest.parse_files
