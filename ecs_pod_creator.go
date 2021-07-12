@@ -43,7 +43,7 @@ type ECSPodCreationOptions struct {
 	// (ECSPodExecutionOptions).SupportsDebugMode is true.
 	TaskRole *string
 	// Tags are resource tags to apply to the pod definition.
-	Tags []string
+	Tags map[string]string
 	// ExecutionOpts specify options to configure how the pod executes.
 	ExecutionOpts *ECSPodExecutionOptions
 }
@@ -95,14 +95,21 @@ func (o *ECSPodCreationOptions) SetTaskRole(role string) *ECSPodCreationOptions 
 
 // SetTags sets the tags for the pod definition. This overwrites any existing
 // tags.
-func (o *ECSPodCreationOptions) SetTags(tags []string) *ECSPodCreationOptions {
+func (o *ECSPodCreationOptions) SetTags(tags map[string]string) *ECSPodCreationOptions {
 	o.Tags = tags
 	return o
 }
 
 // AddTags adds new tags to the existing ones for the pod definition.
-func (o *ECSPodCreationOptions) AddTags(tags ...string) *ECSPodCreationOptions {
-	o.Tags = append(o.Tags, tags...)
+func (o *ECSPodCreationOptions) AddTags(tags map[string]string) *ECSPodCreationOptions {
+	if o.Tags == nil {
+		o.Tags = make(map[string]string)
+	}
+
+	for k, v := range tags {
+		o.Tags[k] = v
+	}
+
 	return o
 }
 
@@ -230,6 +237,10 @@ func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutio
 
 		if opt.Tags != nil {
 			merged.Tags = opt.Tags
+		}
+
+		if opt.ExecutionRole != nil {
+			merged.ExecutionRole = opt.ExecutionRole
 		}
 	}
 
@@ -446,7 +457,10 @@ type ECSPodExecutionOptions struct {
 	// defined. By default, this is false.
 	SupportsDebugMode *bool
 	// Tags are any tags to apply to the running pods.
-	Tags []string
+	Tags map[string]string
+	// ExecutionRole is the role that ECS container agent can use. Depending on
+	// the configuration, this may be required if the container uses secrets.
+	ExecutionRole *string
 }
 
 // NewECSPodExecutionOptions returns new uninitialized options to run a pod.
@@ -476,14 +490,28 @@ func (o *ECSPodExecutionOptions) SetSupportsDebugMode(supported bool) *ECSPodExe
 
 // SetTags sets the tags for the pod itself when it is run. This overwrites any
 // existing tags.
-func (o *ECSPodExecutionOptions) SetTags(tags []string) *ECSPodExecutionOptions {
+func (o *ECSPodExecutionOptions) SetTags(tags map[string]string) *ECSPodExecutionOptions {
 	o.Tags = tags
 	return o
 }
 
 // AddTags adds new tags to the existing ones for the pod itself when it is run.
-func (o *ECSPodExecutionOptions) AddTags(tags ...string) *ECSPodExecutionOptions {
-	o.Tags = append(o.Tags, tags...)
+func (o *ECSPodExecutionOptions) AddTags(tags map[string]string) *ECSPodExecutionOptions {
+	if o.Tags == nil {
+		o.Tags = make(map[string]string)
+	}
+
+	for k, v := range tags {
+		o.Tags[k] = v
+	}
+
+	return o
+}
+
+// SetExecutionRole sets the execution role for the pod itself when it is run. This overwrites any
+// existing execution roles.
+func (o *ECSPodExecutionOptions) SetExecutionRole(role string) *ECSPodExecutionOptions {
+	o.ExecutionRole = &role
 	return o
 }
 

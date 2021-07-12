@@ -144,5 +144,28 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 
 // Delete deletes the pod and its owned resources.
 func (p *BasicECSPod) Delete(ctx context.Context) error {
-	return errors.New("TODO: implement")
+	if err := p.Stop(ctx); err != nil {
+		return errors.Wrap(err, "stopping pod")
+	}
+
+	if utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
+		deregisterDef := ecs.DeregisterTaskDefinitionInput{}
+		deregisterDef.SetTaskDefinition(utility.FromStringPtr(p.resources.TaskDefinition.ID))
+
+		if _, err := p.client.DeregisterTaskDefinition(ctx, &deregisterDef); err != nil {
+			return errors.Wrap(err, "deregistering task definition")
+		}
+	}
+
+	for _, secret := range p.resources.Secrets {
+		if utility.FromBoolPtr(secret.Owned) {
+			if err := p.vault.DeleteSecret(ctx, utility.FromStringPtr(secret.Name)); err != nil {
+				return errors.Wrap(err, "deleting secret")
+			}
+		}
+	}
+
+	p.status = cocoa.Deleted
+
+	return nil
 }

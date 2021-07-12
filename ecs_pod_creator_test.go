@@ -46,19 +46,22 @@ func TestECSPodCreationOptions(t *testing.T) {
 		assert.Equal(t, cpu, utility.FromIntPtr(def.CPU))
 	})
 	t.Run("SetTags", func(t *testing.T) {
-		tag := "tag"
-		def := NewECSPodCreationOptions().SetTags([]string{tag})
+		key := "tagKey"
+		value := "tagValue"
+		def := NewECSPodCreationOptions().SetTags(map[string]string{key: value})
 		require.Len(t, def.Tags, 1)
-		assert.Equal(t, tag, def.Tags[0])
+		assert.Equal(t, value, def.Tags[key])
 	})
 	t.Run("AddTags", func(t *testing.T) {
-		tag0 := "tag0"
-		tag1 := "tag1"
-		def := NewECSPodCreationOptions().AddTags(tag0, tag1)
+		key0 := "key0"
+		val0 := "val0"
+		key1 := "key1"
+		val1 := "val1"
+		def := NewECSPodCreationOptions().AddTags(map[string]string{key0: val0, key1: val1})
 		require.Len(t, def.Tags, 2)
-		assert.Equal(t, tag0, def.Tags[0])
-		assert.Equal(t, tag1, def.Tags[1])
-		def.AddTags()
+		assert.Equal(t, val0, def.Tags[key0])
+		assert.Equal(t, val1, def.Tags[key1])
+		def.AddTags(map[string]string{})
 		assert.Len(t, def.Tags, 2)
 	})
 	t.Run("Validate", func(t *testing.T) {
@@ -100,7 +103,7 @@ func TestECSPodCreationOptions(t *testing.T) {
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole("role").
-				AddTags("tag").
+				AddTags(map[string]string{"key": "val"}).
 				SetExecutionOptions(*NewECSPodExecutionOptions())
 			assert.NoError(t, def.Validate())
 		})
@@ -415,20 +418,28 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		assert.True(t, utility.FromBoolPtr(opts.SupportsDebugMode))
 	})
 	t.Run("SetTags", func(t *testing.T) {
-		tag := "tag"
-		opts := NewECSPodExecutionOptions().SetTags([]string{tag})
+		key := "tkey"
+		value := "tvalue"
+		opts := NewECSPodExecutionOptions().SetTags(map[string]string{key: value})
 		require.Len(t, opts.Tags, 1)
-		assert.Equal(t, tag, opts.Tags[0])
+		assert.Equal(t, value, opts.Tags[key])
 	})
 	t.Run("AddTags", func(t *testing.T) {
-		tag0 := "tag0"
-		tag1 := "tag1"
-		opts := NewECSPodExecutionOptions().AddTags(tag0, tag1)
+		key0 := "key0"
+		val0 := "val0"
+		key1 := "key1"
+		val1 := "val1"
+		opts := NewECSPodExecutionOptions().AddTags(map[string]string{key0: val0, key1: val1})
 		require.Len(t, opts.Tags, 2)
-		assert.Equal(t, tag0, opts.Tags[0])
-		assert.Equal(t, tag1, opts.Tags[1])
-		opts.AddTags()
+		assert.Equal(t, val0, opts.Tags[key0])
+		assert.Equal(t, val1, opts.Tags[key1])
+		opts.AddTags(map[string]string{})
 		assert.Len(t, opts.Tags, 2)
+	})
+	t.Run("SetExecutionRole", func(t *testing.T) {
+		role := "role"
+		opts := NewECSPodExecutionOptions().SetExecutionRole(role)
+		assert.Equal(t, role, *opts.ExecutionRole)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsValid", func(t *testing.T) {

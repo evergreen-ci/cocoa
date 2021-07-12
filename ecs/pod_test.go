@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/awsutil"
+	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/cocoa/secret"
 	"github.com/evergreen-ci/utility"
@@ -19,13 +21,19 @@ func TestECSPodInterface(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSPod)(nil), &BasicECSPod{})
 }
 
-func TestECSPod(t *testing.T) {
+func TestECSPodBasics(t *testing.T) {
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient){
+		"InvalidPodOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			opts := NewBasicECSPodOptions()
+			p, err := NewBasicECSPod(opts)
+			require.Error(t, err)
+			require.Zero(t, p)
+		},
 		"InfoIsPopulated": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			res := cocoa.NewECSPodResources().SetTaskID("task_id")
 			stat := cocoa.Starting
@@ -46,6 +54,7 @@ func TestECSPod(t *testing.T) {
 
 			hc := utility.GetHTTPClient()
 			defer utility.PutHTTPClient(hc)
+
 			awsOpts := awsutil.NewClientOptions().
 				SetHTTPClient(hc).
 				SetCredentials(credentials.NewEnvCredentials()).
@@ -54,8 +63,61 @@ func TestECSPod(t *testing.T) {
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
+			defer c.Close(ctx)
 
 			tCase(tctx, t, c)
+		})
+
+	}
+
+}
+
+// TODO (EVG-14979): clean up resources in ECS tests more thoroughly
+func TestECSPod(t *testing.T) {
+	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for tName, tCase := range testcase.ECSPodTests() {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			defer tcancel()
+
+			hc := utility.GetHTTPClient()
+			defer utility.PutHTTPClient(hc)
+
+			awsOpts := awsutil.NewClientOptions().
+				SetHTTPClient(hc).
+				SetCredentials(credentials.NewEnvCredentials()).
+				SetRole(testutil.AWSRole()).
+				SetRegion(testutil.AWSRegion())
+
+			c, err := NewBasicECSClient(*awsOpts)
+			require.NoError(t, err)
+			defer c.Close(ctx)
+
+			secretsClient, err := secret.NewBasicSecretsManagerClient(awsutil.ClientOptions{
+				Creds:  credentials.NewEnvCredentials(),
+				Region: aws.String(testutil.AWSRegion()),
+				Role:   aws.String(testutil.AWSRole()),
+				RetryOpts: &utility.RetryOptions{
+					MaxAttempts: 5,
+				},
+				HTTPClient: hc,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, c)
+			defer secretsClient.Close(ctx)
+
+			m := secret.NewBasicSecretsManager(secretsClient)
+			require.NotNil(t, m)
+
+			pc, err := NewBasicECSPodCreator(c, m)
+			require.NoError(t, err)
+			require.NotZero(t, pc)
+
+			tCase(tctx, t, m, pc)
 		})
 	}
 }
