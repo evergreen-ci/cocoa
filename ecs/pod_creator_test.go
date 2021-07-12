@@ -130,8 +130,10 @@ func TestECSPodCreator(t *testing.T) {
 		"CreatePodSucceedsWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("envVar").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name")).SetValue("value"))
-			envVar.SecretOpts.SetExists(false)
+				SetSecretOptions(*cocoa.NewSecretOptions().
+					SetName(testutil.NewSecretName("name")).
+					SetValue("value").
+					SetExists(false))
 			envVar.SecretOpts.SetOwned(true)
 
 			containerDef := cocoa.NewECSContainerDefinition().
