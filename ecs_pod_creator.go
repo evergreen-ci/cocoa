@@ -119,15 +119,13 @@ func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions)
 	return o
 }
 
-// Validate checks that all the required parameters are given and the values are
-// valid.
-func (o *ECSPodCreationOptions) Validate() error {
-	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
-	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
-	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
-	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
+// validateContainerDefinitions checks that all the individual container definitions are valid.
+func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 	var totalContainerMemMB, totalContainerCPU int
+	catcher := grip.NewBasicCatcher()
+
+	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
+
 	for i := range o.ContainerDefinitions {
 		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", o.ContainerDefinitions[i].Name)
 
@@ -151,12 +149,26 @@ func (o *ECSPodCreationOptions) Validate() error {
 			}
 		}
 	}
+
 	if o.MemoryMB != nil {
 		catcher.ErrorfWhen(*o.MemoryMB < totalContainerMemMB, "total memory requested for the individual containers (%d MB) is greater than the memory available for the entire task (%d MB)", totalContainerMemMB, *o.MemoryMB)
 	}
 	if o.CPU != nil {
 		catcher.ErrorfWhen(*o.CPU < totalContainerCPU, "total CPU requested for the individual containers (%d units) is greater than the memory available for the entire task (%d units)", totalContainerCPU, *o.CPU)
 	}
+
+	return catcher.Resolve()
+}
+
+// Validate checks that all the required parameters are given and the values are
+// valid.
+func (o *ECSPodCreationOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
+	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
+	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
+
+	catcher.Wrap(o.validateContainerDefinitions(), "invalid container definitions")
 
 	if o.ExecutionOpts != nil {
 		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")

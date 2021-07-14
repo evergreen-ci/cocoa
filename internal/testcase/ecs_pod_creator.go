@@ -13,7 +13,7 @@ import (
 // ECSPodCreatorTestCase represents a test case for a cocoa.ECSPodCreator.
 type ECSPodCreatorTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator)
 
-// ECSPodCreatorNoVaultTests returns common test cases that a cocoa.ECSPodCreator should support.
+// ECSPodCreatorTests returns common test cases that a cocoa.ECSPodCreator should support.
 func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithInvalidCreationOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
@@ -87,7 +87,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 	}
 }
 
-// ECSPodCreatorTests returns common test casese that a cocoa.ECSPodCreator should support that rely on an ECSPodCreator with both an ECSClient and Vault.
+// ECSPodCreatorWithVaultTests returns common test casese that a cocoa.ECSPodCreator should support that rely on both an ECSClient and Vault.
 func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
