@@ -11,7 +11,6 @@ import (
 type ECSPod struct {
 	cocoa.ECSPod
 
-	Input      context.Context
 	InfoOutput *cocoa.ECSPodInfo
 }
 
@@ -25,8 +24,6 @@ func NewECSPod(p cocoa.ECSPod) *ECSPod {
 // Info returns mock information about the pod. The mock output can be
 // customized. By default, it will return its cached information.
 func (p *ECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
-	p.Input = ctx
-
 	if p.InfoOutput != nil {
 		return p.InfoOutput, nil
 	}
@@ -37,8 +34,6 @@ func (p *ECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
 // Stop stops the mock pod. The mock output can be customized. By default, it
 // will set the cached status to stopped.
 func (p *ECSPod) Stop(ctx context.Context) error {
-	p.Input = ctx
-
 	return p.ECSPod.Stop(ctx)
 }
 
@@ -46,7 +41,5 @@ func (p *ECSPod) Stop(ctx context.Context) error {
 // output can be customized. By default, it will delete its secrets from its
 // Vault. If it succeeds, it will set the cached status to deleted.
 func (p *ECSPod) Delete(ctx context.Context) error {
-	p.Input = ctx
-
 	return p.ECSPod.Delete(ctx)
 }
