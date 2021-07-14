@@ -210,11 +210,18 @@ func (m *BasicECSPodCreator) exportPodCreationOptions(ctx context.Context, merge
 
 	for _, def := range merged.ContainerDefinitions {
 		containerDef := ecs.ContainerDefinition{}
+
+		if mem := utility.FromIntPtr(def.MemoryMB); mem != 0 {
+			containerDef.SetMemory(int64(mem))
+		}
+
+		if cpu := utility.FromIntPtr(def.CPU); cpu != 0 {
+			containerDef.SetMemory(int64(cpu))
+		}
+
 		containerDef.SetCommand(utility.ToStringPtrSlice(def.Command)).
-			SetCpu(int64(utility.FromIntPtr(def.CPU))).
 			SetImage(utility.FromStringPtr(def.Image)).
 			SetName(utility.FromStringPtr(def.Name)).
-			SetMemory(int64(utility.FromIntPtr(def.MemoryMB))).
 			SetEnvironment(exportEnvVars(def.EnvVars)).
 			SetSecrets(exportSecrets(def.EnvVars))
 
@@ -222,9 +229,16 @@ func (m *BasicECSPodCreator) exportPodCreationOptions(ctx context.Context, merge
 	}
 
 	taskDef := &ecs.RegisterTaskDefinitionInput{}
+
+	if mem := utility.FromIntPtr(merged.MemoryMB); mem != 0 {
+		taskDef.SetMemory(strconv.Itoa(mem))
+	}
+
+	if cpu := utility.FromIntPtr(merged.CPU); cpu != 0 {
+		taskDef.SetMemory(strconv.Itoa(cpu))
+	}
+
 	taskDef.SetContainerDefinitions(containerDefs).
-		SetMemory(strconv.Itoa(utility.FromIntPtr(merged.MemoryMB))).
-		SetCpu(strconv.Itoa(utility.FromIntPtr(merged.CPU))).
 		SetTaskRoleArn(utility.FromStringPtr(merged.TaskRole)).
 		SetTags(exportTags(merged.ExecutionOpts.Tags)).
 		SetFamily(utility.FromStringPtr(merged.Name)).

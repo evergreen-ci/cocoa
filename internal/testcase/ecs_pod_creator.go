@@ -14,7 +14,7 @@ import (
 type ECSPodCreatorTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator)
 
 // ECSPodCreatorNoVaultTests returns common test cases that a cocoa.ECSPodCreator should support.
-func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
+func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithInvalidCreationOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			opts := cocoa.NewECSPodCreationOptions()
@@ -31,7 +31,7 @@ func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
 					SetValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
-				SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
+				AddEnvironmentVariables(*envVar).
 				SetName("container")
 			require.NotNil(t, containerDef.EnvVars)
 
@@ -39,30 +39,11 @@ func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
 			assert.NoError(t, execOpts.Validate())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily("name")).
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole("role").
-				SetExecutionOptions(*execOpts)
-			assert.NoError(t, opts.Validate())
-
-			p, err := c.CreatePod(ctx, opts)
-			require.Error(t, err)
-			require.Zero(t, p)
-		},
-		"CreatePodFailsWithIncompleteContainerDef": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
-			containerDef := cocoa.NewECSContainerDefinition().SetImage("image")
-
-			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-			assert.NoError(t, execOpts.Validate())
-
-			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily("name")).
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetTaskRole("role").
+				SetTaskRole(testutil.TaskRole()).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -74,7 +55,7 @@ func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
 			envVar := cocoa.NewEnvironmentVariable().SetName("name").SetValue("value")
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
-				SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
+				AddEnvironmentVariables(*envVar).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
@@ -84,7 +65,7 @@ func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
 			assert.NoError(t, execOpts.Validate())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily("name")).
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
@@ -107,7 +88,7 @@ func ECSPodCreatorNoVaultTests() map[string]ECSPodCreatorTestCase {
 }
 
 // ECSPodCreatorTests returns common test casese that a cocoa.ECSPodCreator should support that rely on an ECSPodCreator with both an ECSClient and Vault.
-func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
+func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			envVar := cocoa.NewEnvironmentVariable().SetName("envVar").
@@ -115,7 +96,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 					SetName(testutil.NewSecretName("name")).
 					SetValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
-				SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
+				AddEnvironmentVariables(*envVar).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
@@ -131,8 +112,8 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetCPU(128).
 				SetTaskRole(testutil.TaskRole()).
 				SetExecutionOptions(*execOpts).
-				SetName(testutil.NewTaskDefinitionFamily("name"))
-			assert.NoError(t, opts.Validate())
+				SetName(testutil.NewTaskDefinitionFamily(t.Name()))
+			assert.Error(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, opts)
 			require.Error(t, err)
@@ -149,7 +130,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
-				SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
+				AddEnvironmentVariables(*envVar).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
@@ -161,7 +142,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			assert.NoError(t, execOpts.Validate())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily("name")).
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).

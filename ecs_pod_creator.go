@@ -128,18 +128,27 @@ func (o *ECSPodCreationOptions) Validate() error {
 	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
 	var totalContainerMemMB, totalContainerCPU int
-	for _, def := range o.ContainerDefinitions {
-		catcher.Wrapf(def.Validate(), "container definition '%s'", def.Name)
-		if def.MemoryMB != nil {
-			totalContainerMemMB += *def.MemoryMB
+	for i := range o.ContainerDefinitions {
+		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", o.ContainerDefinitions[i].Name)
+
+		if o.ContainerDefinitions[i].MemoryMB != nil {
+			totalContainerMemMB += *o.ContainerDefinitions[i].MemoryMB
 		} else if o.MemoryMB == nil {
 			catcher.Errorf("must specify container-level memory to allocate for each container if pod-level memory is not specified")
 		}
 
-		if def.CPU != nil {
-			totalContainerCPU += *def.CPU
+		if o.ContainerDefinitions[i].CPU != nil {
+			totalContainerCPU += *o.ContainerDefinitions[i].CPU
 		} else if o.CPU == nil {
 			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
+		}
+
+		if len(o.ContainerDefinitions[i].EnvVars) > 0 {
+			for _, envVar := range o.ContainerDefinitions[i].EnvVars {
+				if envVar.SecretOpts != nil && o.ExecutionOpts.ExecutionRole == nil {
+					catcher.Errorf("must specify execution role ARN when specifying container secrets")
+				}
+			}
 		}
 	}
 	if o.MemoryMB != nil {

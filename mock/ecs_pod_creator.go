@@ -13,7 +13,7 @@ import (
 type ECSPodCreator struct {
 	cocoa.ECSPodCreator
 
-	CreatePodInput  *cocoa.ECSPodCreationOptions
+	CreatePodInput  []*cocoa.ECSPodCreationOptions
 	CreatePodOutput *cocoa.ECSPod
 }
 
@@ -28,8 +28,7 @@ func NewECSPodCreator(c cocoa.ECSPodCreator) *ECSPodCreator {
 // customized. By default, it will create a new pod based on the input that is
 // backed by a mock ECSClient.
 func (m *ECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
-	merged := cocoa.MergeECSPodCreationOptions(opts...)
-	m.CreatePodInput = &merged
+	m.CreatePodInput = opts
 
 	if m.CreatePodOutput != nil {
 		return *m.CreatePodOutput, nil
