@@ -87,7 +87,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 	}
 }
 
-// ECSPodCreatorWithVaultTests returns common test casese that a cocoa.ECSPodCreator should support that rely on both an ECSClient and Vault.
+// ECSPodCreatorWithVaultTests returns common test cases that a cocoa.ECSPodCreator should support with a Vault.
 func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
