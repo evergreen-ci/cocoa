@@ -119,6 +119,47 @@ func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions)
 	return o
 }
 
+// validateContainerDefinitions checks that all the individual container definitions are valid.
+func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
+	var totalContainerMemMB, totalContainerCPU int
+	catcher := grip.NewBasicCatcher()
+
+	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
+
+	for i := range o.ContainerDefinitions {
+		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", o.ContainerDefinitions[i].Name)
+
+		if o.ContainerDefinitions[i].MemoryMB != nil {
+			totalContainerMemMB += *o.ContainerDefinitions[i].MemoryMB
+		} else if o.MemoryMB == nil {
+			catcher.Errorf("must specify container-level memory to allocate for each container if pod-level memory is not specified")
+		}
+
+		if o.ContainerDefinitions[i].CPU != nil {
+			totalContainerCPU += *o.ContainerDefinitions[i].CPU
+		} else if o.CPU == nil {
+			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
+		}
+
+		if len(o.ContainerDefinitions[i].EnvVars) > 0 {
+			for _, envVar := range o.ContainerDefinitions[i].EnvVars {
+				if envVar.SecretOpts != nil && o.ExecutionOpts.ExecutionRole == nil {
+					catcher.Errorf("must specify execution role ARN when specifying container secrets")
+				}
+			}
+		}
+	}
+
+	if o.MemoryMB != nil {
+		catcher.ErrorfWhen(*o.MemoryMB < totalContainerMemMB, "total memory requested for the individual containers (%d MB) is greater than the memory available for the entire task (%d MB)", totalContainerMemMB, *o.MemoryMB)
+	}
+	if o.CPU != nil {
+		catcher.ErrorfWhen(*o.CPU < totalContainerCPU, "total CPU requested for the individual containers (%d units) is greater than the memory available for the entire task (%d units)", totalContainerCPU, *o.CPU)
+	}
+
+	return catcher.Resolve()
+}
+
 // Validate checks that all the required parameters are given and the values are
 // valid.
 func (o *ECSPodCreationOptions) Validate() error {
@@ -126,28 +167,8 @@ func (o *ECSPodCreationOptions) Validate() error {
 	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
 	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
-	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
-	var totalContainerMemMB, totalContainerCPU int
-	for _, def := range o.ContainerDefinitions {
-		catcher.Wrapf(def.Validate(), "container definition '%s'", def.Name)
-		if def.MemoryMB != nil {
-			totalContainerMemMB += *def.MemoryMB
-		} else if o.MemoryMB == nil {
-			catcher.Errorf("must specify container-level memory to allocate for each container if pod-level memory is not specified")
-		}
 
-		if def.CPU != nil {
-			totalContainerCPU += *def.CPU
-		} else if o.CPU == nil {
-			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
-		}
-	}
-	if o.MemoryMB != nil {
-		catcher.ErrorfWhen(*o.MemoryMB < totalContainerMemMB, "total memory requested for the individual containers (%d MB) is greater than the memory available for the entire task (%d MB)", totalContainerMemMB, *o.MemoryMB)
-	}
-	if o.CPU != nil {
-		catcher.ErrorfWhen(*o.CPU < totalContainerCPU, "total CPU requested for the individual containers (%d units) is greater than the memory available for the entire task (%d units)", totalContainerCPU, *o.CPU)
-	}
+	catcher.Wrap(o.validateContainerDefinitions(), "invalid container definitions")
 
 	if o.ExecutionOpts != nil {
 		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
