@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSPodCreator(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &ECSPodCreator{})
+func TestECSPod(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSPod)(nil), &ECSPod{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -27,38 +27,22 @@ func TestECSPodCreator(t *testing.T) {
 		assert.NoError(t, c.Close(ctx))
 	}()
 
-	for tName, tCase := range testcase.ECSPodCreatorTests() {
-		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, time.Second)
-			defer tcancel()
-
-			pc, err := ecs.NewBasicECSPodCreator(c, nil)
-			require.NoError(t, err)
-
-			podCreator := NewECSPodCreator(pc)
-
-			tCase(tctx, t, podCreator)
-		})
-	}
-
-	for tName, tCase := range testcase.ECSPodCreatorWithVaultTests() {
+	for tName, tCase := range testcase.ECSPodTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
 
 			sm := &SecretsManagerClient{}
 			defer func() {
-				assert.NoError(t, sm.Close(tctx))
+				assert.NoError(t, c.Close(tctx))
 			}()
-
 			v := NewVault(secret.NewBasicSecretsManager(sm))
 
 			pc, err := ecs.NewBasicECSPodCreator(c, v)
 			require.NoError(t, err)
-
 			podCreator := NewECSPodCreator(pc)
 
-			tCase(tctx, t, podCreator)
+			tCase(tctx, t, v, podCreator)
 		})
 	}
 

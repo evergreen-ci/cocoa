@@ -31,7 +31,7 @@ func TestVaultWithSecretsManager(t *testing.T) {
 
 			c := &SecretsManagerClient{}
 			defer func() {
-				assert.NoError(t, c.Close(ctx))
+				assert.NoError(t, c.Close(tctx))
 			}()
 			v := NewVault(secret.NewBasicSecretsManager(c))
 
