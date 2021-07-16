@@ -396,7 +396,7 @@ func TestSecretOptions(t *testing.T) {
 	})
 	t.Run("SetOwned", func(t *testing.T) {
 		opts := NewSecretOptions().SetOwned(true)
-		assert.True(t, utility.FromBoolPtr(opts.Exists))
+		assert.True(t, utility.FromBoolPtr(opts.Owned))
 	})
 }
 
