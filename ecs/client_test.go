@@ -21,11 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSClientInterface(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
-}
-
 func TestECSClient(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
+
 	testutil.CheckAWSEnvVarsForECS(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
