@@ -27,7 +27,7 @@ func TestECSPod(t *testing.T) {
 		assert.NoError(t, c.Close(ctx))
 	}()
 
-	for tName, tCase := range testcase.ECSPodTests() {
+	for tName, tCase := range testcase.ECSPodTests(t) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()

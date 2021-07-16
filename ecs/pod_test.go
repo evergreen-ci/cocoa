@@ -36,7 +36,7 @@ func TestECSPodBasics(t *testing.T) {
 		},
 		"InfoIsPopulated": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			res := cocoa.NewECSPodResources().SetTaskID("task_id")
-			stat := cocoa.Starting
+			stat := cocoa.StartingStatus
 			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatus(stat)
 
 			p, err := NewBasicECSPod(opts)
@@ -79,7 +79,7 @@ func TestECSPod(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for tName, tCase := range testcase.ECSPodTests() {
+	for tName, tCase := range testcase.ECSPodTests(t) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
 			defer tcancel()
@@ -148,7 +148,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 		assert.Equal(t, *res, *opts.Resources)
 	})
 	t.Run("SetStatus", func(t *testing.T) {
-		stat := cocoa.Starting
+		stat := cocoa.StartingStatus
 		opts := NewBasicECSPodOptions().SetStatus(stat)
 		require.NotNil(t, opts.Status)
 		assert.Equal(t, stat, *opts.Status)
@@ -170,7 +170,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 				SetClient(ecsClient).
 				SetVault(v).
 				SetResources(*res).
-				SetStatus(cocoa.Starting)
+				SetStatus(cocoa.StartingStatus)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("MissingClientIsInvalid", func(t *testing.T) {
@@ -182,7 +182,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			opts := NewBasicECSPodOptions().
 				SetVault(v).
 				SetResources(*res).
-				SetStatus(cocoa.Starting)
+				SetStatus(cocoa.StartingStatus)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("MissingVaultIsValid", func(t *testing.T) {
@@ -193,7 +193,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
 				SetResources(*res).
-				SetStatus(cocoa.Starting)
+				SetStatus(cocoa.StartingStatus)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("MissingResourcesIsInvalid", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			opts := NewBasicECSPodOptions().
 				SetVault(v).
 				SetResources(*res).
-				SetStatus(cocoa.Starting)
+				SetStatus(cocoa.StartingStatus)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("BadResourcesIsInvalid", func(t *testing.T) {
@@ -215,7 +215,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			v := secret.NewBasicSecretsManager(smClient)
 			opts := NewBasicECSPodOptions().
 				SetVault(v).
-				SetStatus(cocoa.Starting)
+				SetStatus(cocoa.StartingStatus)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("MissingStatusIsInvalid", func(t *testing.T) {
