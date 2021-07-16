@@ -17,11 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSPodInterface(t *testing.T) {
+func TestBasicECSPod(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSPod)(nil), &BasicECSPod{})
-}
 
-func TestECSPodBasics(t *testing.T) {
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -79,7 +77,7 @@ func TestECSPod(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for tName, tCase := range testcase.ECSPodTests(t) {
+	for tName, tCase := range testcase.ECSPodTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
 			defer tcancel()

@@ -17,11 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestECSPodCreatorInterface(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &BasicECSPodCreator{})
-}
-
 func TestBasicECSPodCreator(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &BasicECSPodCreator{})
+
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())

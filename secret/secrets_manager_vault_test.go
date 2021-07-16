@@ -16,11 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestVaultInterface(t *testing.T) {
-	assert.Implements(t, (*cocoa.Vault)(nil), &BasicSecretsManager{})
-}
-
 func TestSecretsManager(t *testing.T) {
+	assert.Implements(t, (*cocoa.Vault)(nil), &BasicSecretsManager{})
+
 	testutil.CheckAWSEnvVarsForSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())

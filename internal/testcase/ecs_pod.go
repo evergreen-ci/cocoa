@@ -14,38 +14,38 @@ import (
 type ECSPodTestCase func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator)
 
 // ECSPodTests returns common test cases that a cocoa.ECSPod should support.
-func ECSPodTests(t *testing.T) map[string]ECSPodTestCase {
+func ECSPodTests() map[string]ECSPodTestCase {
 
-	envVar := cocoa.NewEnvironmentVariable().SetName(t.Name()).SetValue("value")
+	makeEnvVar := func(t *testing.T) *cocoa.EnvironmentVariable {
+		return cocoa.NewEnvironmentVariable().SetName(t.Name()).SetValue("value")
+	}
 
-	containerDef := cocoa.NewECSContainerDefinition().
-		SetImage("image").
-		SetEnvironmentVariables([]cocoa.EnvironmentVariable{*envVar}).
-		SetMemoryMB(128).
-		SetCPU(128).
-		SetName("container")
+	makeContainerDef := func(t *testing.T) *cocoa.ECSContainerDefinition {
+		return cocoa.NewECSContainerDefinition().
+			SetImage("image").
+			SetMemoryMB(128).
+			SetCPU(128).
+			SetName("container")
+	}
 
-	execOpts := cocoa.NewECSPodExecutionOptions().
-		SetCluster(testutil.ECSClusterName()).
-		SetExecutionRole(testutil.ExecutionRole())
-
-	opts := cocoa.NewECSPodCreationOptions().
-		SetName(testutil.NewTaskDefinitionFamily(t.Name())).
-		AddContainerDefinitions(*containerDef).
-		SetMemoryMB(128).
-		SetCPU(128).
-		SetTaskRole(testutil.TaskRole()).
-		SetExecutionOptions(*execOpts)
-
-	optsSecret := cocoa.NewECSPodCreationOptions().
-		SetName(testutil.NewTaskDefinitionFamily(t.Name())).
-		SetMemoryMB(128).
-		SetCPU(128).
-		SetTaskRole(testutil.TaskRole()).
-		SetExecutionOptions(*execOpts)
+	makePodCreationOpts := func(t *testing.T) *cocoa.ECSPodCreationOptions {
+		return cocoa.NewECSPodCreationOptions().
+			SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+			SetMemoryMB(128).
+			SetCPU(128).
+			SetTaskRole(testutil.TaskRole()).
+			SetExecutionOptions(*cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName()).
+				SetExecutionRole(testutil.ExecutionRole()))
+	}
 
 	return map[string]ECSPodTestCase{
 		"StopSucceeds": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(
+				*makeContainerDef(t).AddEnvironmentVariables(
+					*makeEnvVar(t),
+				),
+			)
 			p, err := pc.CreatePod(ctx, opts)
 			require.NoError(t, err)
 			require.NotZero(t, p)
@@ -58,16 +58,23 @@ func ECSPodTests(t *testing.T) map[string]ECSPodTestCase {
 			assert.Equal(t, cocoa.StoppedStatus, info.Status)
 		},
 		"StopSucceedsWithSecrets": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
-			secret := cocoa.NewEnvironmentVariable().SetName("secret1").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name1")).SetValue("value1"))
-			secretOwned := cocoa.NewEnvironmentVariable().SetName("secret2").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name2")).SetValue("value2").SetOwned(true))
+			secret := cocoa.NewEnvironmentVariable().
+				SetName("secret1").
+				SetSecretOptions(*cocoa.NewSecretOptions().
+					SetName(testutil.NewSecretName("name1")).
+					SetValue("value1"))
+			ownedSecret := cocoa.NewEnvironmentVariable().
+				SetName("secret2").
+				SetSecretOptions(*cocoa.NewSecretOptions().
+					SetName(testutil.NewSecretName("name2")).
+					SetValue("value2").
+					SetOwned(true))
 
-			optsSecret := optsSecret.SetContainerDefinitions(
-				[]cocoa.ECSContainerDefinition{*containerDef.SetEnvironmentVariables(
-					[]cocoa.EnvironmentVariable{*secret, *secretOwned})})
+			secretOpts := makePodCreationOpts(t).
+				AddContainerDefinitions(*makeContainerDef(t).
+					AddEnvironmentVariables(*secret, *ownedSecret))
 
-			p, err := pc.CreatePod(ctx, optsSecret)
+			p, err := pc.CreatePod(ctx, secretOpts)
 			require.NoError(t, err)
 			require.NotZero(t, p)
 
@@ -91,6 +98,11 @@ func ECSPodTests(t *testing.T) map[string]ECSPodTestCase {
 			require.NotNil(t, id)
 		},
 		"StopFailsOnIncorrectPodStatus": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(
+				*makeContainerDef(t).AddEnvironmentVariables(
+					*makeEnvVar(t),
+				),
+			)
 			p, err := pc.CreatePod(ctx, opts)
 			require.NoError(t, err)
 			require.NotZero(t, p)
@@ -105,6 +117,7 @@ func ECSPodTests(t *testing.T) map[string]ECSPodTestCase {
 			require.Error(t, p.Stop(ctx))
 		},
 		"DeleteSucceeds": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*makeEnvVar(t)))
 			p, err := pc.CreatePod(ctx, opts)
 			require.NoError(t, err)
 			require.NotZero(t, p)
@@ -122,16 +135,14 @@ func ECSPodTests(t *testing.T) map[string]ECSPodTestCase {
 			assert.Equal(t, cocoa.DeletedStatus, info.Status)
 		},
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, v cocoa.Vault, pc cocoa.ECSPodCreator) {
-			secret := cocoa.NewEnvironmentVariable().SetName("secret1").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name1")).SetValue("value1"))
-			secretOwned := cocoa.NewEnvironmentVariable().SetName("secret2").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName("name2")).SetValue("value2").SetOwned(true))
+			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value1"))
+			ownedSecret := cocoa.NewEnvironmentVariable().SetName("secret2").
+				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value2").SetOwned(true))
 
-			optsSecret := optsSecret.SetContainerDefinitions(
-				[]cocoa.ECSContainerDefinition{*containerDef.SetEnvironmentVariables(
-					[]cocoa.EnvironmentVariable{*secret, *secretOwned})})
+			secretOpts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
 
-			p, err := pc.CreatePod(ctx, optsSecret)
+			p, err := pc.CreatePod(ctx, secretOpts)
 			require.NoError(t, err)
 			require.NotZero(t, p)
 
