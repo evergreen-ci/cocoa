@@ -659,13 +659,13 @@ func (s ECSPlacementStrategy) Validate() error {
 type ECSStrategyParameter = string
 
 const (
-	// BinpackMemory indicates ECS should optimize its binpacking strategy based
+	// StrategyParamBinpackMemory indicates ECS should optimize its binpacking strategy based
 	// on memory usage.
 	StrategyParamBinpackMemory ECSStrategyParameter = "memory"
-	// BinpackCPU indicates ECS should optimize its binpacking strategy based
+	// StrategyParamBinpackCPU indicates ECS should optimize its binpacking strategy based
 	// on CPU usage.
 	StrategyParamBinpackCPU ECSStrategyParameter = "cpu"
-	// SpreadHost indicates the ECS should spread pods evenly across all
+	// StrategyParamSpreadHost indicates the ECS should spread pods evenly across all
 	// container instances (i.e. hosts).
 	StrategyParamSpreadHost ECSStrategyParameter = "host"
 )
