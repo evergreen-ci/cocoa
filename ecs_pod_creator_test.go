@@ -33,7 +33,9 @@ func TestECSPodCreationOptions(t *testing.T) {
 		assert.Equal(t, *containerDef0, def.ContainerDefinitions[0])
 		assert.Equal(t, *containerDef1, def.ContainerDefinitions[1])
 		def.AddContainerDefinitions()
-		assert.Len(t, def.ContainerDefinitions, 2)
+		require.Len(t, def.ContainerDefinitions, 2)
+		assert.Equal(t, *containerDef0, def.ContainerDefinitions[0])
+		assert.Equal(t, *containerDef1, def.ContainerDefinitions[1])
 	})
 	t.Run("SetMemoryMB", func(t *testing.T) {
 		mem := 128
@@ -243,7 +245,9 @@ func TestECSContainerDefinition(t *testing.T) {
 		assert.Equal(t, *ev0, def.EnvVars[0])
 		assert.Equal(t, *ev1, def.EnvVars[1])
 		def.AddEnvironmentVariables()
-		assert.Len(t, def.EnvVars, 2)
+		require.Len(t, def.EnvVars, 2)
+		assert.Equal(t, *ev0, def.EnvVars[0])
+		assert.Equal(t, *ev1, def.EnvVars[1])
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
@@ -439,6 +443,8 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		assert.Equal(t, val1, opts.Tags[key1])
 		opts.AddTags(map[string]string{})
 		assert.Len(t, opts.Tags, 2)
+		assert.Equal(t, val0, opts.Tags[key0])
+		assert.Equal(t, val1, opts.Tags[key1])
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsValid", func(t *testing.T) {
@@ -477,6 +483,21 @@ func TestECSPodPlacementOptions(t *testing.T) {
 		param := StrategyParamBinpackCPU
 		opts := NewECSPodPlacementOptions().SetStrategyParameter(param)
 		assert.Equal(t, param, utility.FromStringPtr(opts.StrategyParameter))
+	})
+	t.Run("SetInstanceFilters", func(t *testing.T) {
+		filters := []string{"runningTasksCount == 0"}
+		opts := NewECSPodPlacementOptions().SetInstanceFilters(filters)
+		assert.ElementsMatch(t, filters, opts.InstanceFilters)
+	})
+	t.Run("AddInstanceFilters", func(t *testing.T) {
+		filter := "runningTasksCount == 0"
+		opts := NewECSPodPlacementOptions().AddInstanceFilters(filter)
+		require.Len(t, opts.InstanceFilters, 1)
+		assert.Equal(t, filter, opts.InstanceFilters[0])
+
+		opts.AddInstanceFilters()
+		require.Len(t, opts.InstanceFilters, 1)
+		assert.Equal(t, filter, opts.InstanceFilters[0])
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsValid", func(t *testing.T) {
