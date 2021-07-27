@@ -569,7 +569,6 @@ type ECSPodPlacementOptions struct {
 	// of the pod to a set of container instances in the cluster that match the
 	// query filter.
 	// Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-query-language.html
-	// kim: TODO: implement
 	InstanceFilters []string
 }
 
