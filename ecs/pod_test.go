@@ -65,9 +65,7 @@ func TestBasicECSPod(t *testing.T) {
 
 			tCase(tctx, t, c)
 		})
-
 	}
-
 }
 
 // TODO (EVG-14979): clean up resources in ECS tests more thoroughly
@@ -93,9 +91,11 @@ func TestECSPod(t *testing.T) {
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
-			defer c.Close(ctx)
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
 
-			secretsClient, err := secret.NewBasicSecretsManagerClient(awsutil.ClientOptions{
+			smc, err := secret.NewBasicSecretsManagerClient(awsutil.ClientOptions{
 				Creds:  credentials.NewEnvCredentials(),
 				Region: aws.String(testutil.AWSRegion()),
 				Role:   aws.String(testutil.AWSRole()),
@@ -105,17 +105,16 @@ func TestECSPod(t *testing.T) {
 				HTTPClient: hc,
 			})
 			require.NoError(t, err)
-			require.NotNil(t, c)
-			defer secretsClient.Close(ctx)
+			defer func() {
+				assert.NoError(t, smc.Close(tctx))
+			}()
 
-			m := secret.NewBasicSecretsManager(secretsClient)
-			require.NotNil(t, m)
+			v := secret.NewBasicSecretsManager(smc)
 
-			pc, err := NewBasicECSPodCreator(c, m)
+			pc, err := NewBasicECSPodCreator(c, v)
 			require.NoError(t, err)
-			require.NotZero(t, pc)
 
-			tCase(tctx, t, m, pc)
+			tCase(tctx, t, pc, c, v)
 		})
 	}
 }

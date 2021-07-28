@@ -386,27 +386,35 @@ func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int,
 type ECSClient struct {
 	RegisterTaskDefinitionInput  *ecs.RegisterTaskDefinitionInput
 	RegisterTaskDefinitionOutput *ecs.RegisterTaskDefinitionOutput
+	RegisterTaskDefinitionError  error
 
 	DescribeTaskDefinitionInput  *ecs.DescribeTaskDefinitionInput
 	DescribeTaskDefinitionOutput *ecs.DescribeTaskDefinitionOutput
+	DescribeTaskDefinitionError  error
 
 	ListTaskDefinitionsInput  *ecs.ListTaskDefinitionsInput
 	ListTaskDefinitionsOutput *ecs.ListTaskDefinitionsOutput
+	ListTaskDefinitionsError  error
 
 	DeregisterTaskDefinitionInput  *ecs.DeregisterTaskDefinitionInput
 	DeregisterTaskDefinitionOutput *ecs.DeregisterTaskDefinitionOutput
+	DeregisterTaskDefinitionError  error
 
 	RunTaskInput  *ecs.RunTaskInput
 	RunTaskOutput *ecs.RunTaskOutput
+	RunTaskError  error
 
 	DescribeTasksInput  *ecs.DescribeTasksInput
 	DescribeTasksOutput *ecs.DescribeTasksOutput
+	DescribeTasksError  error
 
 	ListTasksInput  *ecs.ListTasksInput
 	ListTasksOutput *ecs.ListTasksOutput
+	ListTasksError  error
 
 	StopTaskInput  *ecs.StopTaskInput
 	StopTaskOutput *ecs.StopTaskOutput
+	StopTaskError  error
 
 	CloseError error
 }
@@ -417,8 +425,8 @@ type ECSClient struct {
 func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
 	c.RegisterTaskDefinitionInput = in
 
-	if c.RegisterTaskDefinitionOutput != nil {
-		return c.RegisterTaskDefinitionOutput, nil
+	if c.RegisterTaskDefinitionOutput != nil || c.RegisterTaskDefinitionError != nil {
+		return c.RegisterTaskDefinitionOutput, c.RegisterTaskDefinitionError
 	}
 
 	if in.Family == nil {
@@ -444,8 +452,8 @@ func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Register
 func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 	c.DescribeTaskDefinitionInput = in
 
-	if c.DescribeTaskDefinitionOutput != nil {
-		return c.DescribeTaskDefinitionOutput, nil
+	if c.DescribeTaskDefinitionOutput != nil || c.DescribeTaskDefinitionError != nil {
+		return c.DescribeTaskDefinitionOutput, c.DescribeTaskDefinitionError
 	}
 
 	id := utility.FromStringPtr(in.TaskDefinition)
@@ -466,8 +474,8 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
 	c.ListTaskDefinitionsInput = in
 
-	if c.ListTaskDefinitionsOutput != nil {
-		return c.ListTaskDefinitionsOutput, nil
+	if c.ListTaskDefinitionsOutput != nil || c.ListTaskDefinitionsError != nil {
+		return c.ListTaskDefinitionsOutput, c.ListTaskDefinitionsError
 	}
 
 	var arns []*string
@@ -495,8 +503,8 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDef
 func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	c.DeregisterTaskDefinitionInput = in
 
-	if c.DeregisterTaskDefinitionOutput != nil {
-		return c.DeregisterTaskDefinitionOutput, nil
+	if c.DeregisterTaskDefinitionOutput != nil || c.DeregisterTaskDefinitionError != nil {
+		return c.DeregisterTaskDefinitionOutput, c.DeregisterTaskDefinitionError
 	}
 
 	if in.TaskDefinition == nil {
@@ -540,8 +548,8 @@ func parseFamilyAndRevision(taskDef string) (family string, revNum int, err erro
 func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
 	c.RunTaskInput = in
 
-	if c.RunTaskOutput != nil {
-		return c.RunTaskOutput, nil
+	if c.RunTaskOutput != nil || c.RunTaskError != nil {
+		return c.RunTaskOutput, c.RunTaskError
 	}
 
 	if in.TaskDefinition == nil {
@@ -583,8 +591,8 @@ func (c *ECSClient) getOrDefaultCluster(name *string) string {
 func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
 	c.DescribeTasksInput = in
 
-	if c.DescribeTasksOutput != nil {
-		return c.DescribeTasksOutput, nil
+	if c.DescribeTasksOutput != nil || c.DescribeTasksError != nil {
+		return c.DescribeTasksOutput, c.DescribeTasksError
 	}
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
@@ -621,8 +629,8 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
 	c.ListTasksInput = in
 
-	if c.ListTasksOutput != nil {
-		return c.ListTasksOutput, nil
+	if c.ListTasksOutput != nil || c.ListTasksError != nil {
+		return c.ListTasksOutput, c.ListTasksError
 	}
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
@@ -654,8 +662,8 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
 	c.StopTaskInput = in
 
-	if c.StopTaskOutput != nil {
-		return c.StopTaskOutput, nil
+	if c.StopTaskOutput != nil || c.StopTaskError != nil {
+		return c.StopTaskOutput, c.StopTaskError
 	}
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]

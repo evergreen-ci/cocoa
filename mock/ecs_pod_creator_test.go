@@ -24,7 +24,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
 
-	for tName, tCase := range ecsPodCreatorInputTests() {
+	for tName, tCase := range ecsPodCreatorTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
@@ -96,7 +96,9 @@ func TestECSPodCreator(t *testing.T) {
 	}
 }
 
-func ecsPodCreatorInputTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+// ecsPodCreatorTests are mock-specific tests for ECS and Secrets Manager with
+// the ECS pod creator.
+func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient){
 		"RegistersTaskDefinitionAndRunsTaskWithAllFieldsSet": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			envVar := cocoa.NewEnvironmentVariable().

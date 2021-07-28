@@ -126,14 +126,15 @@ func (p *BasicECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
 // Stop stops the running pod without cleaning up any of its underlying
 // resources.
 func (p *BasicECSPod) Stop(ctx context.Context) error {
-	if p.status != cocoa.StatusRunning {
-		return errors.Errorf("pod can only be stopped when status is '%s', but current status is '%s'", cocoa.StatusRunning, p.status)
+	switch p.status {
+	case cocoa.StatusStopped, cocoa.StatusDeleted:
+		return nil
 	}
 
-	stopTask := &ecs.StopTaskInput{}
+	var stopTask ecs.StopTaskInput
 	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
 
-	if _, err := p.client.StopTask(ctx, stopTask); err != nil {
+	if _, err := p.client.StopTask(ctx, &stopTask); err != nil {
 		return errors.Wrap(err, "stopping pod")
 	}
 
@@ -144,25 +145,27 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 
 // Delete deletes the pod and its owned resources.
 func (p *BasicECSPod) Delete(ctx context.Context) error {
-	if err := p.Stop(ctx); err != nil {
-		return errors.Wrap(err, "stopping pod")
-	}
+	catcher := grip.NewBasicCatcher()
+
+	catcher.Wrap(p.Stop(ctx), "stopping pod")
 
 	if utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
-		deregisterDef := ecs.DeregisterTaskDefinitionInput{}
+		var deregisterDef ecs.DeregisterTaskDefinitionInput
 		deregisterDef.SetTaskDefinition(utility.FromStringPtr(p.resources.TaskDefinition.ID))
 
 		if _, err := p.client.DeregisterTaskDefinition(ctx, &deregisterDef); err != nil {
-			return errors.Wrap(err, "deregistering task definition")
+			catcher.Wrap(err, "deregistering task definition")
 		}
 	}
 
 	for _, secret := range p.resources.Secrets {
 		if utility.FromBoolPtr(secret.Owned) {
-			if err := p.vault.DeleteSecret(ctx, utility.FromStringPtr(secret.Name)); err != nil {
-				return errors.Wrap(err, "deleting secret")
-			}
+			catcher.Wrap(p.vault.DeleteSecret(ctx, utility.FromStringPtr(secret.Name)), "deleting secret")
 		}
+	}
+
+	if catcher.HasErrors() {
+		return catcher.Resolve()
 	}
 
 	p.status = cocoa.StatusDeleted
