@@ -317,6 +317,69 @@ func init() {
 	}
 }
 
+// getLatestTaskDefinition is the same as getTaskDefinition, but it can also
+// interpret the identifier as just a family name if it's neither an ARN or a
+// family and revision. If it matches a family name, the latest active revision
+// is returned.
+func (s *ECSService) getLatestTaskDefinition(id string) (*ECSTaskDefinition, error) {
+	if def, err := s.getTaskDefinition(id); err == nil {
+		return def, nil
+	}
+
+	// Use the latest active revision in the family if no revision is given.
+	family := id
+	revisions, ok := GlobalECSService.TaskDefs[family]
+	if !ok {
+		return nil, errors.New("task definition family not found")
+	}
+
+	for i := len(revisions) - 1; i >= 0; i-- {
+		if utility.FromStringPtr(revisions[i].Status) == ecs.TaskDefinitionStatusActive {
+			return &revisions[i], nil
+		}
+	}
+
+	return nil, errors.New("task definition family has no active revisions")
+}
+
+// getTaskDefinition gets a task definition by the identifier. The identifier is
+// either the task definition's ARN or its family and revision.
+func (s *ECSService) getTaskDefinition(id string) (*ECSTaskDefinition, error) {
+	if arn.IsARN(id) {
+		family, revNum, found := s.taskDefIndexFromARN(id)
+		if !found {
+			return nil, errors.New("task definition not found")
+		}
+		return &GlobalECSService.TaskDefs[family][revNum-1], nil
+	}
+
+	family, revNum, err := parseFamilyAndRevision(id)
+	if err == nil {
+		revisions, ok := GlobalECSService.TaskDefs[family]
+		if !ok {
+			return nil, errors.New("task definition family not found")
+		}
+		if len(revisions) < revNum {
+			return nil, errors.New("task definition revision not found")
+		}
+
+		return &revisions[revNum-1], nil
+	}
+
+	return nil, errors.New("task definition not found")
+}
+
+func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int, found bool) {
+	for family, revisions := range GlobalECSService.TaskDefs {
+		for revIdx, def := range revisions {
+			if utility.FromStringPtr(def.ARN) == arn {
+				return family, revIdx + 1, true
+			}
+		}
+	}
+	return "", -1, false
+}
+
 // ECSClient provides a mock implementation of a cocoa.ECSClient. This makes
 // it possible to introspect on inputs to the client and control the client's
 // output. It provides some default implementations where possible.
@@ -324,11 +387,14 @@ type ECSClient struct {
 	RegisterTaskDefinitionInput  *ecs.RegisterTaskDefinitionInput
 	RegisterTaskDefinitionOutput *ecs.RegisterTaskDefinitionOutput
 
-	DeregisterTaskDefinitionInput  *ecs.DeregisterTaskDefinitionInput
-	DeregisterTaskDefinitionOutput *ecs.DeregisterTaskDefinitionOutput
+	DescribeTaskDefinitionInput  *ecs.DescribeTaskDefinitionInput
+	DescribeTaskDefinitionOutput *ecs.DescribeTaskDefinitionOutput
 
 	ListTaskDefinitionsInput  *ecs.ListTaskDefinitionsInput
 	ListTaskDefinitionsOutput *ecs.ListTaskDefinitionsOutput
+
+	DeregisterTaskDefinitionInput  *ecs.DeregisterTaskDefinitionInput
+	DeregisterTaskDefinitionOutput *ecs.DeregisterTaskDefinitionOutput
 
 	RunTaskInput  *ecs.RunTaskInput
 	RunTaskOutput *ecs.RunTaskOutput
@@ -372,83 +438,26 @@ func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Register
 	}, nil
 }
 
-// DeregisterTaskDefinition saves the input and deletes an existing mock task
-// definition. The mock output can be customized. By default, it will delete a
-// cached task definition if it exists.
-func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
-	c.DeregisterTaskDefinitionInput = in
+// DescribeTaskDefinition saves the input and returns information about the
+// matching task definition. The mock output can be customized. By default, it
+// will return the task definition information if it exists.
+func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
+	c.DescribeTaskDefinitionInput = in
 
-	if c.DeregisterTaskDefinitionOutput != nil {
-		return c.DeregisterTaskDefinitionOutput, nil
-	}
-
-	if in.TaskDefinition == nil {
-		return nil, errors.New("missing task definition")
+	if c.DescribeTaskDefinitionOutput != nil {
+		return c.DescribeTaskDefinitionOutput, nil
 	}
 
 	id := utility.FromStringPtr(in.TaskDefinition)
 
-	if arn.IsARN(id) {
-		family, revNum, found := taskDefIndexFromARN(id)
-		if !found {
-			return nil, errors.New("task definition not found")
-		}
-		taskDef := GlobalECSService.TaskDefs[family][revNum-1]
-		taskDef.Status = utility.ToStringPtr(ecs.TaskDefinitionStatusInactive)
-		GlobalECSService.TaskDefs[family][revNum-1] = taskDef
-
-		return &ecs.DeregisterTaskDefinitionOutput{
-			TaskDefinition: taskDef.export(),
-		}, nil
-	}
-
-	family, revNum, err := parseFamilyAndRevision(id)
+	def, err := GlobalECSService.getLatestTaskDefinition(id)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid task definition")
+		return nil, errors.Wrap(err, "finding task definition")
 	}
 
-	revisions, ok := GlobalECSService.TaskDefs[family]
-	if !ok {
-		return nil, errors.New("family not found")
-	}
-	if len(revisions) < revNum {
-		return nil, errors.New("revision not found")
-	}
-
-	taskDef := revisions[revNum-1]
-	taskDef.Status = utility.ToStringPtr(ecs.TaskDefinitionStatusInactive)
-	GlobalECSService.TaskDefs[family][revNum-1] = taskDef
-
-	return &ecs.DeregisterTaskDefinitionOutput{
-		TaskDefinition: taskDef.export(),
+	return &ecs.DescribeTaskDefinitionOutput{
+		TaskDefinition: def.export(),
 	}, nil
-}
-
-func parseFamilyAndRevision(taskDef string) (family string, revNum int, err error) {
-	partition := strings.LastIndex(taskDef, ":")
-	if partition == -1 {
-		return "", -1, errors.New("task definition is not in family:revision format")
-	}
-
-	family = taskDef[:partition]
-
-	revNum, err = strconv.Atoi(taskDef[partition+1:])
-	if err != nil {
-		return "", -1, errors.Wrap(err, "parsing revision")
-	}
-
-	return family, revNum, nil
-}
-
-func taskDefIndexFromARN(arn string) (family string, revNum int, found bool) {
-	for family, revisions := range GlobalECSService.TaskDefs {
-		for revIdx, def := range revisions {
-			if utility.FromStringPtr(def.ARN) == arn {
-				return family, revIdx + 1, true
-			}
-		}
-	}
-	return "", -1, false
 }
 
 // ListTaskDefinitions saves the input and lists all matching task definitions.
@@ -480,6 +489,51 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDef
 	}, nil
 }
 
+// DeregisterTaskDefinition saves the input and deletes an existing mock task
+// definition. The mock output can be customized. By default, it will delete a
+// cached task definition if it exists.
+func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
+	c.DeregisterTaskDefinitionInput = in
+
+	if c.DeregisterTaskDefinitionOutput != nil {
+		return c.DeregisterTaskDefinitionOutput, nil
+	}
+
+	if in.TaskDefinition == nil {
+		return nil, errors.New("missing task definition")
+	}
+
+	id := utility.FromStringPtr(in.TaskDefinition)
+
+	def, err := GlobalECSService.getTaskDefinition(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "finding task definition")
+	}
+
+	def.Status = utility.ToStringPtr(ecs.TaskDefinitionStatusInactive)
+	GlobalECSService.TaskDefs[utility.FromStringPtr(def.Family)][utility.FromInt64Ptr(def.Revision)-1] = *def
+
+	return &ecs.DeregisterTaskDefinitionOutput{
+		TaskDefinition: def.export(),
+	}, nil
+}
+
+func parseFamilyAndRevision(taskDef string) (family string, revNum int, err error) {
+	partition := strings.LastIndex(taskDef, ":")
+	if partition == -1 {
+		return "", -1, errors.New("task definition is not in family:revision format")
+	}
+
+	family = taskDef[:partition]
+
+	revNum, err = strconv.Atoi(taskDef[partition+1:])
+	if err != nil {
+		return "", -1, errors.Wrap(err, "parsing revision")
+	}
+
+	return family, revNum, nil
+}
+
 // RunTask saves the input options and returns the mock result of running a task
 // definition. The mock output can be customized. By default, it will create
 // mock output based on the input.
@@ -502,45 +556,12 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 
 	taskDefID := utility.FromStringPtr(in.TaskDefinition)
 
-	if arn.IsARN(taskDefID) {
-		family, revNum, found := taskDefIndexFromARN(taskDefID)
-		if !found {
-			return nil, errors.New("task definition not found")
-		}
-		taskDef := GlobalECSService.TaskDefs[family][revNum-1]
-		task := newECSTask(in, taskDef)
-
-		cluster[utility.FromStringPtr(task.ARN)] = task
-
-		return &ecs.RunTaskOutput{
-			Tasks: []*ecs.Task{task.export()},
-		}, nil
+	def, err := GlobalECSService.getLatestTaskDefinition(taskDefID)
+	if err != nil {
+		return nil, errors.Wrap(err, "finding task definition")
 	}
 
-	var taskDef ECSTaskDefinition
-	family, revNum, err := parseFamilyAndRevision(taskDefID)
-	if err == nil {
-		revisions, ok := GlobalECSService.TaskDefs[family]
-		if !ok {
-			return nil, errors.New("task definition family not found")
-		}
-		if len(revisions) < revNum {
-			return nil, errors.New("task definition revision not found")
-		}
-
-		taskDef = revisions[revNum-1]
-	} else {
-		// Use the latest revision if none is specified.
-		family = taskDefID
-		revisions, ok := GlobalECSService.TaskDefs[family]
-		if !ok {
-			return nil, errors.New("task definition family not found")
-		}
-
-		taskDef = revisions[len(revisions)-1]
-	}
-
-	task := newECSTask(in, taskDef)
+	task := newECSTask(in, *def)
 
 	cluster[utility.FromStringPtr(task.ARN)] = task
 
