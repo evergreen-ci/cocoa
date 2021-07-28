@@ -162,6 +162,18 @@ func exportStrategy(strategy *cocoa.ECSPlacementStrategy, param *cocoa.ECSStrate
 	return []*ecs.PlacementStrategy{&placementStrat}
 }
 
+// exportPlacementConstraints converts the placement options into placement
+// constraints.
+func exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
+	var constraints []*ecs.PlacementConstraint
+	for _, filter := range opts.InstanceFilters {
+		var constraint ecs.PlacementConstraint
+		constraint.SetType("memberOf").SetExpression(filter)
+		constraints = append(constraints, &constraint)
+	}
+	return constraints
+}
+
 // exportEnvVars converts the non-secret environment variables into ECS
 // environment variables.
 func exportEnvVars(envVars []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
@@ -258,6 +270,7 @@ func (m *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecuti
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
 		SetTags(exportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
-		SetPlacementStrategy(exportStrategy(opts.PlacementOpts.Strategy, opts.PlacementOpts.StrategyParameter))
+		SetPlacementStrategy(exportStrategy(opts.PlacementOpts.Strategy, opts.PlacementOpts.StrategyParameter)).
+		SetPlacementConstraints(exportPlacementConstraints(opts.PlacementOpts))
 	return &runTask
 }

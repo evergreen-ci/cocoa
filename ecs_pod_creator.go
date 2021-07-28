@@ -564,6 +564,12 @@ type ECSPodPlacementOptions struct {
 	// If the strategy is binpack, it defaults to "memory".
 	// If the strategy is random, this does not apply.
 	StrategyParameter *ECSStrategyParameter
+
+	// InstanceFilter is a set of query expressions that restrict the placement
+	// of the pod to a set of container instances in the cluster that match the
+	// query filter.
+	// Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-query-language.html
+	InstanceFilters []string
 }
 
 // NewECSPodPlacementOptions creates new options to specify how an ECS pod
@@ -582,6 +588,20 @@ func (o *ECSPodPlacementOptions) SetStrategy(s ECSPlacementStrategy) *ECSPodPlac
 // on a container instance.
 func (o *ECSPodPlacementOptions) SetStrategyParameter(p ECSStrategyParameter) *ECSPodPlacementOptions {
 	o.StrategyParameter = &p
+	return o
+}
+
+// SetInstanceFilters sets the instance filters to constrain pod placement to
+// one in the set of matching container instances.
+func (o *ECSPodPlacementOptions) SetInstanceFilters(filters []string) *ECSPodPlacementOptions {
+	o.InstanceFilters = filters
+	return o
+}
+
+// AddInstanceFilters adds new instance filters to the existing ones to
+// constrain pod placement to one in the set of matching container instances.
+func (o *ECSPodPlacementOptions) AddInstanceFilters(filters ...string) *ECSPodPlacementOptions {
+	o.InstanceFilters = append(o.InstanceFilters, filters...)
 	return o
 }
 
