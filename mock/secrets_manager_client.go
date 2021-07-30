@@ -40,18 +40,22 @@ func init() {
 type SecretsManagerClient struct {
 	CreateSecretInput  *secretsmanager.CreateSecretInput
 	CreateSecretOutput *secretsmanager.CreateSecretOutput
+	CreateSecretError  error
 
 	GetSecretValueInput  *secretsmanager.GetSecretValueInput
 	GetSecretValueOutput *secretsmanager.GetSecretValueOutput
+	GetSecretValueError  error
 
 	DescribeSecretInput  *secretsmanager.DescribeSecretInput
 	DescribeSecretOutput *secretsmanager.DescribeSecretOutput
 
 	UpdateSecretInput  *secretsmanager.UpdateSecretInput
 	UpdateSecretOutput *secretsmanager.UpdateSecretOutput
+	UpdateSecretError  error
 
 	DeleteSecretInput  *secretsmanager.DeleteSecretInput
 	DeleteSecretOutput *secretsmanager.DeleteSecretOutput
+	DeleteSecretError  error
 }
 
 // CreateSecret saves the input options and returns a new mock secret. The mock
@@ -60,8 +64,8 @@ type SecretsManagerClient struct {
 func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmanager.CreateSecretInput) (*secretsmanager.CreateSecretOutput, error) {
 	c.CreateSecretInput = in
 
-	if c.CreateSecretOutput != nil {
-		return c.CreateSecretOutput, nil
+	if c.CreateSecretOutput != nil || c.CreateSecretError != nil {
+		return c.CreateSecretOutput, c.CreateSecretError
 	}
 
 	if in.Name == nil {
@@ -94,8 +98,8 @@ func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmana
 func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
 	c.GetSecretValueInput = in
 
-	if c.GetSecretValueOutput != nil {
-		return c.GetSecretValueOutput, nil
+	if c.GetSecretValueOutput != nil || c.GetSecretValueError != nil {
+		return c.GetSecretValueOutput, c.GetSecretValueError
 	}
 
 	if in.SecretId == nil {
@@ -159,8 +163,8 @@ func (c *SecretsManagerClient) DescribeSecret(ctx context.Context, in *secretsma
 func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error) {
 	c.UpdateSecretInput = in
 
-	if c.UpdateSecretOutput != nil {
-		return c.UpdateSecretOutput, nil
+	if c.UpdateSecretOutput != nil || c.UpdateSecretError != nil {
+		return c.UpdateSecretOutput, c.UpdateSecretError
 	}
 
 	if in.SecretId == nil {
@@ -203,8 +207,8 @@ func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secret
 func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error) {
 	c.DeleteSecretInput = in
 
-	if c.DeleteSecretOutput != nil {
-		return c.DeleteSecretOutput, nil
+	if c.DeleteSecretOutput != nil || c.DeleteSecretError != nil {
+		return c.DeleteSecretOutput, c.DeleteSecretError
 	}
 
 	if in.SecretId == nil {

@@ -73,7 +73,7 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 	if len(runOut.Failures) > 0 {
 		catcher := grip.NewBasicCatcher()
 		for _, failure := range runOut.Failures {
-			catcher.Errorf("task '%s': %s: %s\n", *failure.Arn, *failure.Detail, *failure.Reason)
+			catcher.Errorf("task '%s': %s: %s\n", utility.FromStringPtr(failure.Arn), utility.FromStringPtr(failure.Detail), utility.FromStringPtr(failure.Reason))
 		}
 		return nil, errors.Wrap(catcher.Resolve(), "running task")
 	}
