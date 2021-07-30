@@ -23,7 +23,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
-		"CreatePodFailsWithSecretsNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodFailsWithSecretsButNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
@@ -33,10 +33,36 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetImage("image").
 				AddEnvironmentVariables(*envVar).
 				SetName("container")
-			require.NotNil(t, containerDef.EnvVars)
 
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-			assert.NoError(t, execOpts.Validate())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetTaskRole(testutil.TaskRole()).
+				SetExecutionRole(testutil.ExecutionRole()).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+
+			p, err := c.CreatePod(ctx, opts)
+			require.Error(t, err)
+			require.Zero(t, p)
+		},
+		"CreatePodFailsWithRepoCredsButNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+			storedCreds := cocoa.NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			creds := cocoa.NewRepositoryCredentials().
+				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetNewCredentials(*storedCreds)
+			containerDef := cocoa.NewECSContainerDefinition().
+				SetImage("image").
+				SetRepositoryCredentials(*creds).
+				SetName("container")
+
+			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
@@ -60,10 +86,38 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
-			require.NotNil(t, containerDef.EnvVars)
 
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-			assert.NoError(t, execOpts.Validate())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+
+			p, err := c.CreatePod(ctx, opts)
+			require.NoError(t, err)
+			require.NotNil(t, p)
+
+			defer func() {
+				require.NoError(t, p.Delete(ctx))
+			}()
+
+			info, err := p.Info(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, cocoa.StatusRunning, info.Status)
+		},
+		"CreatePodSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+			containerDef := cocoa.NewECSContainerDefinition().
+				SetImage("image").
+				SetWorkingDir("working_dir").
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetName("container")
+
+			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
@@ -101,11 +155,9 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
-			require.NotNil(t, containerDef.EnvVars)
 
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName())
-			assert.NoError(t, execOpts.Validate())
 
 			opts := cocoa.NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
@@ -135,11 +187,50 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetName("container")
-			require.NotNil(t, containerDef.EnvVars)
 
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName())
-			assert.NoError(t, execOpts.Validate())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetTaskRole(testutil.TaskRole()).
+				SetExecutionRole(testutil.ExecutionRole()).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+
+			p, err := c.CreatePod(ctx, opts)
+			require.NoError(t, err)
+			require.NotNil(t, p)
+
+			defer func() {
+				require.NoError(t, p.Delete(ctx))
+			}()
+
+			info, err := p.Info(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, cocoa.StatusRunning, info.Status)
+		},
+		"CreatePodSucceedsWithNewlyCreatedRepoCreds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+			storedCreds := cocoa.NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			creds := cocoa.NewRepositoryCredentials().
+				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetNewCredentials(*storedCreds).
+				SetOwned(true)
+
+			containerDef := cocoa.NewECSContainerDefinition().
+				SetImage("image").
+				SetRepositoryCredentials(*creds).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetName("container")
+
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t.Name())).

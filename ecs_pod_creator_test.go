@@ -192,6 +192,16 @@ func TestECSPodCreationOptions(t *testing.T) {
 				SetExecutionOptions(*execOpts)
 			assert.Error(t, def.Validate())
 		})
+		t.Run("SecretEnvironmentVariablesWithoutExecutionRoleIsInvalid", func(t *testing.T) {
+			secretOpts := NewSecretOptions().SetName("name").SetValue("value")
+			ev := NewEnvironmentVariable().SetName("name").SetSecretOptions(*secretOpts)
+			containerDef := NewECSContainerDefinition().SetImage("image").AddEnvironmentVariables(*ev)
+			def := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128)
+			assert.Error(t, def.Validate())
+		})
 	})
 }
 
@@ -249,6 +259,12 @@ func TestECSContainerDefinition(t *testing.T) {
 		assert.Equal(t, *ev0, def.EnvVars[0])
 		assert.Equal(t, *ev1, def.EnvVars[1])
 	})
+	t.Run("SetRepositoryCredentials", func(t *testing.T) {
+		creds := NewRepositoryCredentials().SetSecretName("name")
+		def := NewECSContainerDefinition().SetRepositoryCredentials(*creds)
+		require.NotZero(t, def.RepoCreds)
+		assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(def.RepoCreds.SecretName))
+	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
 			assert.Error(t, NewECSContainerDefinition().Validate())
@@ -296,6 +312,12 @@ func TestECSContainerDefinition(t *testing.T) {
 				AddEnvironmentVariables(*NewEnvironmentVariable())
 			assert.Error(t, def.Validate())
 		})
+		t.Run("BadRepositoryCredentialsIsInvalid", func(t *testing.T) {
+			def := NewECSContainerDefinition().
+				SetImage("image").
+				SetRepositoryCredentials(*NewRepositoryCredentials())
+			assert.Error(t, def.Validate())
+		})
 	})
 }
 
@@ -319,8 +341,8 @@ func TestEnvironmentVariable(t *testing.T) {
 		opts := NewSecretOptions().SetName("name").SetValue("value")
 		ev := NewEnvironmentVariable().SetSecretOptions(*opts)
 		require.NotNil(t, ev.SecretOpts)
-		assert.Equal(t, opts.Name, ev.SecretOpts.Name)
-		assert.Equal(t, opts.Value, ev.SecretOpts.Value)
+		assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(ev.SecretOpts.Name))
+		assert.Equal(t, utility.FromStringPtr(opts.Value), utility.FromStringPtr(ev.SecretOpts.Value))
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
@@ -378,6 +400,91 @@ func TestEnvironmentVariable(t *testing.T) {
 	})
 }
 
+func TestRepositoryCredentials(t *testing.T) {
+	t.Run("NewRepositoryCredentials", func(t *testing.T) {
+		creds := NewRepositoryCredentials()
+		require.NotZero(t, creds)
+		assert.Zero(t, *creds)
+	})
+	t.Run("SetSecretName", func(t *testing.T) {
+		name := "secret_name"
+		creds := NewRepositoryCredentials().SetSecretName(name)
+		assert.Equal(t, name, utility.FromStringPtr(creds.SecretName))
+	})
+	t.Run("SetOwned", func(t *testing.T) {
+		creds := NewRepositoryCredentials().SetOwned(true)
+		assert.True(t, utility.FromBoolPtr(creds.Owned))
+	})
+	t.Run("SetNewCredentials", func(t *testing.T) {
+		storedCreds := NewStoredRepositoryCredentials().
+			SetUsername("username").
+			SetPassword("password")
+		creds := NewRepositoryCredentials().SetNewCredentials(*storedCreds)
+		require.NotZero(t, creds.NewCreds)
+		assert.Equal(t, *storedCreds, *creds.NewCreds)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsIfNewCredsAreSet", func(t *testing.T) {
+			storedCreds := NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			creds := NewRepositoryCredentials().
+				SetSecretName("name").
+				SetNewCredentials(*storedCreds)
+			assert.NoError(t, creds.Validate())
+		})
+		t.Run("SucceedsWithJustSecretNameForExistingSecret", func(t *testing.T) {
+			creds := NewRepositoryCredentials().SetSecretName("name")
+			assert.NoError(t, creds.Validate())
+		})
+		t.Run("EmptyIsInvalid", func(t *testing.T) {
+			creds := NewRepositoryCredentials()
+			assert.Error(t, creds.Validate())
+		})
+		t.Run("MissingSecretNameIsInvalid", func(t *testing.T) {
+			storedCreds := NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			creds := NewRepositoryCredentials().SetNewCredentials(*storedCreds)
+			assert.Error(t, creds.Validate())
+		})
+		t.Run("BadNewCredentialsIsInvalid", func(t *testing.T) {
+			storedCreds := NewStoredRepositoryCredentials()
+			creds := NewRepositoryCredentials().SetNewCredentials(*storedCreds)
+			assert.Error(t, creds.Validate())
+		})
+	})
+}
+
+func TestStoredRepositoryCredentials(t *testing.T) {
+	t.Run("SetUsername", func(t *testing.T) {
+		username := "username"
+		creds := NewStoredRepositoryCredentials().SetUsername(username)
+		assert.Equal(t, username, utility.FromStringPtr(creds.Username))
+	})
+	t.Run("SetPassword", func(t *testing.T) {
+		password := "password"
+		creds := NewStoredRepositoryCredentials().SetPassword(password)
+		assert.Equal(t, password, utility.FromStringPtr(creds.Password))
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithUsernameAndPassword", func(t *testing.T) {
+			creds := NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			assert.NoError(t, creds.Validate())
+		})
+		t.Run("FailsWithoutUsername", func(t *testing.T) {
+			creds := NewStoredRepositoryCredentials().SetPassword("password")
+			assert.Error(t, creds.Validate())
+		})
+		t.Run("FailsWithoutPassword", func(t *testing.T) {
+			creds := NewStoredRepositoryCredentials().SetPassword("password")
+			assert.Error(t, creds.Validate())
+		})
+	})
+}
+
 func TestSecretOptions(t *testing.T) {
 	t.Run("NewSecretOptions", func(t *testing.T) {
 		opts := NewSecretOptions()
@@ -401,6 +508,28 @@ func TestSecretOptions(t *testing.T) {
 	t.Run("SetOwned", func(t *testing.T) {
 		opts := NewSecretOptions().SetOwned(true)
 		assert.True(t, utility.FromBoolPtr(opts.Owned))
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("NameAndNewValueIsValid", func(t *testing.T) {
+			s := NewSecretOptions().SetName("name").SetValue("value")
+			assert.NoError(t, s.Validate())
+		})
+		t.Run("EmptyIsInvalid", func(t *testing.T) {
+			s := NewSecretOptions()
+			assert.Error(t, s.Validate())
+		})
+		t.Run("ExistingSecretWithNameIsValid", func(t *testing.T) {
+			s := NewSecretOptions().SetName("name").SetExists(true)
+			assert.NoError(t, s.Validate())
+		})
+		t.Run("MissingNameIsInvalid", func(t *testing.T) {
+			s := NewSecretOptions().SetValue("value")
+			assert.Error(t, s.Validate())
+		})
+		t.Run("ExistingSecretWithNewValueIsInvalid", func(t *testing.T) {
+			s := NewSecretOptions().SetName("name").SetExists(true).SetValue("value")
+			assert.Error(t, s.Validate())
+		})
 	})
 }
 

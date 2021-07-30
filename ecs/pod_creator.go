@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
@@ -48,6 +49,15 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		return nil, errors.Wrap(err, "creating secrets")
 	}
 
+	repoCreds, err := m.getRepoCreds(mergedPodCreationOpts)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting secret repository credentials")
+	}
+
+	if err := m.createSecrets(ctx, repoCreds); err != nil {
+		return nil, errors.Wrap(err, "creating secret repository credentials")
+	}
+
 	taskDefinition := m.exportPodCreationOptions(mergedPodCreationOpts)
 
 	registerOut, err := m.client.RegisterTaskDefinition(ctx, taskDefinition)
@@ -82,9 +92,11 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		return nil, errors.New("expected a task to be running in ECS, but none was returned")
 	}
 
+	// TODO (EVG-15104): separate per-container secrets and repository
+	// credentials.
 	resources := cocoa.NewECSPodResources().
 		SetCluster(utility.FromStringPtr(mergedPodExecutionOpts.Cluster)).
-		SetSecrets(translatePodSecrets(secrets)).
+		SetSecrets(translatePodSecrets(append(secrets, repoCreds...))).
 		SetTaskDefinition(*taskDef).
 		SetTaskID(utility.FromStringPtr(runOut.Tasks[0].TaskArn))
 
@@ -108,14 +120,15 @@ func (m *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context
 	return nil, errors.New("TODO: implement")
 }
 
-// getSecrets retrieves the secrets from the secret environment variables for the pod.
-func (m *BasicECSPodCreator) getSecrets(merged cocoa.ECSPodCreationOptions) []cocoa.SecretOptions {
+// getSecrets retrieves the secrets from the secret environment variables for
+// the containers.
+func (m *BasicECSPodCreator) getSecrets(opts cocoa.ECSPodCreationOptions) []cocoa.SecretOptions {
 	var secrets []cocoa.SecretOptions
 
-	for _, def := range merged.ContainerDefinitions {
-		for _, variable := range def.EnvVars {
-			if variable.SecretOpts != nil {
-				secrets = append(secrets, *variable.SecretOpts)
+	for _, def := range opts.ContainerDefinitions {
+		for _, envVar := range def.EnvVars {
+			if envVar.SecretOpts != nil {
+				secrets = append(secrets, *envVar.SecretOpts)
 			}
 		}
 	}
@@ -126,21 +139,50 @@ func (m *BasicECSPodCreator) getSecrets(merged cocoa.ECSPodCreationOptions) []co
 // createSecrets creates secrets that do not already exist.
 func (m *BasicECSPodCreator) createSecrets(ctx context.Context, secrets []cocoa.SecretOptions) error {
 	for _, secret := range secrets {
-		if !utility.FromBoolPtr(secret.Exists) {
-			if m.vault == nil {
-				return errors.New("no vault was specified")
-			}
-			arn, err := m.vault.CreateSecret(ctx, secret.PodSecret.NamedSecret)
-			if err != nil {
-				return err
-			}
-			// Pods must use the secret's ARN once the secret is created
-			// because that uniquely identifies the resource.
-			secret.SetName(arn)
+		if utility.FromBoolPtr(secret.Exists) {
+			continue
 		}
+		if m.vault == nil {
+			return errors.New("no vault was specified")
+		}
+		arn, err := m.vault.CreateSecret(ctx, secret.PodSecret.NamedSecret)
+		if err != nil {
+			return err
+		}
+		// Pods must use the secret's ARN once the secret is created
+		// because that uniquely identifies the resource.
+		secret.SetName(arn)
 	}
 
 	return nil
+}
+
+// getRepoCreds retrieves the secrets from the repository credentials for the
+// containers.
+func (m *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) ([]cocoa.SecretOptions, error) {
+	var secrets []cocoa.SecretOptions
+
+	for _, def := range opts.ContainerDefinitions {
+		if def.RepoCreds == nil {
+			continue
+		}
+		opts := cocoa.NewSecretOptions().
+			SetName(utility.FromStringPtr(def.RepoCreds.SecretName)).
+			SetOwned(utility.FromBoolPtr(def.RepoCreds.Owned))
+		if def.RepoCreds.NewCreds != nil {
+			val, err := json.Marshal(def.RepoCreds.NewCreds)
+			if err != nil {
+				return nil, errors.Wrap(err, "formatting new credentials to create")
+			}
+			opts.SetValue(string(val)).
+				SetExists(false)
+		} else {
+			opts.SetExists(true)
+		}
+		secrets = append(secrets, *opts)
+	}
+
+	return secrets, nil
 }
 
 // exportTags converts a mapping of string-string into ECS tags.

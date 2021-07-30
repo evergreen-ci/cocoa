@@ -1,6 +1,7 @@
 package cocoa
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/evergreen-ci/utility"
@@ -23,6 +24,10 @@ func TestPodSecret(t *testing.T) {
 		val := "val"
 		s := NewPodSecret().SetValue(val)
 		assert.Equal(t, val, utility.FromStringPtr(s.Value))
+	})
+	t.Run("SetOwned", func(t *testing.T) {
+		s := NewPodSecret().SetOwned(true)
+		assert.True(t, utility.FromBoolPtr(s.Owned))
 	})
 }
 
@@ -62,5 +67,26 @@ func TestECSPodResources(t *testing.T) {
 		res := NewECSPodResources().SetCluster(cluster)
 		require.NotZero(t, res.Cluster)
 		assert.Equal(t, cluster, *res.Cluster)
+	})
+}
+
+func TestECSPodStatus(t *testing.T) {
+	t.Run("Validate", func(t *testing.T) {
+		for _, s := range []ECSPodStatus{
+			StatusStarting,
+			StatusRunning,
+			StatusStopped,
+			StatusDeleted,
+		} {
+			t.Run(fmt.Sprintf("SucceedsForStatus=%s", s), func(t *testing.T) {
+				assert.NoError(t, s.Validate())
+			})
+		}
+		t.Run("FailsForEmptyStatus", func(t *testing.T) {
+			assert.Error(t, ECSPodStatus("").Validate())
+		})
+		t.Run("FailsForInvalidStatus", func(t *testing.T) {
+			assert.Error(t, ECSPodStatus("invalid").Validate())
+		})
 	})
 }
