@@ -72,9 +72,6 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			assert.NotZero(t, res.TaskDefinition)
 			assert.Equal(t, opts.ExecutionOpts.Cluster, res.Cluster)
 
-			stat := p.Status()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
-
 			require.Len(t, res.Secrets, len(opts.ContainerDefinitions[0].EnvVars))
 			for _, s := range res.Secrets {
 				val, err := v.GetValue(ctx, utility.FromStringPtr(s.Name))

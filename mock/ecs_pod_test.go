@@ -150,7 +150,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			require.Error(t, p.Stop(ctx))
 
 			stat := p.Status()
-			assert.Equal(t, cocoa.StatusRunning, stat.Status)
+			assert.Equal(t, cocoa.StatusStarting, stat.Status)
 
 			c.StopTaskError = nil
 
@@ -173,7 +173,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			stat := p.Status()
 			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusRunning, stat.Status)
+			assert.Equal(t, cocoa.StatusStarting, stat.Status)
 
 			c.StopTaskError = nil
 
