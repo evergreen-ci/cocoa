@@ -115,12 +115,16 @@ func NewBasicECSPod(opts ...*BasicECSPodOptions) (*BasicECSPod, error) {
 	}, nil
 }
 
-// Info returns information about the current state of the pod.
-func (p *BasicECSPod) Info(ctx context.Context) (*cocoa.ECSPodInfo, error) {
-	return &cocoa.ECSPodInfo{
-		Status:    p.status,
-		Resources: p.resources,
-	}, nil
+// Resources returns information about the resources used by the pod.
+func (p *BasicECSPod) Resources() cocoa.ECSPodResources {
+	return p.resources
+}
+
+// Status returns the cached status of the pod.
+func (p *BasicECSPod) Status() cocoa.ECSPodStatusInfo {
+	return cocoa.ECSPodStatusInfo{
+		Status: p.status,
+	}
 }
 
 // Stop stops the running pod without cleaning up any of its underlying

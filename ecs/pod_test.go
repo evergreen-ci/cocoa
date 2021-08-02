@@ -40,10 +40,9 @@ func TestBasicECSPod(t *testing.T) {
 			p, err := NewBasicECSPod(opts)
 			require.NoError(t, err)
 
-			info, err := p.Info(ctx)
-			require.NoError(t, err)
-			assert.Equal(t, *res, info.Resources)
-			assert.Equal(t, stat, info.Status)
+			podRes := p.Resources()
+			assert.Equal(t, *res, podRes)
+			assert.Equal(t, stat, p.Status().Status)
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
