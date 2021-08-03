@@ -133,11 +133,11 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
 
-	for i := range o.ContainerDefinitions {
-		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", o.ContainerDefinitions[i].Name)
+	for i, def := range o.ContainerDefinitions {
+		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", def.Name)
 
-		if o.ContainerDefinitions[i].MemoryMB != nil {
-			totalContainerMemMB += *o.ContainerDefinitions[i].MemoryMB
+		if def.MemoryMB != nil {
+			totalContainerMemMB += *def.MemoryMB
 		} else if o.MemoryMB == nil {
 			catcher.Errorf("must specify container-level memory to allocate for each container if pod-level memory is not specified")
 		}
@@ -148,11 +148,10 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
 		}
 
-		if len(o.ContainerDefinitions[i].EnvVars) > 0 {
-			for _, envVar := range o.ContainerDefinitions[i].EnvVars {
-				if envVar.SecretOpts != nil && o.ExecutionRole == nil {
-					catcher.Errorf("must specify execution role ARN when specifying container secrets")
-				}
+		for _, envVar := range def.EnvVars {
+			if envVar.SecretOpts != nil && o.ExecutionRole == nil {
+				catcher.Errorf("must specify execution role ARN when specifying container secrets")
+				break
 			}
 		}
 	}
@@ -298,6 +297,9 @@ type ECSContainerDefinition struct {
 	CPU *int
 	// EnvVars are environment variables to make available in the container.
 	EnvVars []EnvironmentVariable
+	// RepoCreds are private repository credentials for using images that
+	// require authentication.
+	RepoCreds *RepositoryCredentials
 }
 
 // NewECSContainerDefinition returns a new uninitialized container definition.
@@ -356,6 +358,13 @@ func (d *ECSContainerDefinition) AddEnvironmentVariables(envVars ...EnvironmentV
 	return d
 }
 
+// SetRepositoryCredentials sets the private repository credentials for using
+// images that require authentication.
+func (d *ECSContainerDefinition) SetRepositoryCredentials(creds RepositoryCredentials) *ECSContainerDefinition {
+	d.RepoCreds = &creds
+	return d
+}
+
 // Validate checks that the image is provided and that all of its environment
 // variables are valid.
 func (d *ECSContainerDefinition) Validate() error {
@@ -366,6 +375,9 @@ func (d *ECSContainerDefinition) Validate() error {
 	catcher.NewWhen(d.CPU != nil && *d.CPU <= 0, "must have positive CPU value if non-default")
 	for _, ev := range d.EnvVars {
 		catcher.Wrapf(ev.Validate(), "environment variable '%s'", ev.Name)
+	}
+	if d.RepoCreds != nil {
+		catcher.Wrap(d.RepoCreds.Validate(), "invalid repository credentials")
 	}
 	if catcher.HasErrors() {
 		return catcher.Resolve()
@@ -381,8 +393,14 @@ func (d *ECSContainerDefinition) Validate() error {
 // EnvironmentVariable represents an environment variable, which can be
 // optionally backed by a secret.
 type EnvironmentVariable struct {
-	Name       *string
-	Value      *string
+	// Name is the name of the environment variable.
+	Name *string
+	// Value is the environment variable's non-secret value. This is required if
+	// SecretOpts is not given.
+	Value *string
+	// SecretOpts are options to define a stored secret that the environment
+	// variable refers to. This is required if the non-secret Value is not
+	// given.
 	SecretOpts *SecretOptions
 }
 
@@ -404,7 +422,7 @@ func (e *EnvironmentVariable) SetValue(val string) *EnvironmentVariable {
 	return e
 }
 
-// SetSecretOptions sets the environment variable's secret value. This is
+// SetSecretOptions sets the environment variable's secret options. This is
 // mutually exclusive with setting the non-secret (EnvironmentVariable).Value.
 func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentVariable {
 	e.SecretOpts = &opts
@@ -470,6 +488,93 @@ func (s *SecretOptions) Validate() error {
 	catcher.NewWhen(s.Name == nil, "must specify a name")
 	catcher.NewWhen(s.Name != nil && *s.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(!utility.FromBoolPtr(s.Exists) && s.Value == nil, "either a new secret's value must be given or the secret must already exist")
+	catcher.NewWhen(utility.FromBoolPtr(s.Exists) && s.Value != nil, "cannot specify a new secret value when the secret already exists")
+	return catcher.Resolve()
+}
+
+// RepositoryCredentials are credentials for using images from private
+// repositories. The credentials must be stored in a secret vault.
+type RepositoryCredentials struct {
+	// SecretName is either the friendly name of the secret to be created or the
+	// resource name of an existing secret.
+	SecretName *string
+	// NewCreds are the new credentials to be stored. If this is unspecified,
+	// the secrets are assumed to already exist.
+	NewCreds *StoredRepositoryCredentials
+	// Owned determines whether or not the secret is owned by its pod or not.
+	Owned *bool
+}
+
+// NewRepositoryCredentials returns a new uninitialized set of repository
+// credentials.
+func NewRepositoryCredentials() *RepositoryCredentials {
+	return &RepositoryCredentials{}
+}
+
+// SetSecretName sets the either the friendly name for the new secret to be
+// created or the resource name of an existing secret.
+func (c *RepositoryCredentials) SetSecretName(name string) *RepositoryCredentials {
+	c.SecretName = &name
+	return c
+}
+
+// SetNewCredentials sets the new credentials to be store.
+func (c *RepositoryCredentials) SetNewCredentials(creds StoredRepositoryCredentials) *RepositoryCredentials {
+	c.NewCreds = &creds
+	return c
+}
+
+// SetOwned sets whether or not the secret credentials are owned by its pod or
+// not.
+func (c *RepositoryCredentials) SetOwned(owned bool) *RepositoryCredentials {
+	c.Owned = &owned
+	return c
+}
+
+// Validate check that the secret options are given and that either the
+// new credentials to create are specified, or the secret already exists.
+func (c *RepositoryCredentials) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(c.SecretName == nil, "must specify a secret name")
+	catcher.NewWhen(c.SecretName != nil && *c.SecretName == "", "cannot specify an empty secret name")
+	if c.NewCreds != nil {
+		catcher.Wrap(c.NewCreds.Validate(), "invalid new credentials to create")
+	}
+	return catcher.Resolve()
+}
+
+// StoredRepositoryCredentials represents the storage format of repository
+// credentials for using images from private repositories.
+type StoredRepositoryCredentials struct {
+	// Username is the username for authentication.
+	Username *string `json:"username"`
+	// Password is the password for authentication.
+	Password *string `json:"password"`
+}
+
+// NewStoredRepositoryCredentials returns a new uninitialized set of repository
+// credentials for storage.
+func NewStoredRepositoryCredentials() *StoredRepositoryCredentials {
+	return &StoredRepositoryCredentials{}
+}
+
+// SetUsername sets the stored repository credential's username.
+func (c *StoredRepositoryCredentials) SetUsername(name string) *StoredRepositoryCredentials {
+	c.Username = &name
+	return c
+}
+
+// SetPassword sets the stored repository credential's password.
+func (c *StoredRepositoryCredentials) SetPassword(pwd string) *StoredRepositoryCredentials {
+	c.Password = &pwd
+	return c
+}
+
+// Validate checks that both the username and password are set.
+func (c *StoredRepositoryCredentials) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username")
+	catcher.NewWhen(utility.FromStringPtr(c.Password) == "", "must specify a password")
 	return catcher.Resolve()
 }
 
