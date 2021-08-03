@@ -538,7 +538,7 @@ func (c *RepositoryCredentials) Validate() error {
 	catcher.NewWhen(c.SecretName == nil, "must specify a secret name")
 	catcher.NewWhen(c.SecretName != nil && *c.SecretName == "", "cannot specify an empty secret name")
 	if c.NewCreds != nil {
-		catcher.Wrap(c.NewCreds.Validate(), "invalid credentials to create")
+		catcher.Wrap(c.NewCreds.Validate(), "invalid new credentials to create")
 	}
 	return catcher.Resolve()
 }
@@ -573,8 +573,8 @@ func (c *StoredRepositoryCredentials) SetPassword(pwd string) *StoredRepositoryC
 // Validate checks that both the username and password are set.
 func (c *StoredRepositoryCredentials) Validate() error {
 	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username if secret does not already exist")
-	catcher.NewWhen(utility.FromStringPtr(c.Password) == "", "must specify a password if secret does not already exist")
+	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username")
+	catcher.NewWhen(utility.FromStringPtr(c.Password) == "", "must specify a password")
 	return catcher.Resolve()
 }
 
