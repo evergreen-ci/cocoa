@@ -88,13 +88,13 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		SetTaskDefinition(*taskDef).
 		SetTaskID(utility.FromStringPtr(runOut.Tasks[0].TaskArn))
 
-	options := NewBasicECSPodOptions().
+	podOpts := NewBasicECSPodOptions().
 		SetClient(m.client).
 		SetVault(m.vault).
-		SetStatus(cocoa.StatusRunning).
+		SetStatus(cocoa.StatusStarting).
 		SetResources(*resources)
 
-	p, err := NewBasicECSPod(options)
+	p, err := NewBasicECSPod(podOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod")
 	}

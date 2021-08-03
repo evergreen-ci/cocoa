@@ -8,8 +8,12 @@ import (
 
 // ECSPod provides an abstraction of a pod backed by AWS ECS.
 type ECSPod interface {
-	// Info returns information about the current state of the pod.
-	Info(ctx context.Context) (*ECSPodInfo, error)
+	// Resources returns information about the current resources being used by
+	// the pod.
+	Resources() ECSPodResources
+	// Status returns the current cached status of the pod.
+	Status() ECSPodStatusInfo
+	// TODO (EVG-15161): add GetLatestStatus method to get non-cached status.
 	// Stop stops the running pod without cleaning up any of its underlying
 	// resources.
 	Stop(ctx context.Context) error
@@ -17,13 +21,9 @@ type ECSPod interface {
 	Delete(ctx context.Context) error
 }
 
-// ECSPodInfo provides information about the current status of the pod.
-type ECSPodInfo struct {
-	// Status is the current status of the pod.
+// ECSPodStatusInfo represents the current status of the pod.
+type ECSPodStatusInfo struct {
 	Status ECSPodStatus `bson:"-" json:"-" yaml:"-"`
-	// Resources provides information about the underlying ECS resources being
-	// used by the pod.
-	Resources ECSPodResources `bson:"-" json:"-" yaml:"-"`
 }
 
 // ECSPodResources are ECS-specific resources that a pod uses.
@@ -105,6 +105,9 @@ func (s *PodSecret) SetOwned(owned bool) *PodSecret {
 type ECSPodStatus string
 
 const (
+	// StatusUnknown indicates that the status of the ECS pod cannot be
+	// determined.
+	StatusUnknown ECSPodStatus = "unknown"
 	// StatusStarting indicates that the ECS pod is being prepared to run.
 	StatusStarting ECSPodStatus = "starting"
 	// StatusRunning indicates that the ECS pod is actively running.

@@ -106,27 +106,28 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 	}
 
 	checkPodDeleted := func(ctx context.Context, t *testing.T, p cocoa.ECSPod, c cocoa.ECSClient, smc cocoa.SecretsManagerClient, opts cocoa.ECSPodCreationOptions) {
-		info, err := p.Info(ctx)
-		require.NoError(t, err)
-		assert.Equal(t, cocoa.StatusDeleted, info.Status)
+		stat := p.Status()
+		assert.Equal(t, cocoa.StatusDeleted, stat.Status)
+
+		res := p.Resources()
 
 		describeTaskDef, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
-			TaskDefinition: info.Resources.TaskDefinition.ID,
+			TaskDefinition: res.TaskDefinition.ID,
 		})
 		require.NoError(t, err)
 		require.NotZero(t, describeTaskDef.TaskDefinition)
 		assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(describeTaskDef.TaskDefinition.Family))
 
 		describeTasks, err := c.DescribeTasks(ctx, &awsECS.DescribeTasksInput{
-			Cluster: info.Resources.Cluster,
-			Tasks:   []*string{info.Resources.TaskID},
+			Cluster: res.Cluster,
+			Tasks:   []*string{res.TaskID},
 		})
 		require.NoError(t, err)
 		assert.Empty(t, describeTasks.Failures)
 		require.Len(t, describeTasks.Tasks, 1)
 		assert.Equal(t, awsECS.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].LastStatus))
 
-		for _, s := range info.Resources.Secrets {
+		for _, s := range res.Secrets {
 			_, err := smc.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
 				SecretId: s.Name,
 			})
@@ -148,16 +149,14 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			require.Error(t, p.Stop(ctx))
 
-			info, err := p.Info(ctx)
-			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusRunning, info.Status)
+			stat := p.Status()
+			assert.Equal(t, cocoa.StatusStarting, stat.Status)
 
 			c.StopTaskError = nil
 
 			require.NoError(t, p.Stop(ctx))
-			info, err = p.Info(ctx)
-			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStopped, info.Status)
+			stat = p.Status()
+			assert.Equal(t, cocoa.StatusStopped, stat.Status)
 		},
 		"DeleteIsIdempotentWhenStoppingTaskFails": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(
@@ -172,9 +171,9 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			require.Error(t, p.Delete(ctx))
 
-			info, err := p.Info(ctx)
+			stat := p.Status()
 			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusRunning, info.Status)
+			assert.Equal(t, cocoa.StatusStarting, stat.Status)
 
 			c.StopTaskError = nil
 
@@ -195,9 +194,9 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			require.Error(t, p.Delete(ctx))
 
-			info, err := p.Info(ctx)
+			stat := p.Status()
 			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStopped, info.Status)
+			assert.Equal(t, cocoa.StatusStopped, stat.Status)
 
 			c.DeregisterTaskDefinitionError = nil
 
@@ -218,16 +217,14 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			require.Error(t, p.Delete(ctx))
 
-			info, err := p.Info(ctx)
-			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStopped, info.Status)
+			stat := p.Status()
+			assert.Equal(t, cocoa.StatusStopped, stat.Status)
 
 			smc.DeleteSecretError = nil
 
 			require.NoError(t, p.Delete(ctx))
 
 			checkPodDeleted(ctx, t, p, c, smc, *opts)
-
 		},
 	}
 }
