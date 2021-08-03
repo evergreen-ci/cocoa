@@ -444,9 +444,9 @@ func (e *EnvironmentVariable) Validate() error {
 }
 
 // SecretOptions represents a secret with a name and value that may or may not
-// be owned by its pod.
+// be owned by its container.
 type SecretOptions struct {
-	PodSecret
+	ContainerSecret
 	// Exists determines whether or not the secret already exists or must be
 	// created before it can be used.
 	Exists *bool

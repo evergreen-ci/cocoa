@@ -26,6 +26,7 @@ type ECSTaskDefinition struct {
 	Tags          map[string]string
 	Status        *string
 	Registered    *time.Time
+	Deregistered  *time.Time
 }
 
 func newECSTaskDefinition(def *ecs.RegisterTaskDefinitionInput, rev int) ECSTaskDefinition {
@@ -74,6 +75,7 @@ func (d *ECSTaskDefinition) export() *ecs.TaskDefinition {
 		Status:               d.Status,
 		ContainerDefinitions: containerDefs,
 		RegisteredAt:         d.Registered,
+		DeregisteredAt:       d.Deregistered,
 	}
 }
 
@@ -144,7 +146,7 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		ARN:         utility.ToStringPtr(id.String()),
 		Cluster:     in.Cluster,
 		ExecEnabled: in.EnableExecuteCommand,
-		Status:      utility.ToStringPtr(ecs.DesiredStatusRunning),
+		Status:      utility.ToStringPtr(ecs.DesiredStatusPending),
 		GoalStatus:  utility.ToStringPtr(ecs.DesiredStatusRunning),
 		Created:     utility.ToTimePtr(time.Now()),
 		TaskDef:     taskDef,
@@ -184,12 +186,14 @@ func (t *ECSTask) export() *ecs.Task {
 
 // ECSContainer represents a mock running ECS container within a task.
 type ECSContainer struct {
-	ARN      *string
-	TaskARN  *string
-	Name     *string
-	Image    *string
-	CPU      *int64
-	MemoryMB *int64
+	ARN        *string
+	TaskARN    *string
+	Name       *string
+	Image      *string
+	CPU        *int64
+	MemoryMB   *int64
+	Status     *string
+	GoalStatus *string
 }
 
 func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
@@ -204,12 +208,14 @@ func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
 	}
 
 	return ECSContainer{
-		ARN:      utility.ToStringPtr(id.String()),
-		TaskARN:  task.ARN,
-		Name:     def.Name,
-		Image:    def.Image,
-		CPU:      def.CPU,
-		MemoryMB: def.MemoryMB,
+		ARN:        utility.ToStringPtr(id.String()),
+		TaskARN:    task.ARN,
+		Name:       def.Name,
+		Image:      def.Image,
+		CPU:        def.CPU,
+		MemoryMB:   def.MemoryMB,
+		Status:     utility.ToStringPtr(ecs.DesiredStatusPending),
+		GoalStatus: utility.ToStringPtr(ecs.DesiredStatusRunning),
 	}
 }
 
@@ -219,6 +225,7 @@ func (c *ECSContainer) export() *ecs.Container {
 		TaskArn:      c.TaskARN,
 		Name:         c.Name,
 		Image:        c.Image,
+		LastStatus:   c.Status,
 	}
 
 	if c.CPU != nil {
@@ -519,6 +526,7 @@ func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.Deregi
 	}
 
 	def.Status = utility.ToStringPtr(ecs.TaskDefinitionStatusInactive)
+	def.Deregistered = utility.ToTimePtr(time.Now())
 	GlobalECSService.TaskDefs[utility.FromStringPtr(def.Family)][utility.FromInt64Ptr(def.Revision)-1] = *def
 
 	return &ecs.DeregisterTaskDefinitionOutput{
