@@ -27,15 +27,15 @@ func NewECSPod(p cocoa.ECSPod) *ECSPod {
 	}
 }
 
-// Status returns mock cached status information about the pod. The mock output
-// can be customized. By default, it will return the result of the backing ECS
-// pod.
-func (p *ECSPod) Status() cocoa.ECSPodStatusInfo {
+// StatusInfo returns mock cached status information about the pod. The mock
+// output can be customized. By default, it will return the result of the
+// backing ECS pod.
+func (p *ECSPod) StatusInfo() cocoa.ECSPodStatusInfo {
 	if p.StatusOutput != nil {
 		return *p.StatusOutput
 	}
 
-	return p.ECSPod.Status()
+	return p.ECSPod.StatusInfo()
 }
 
 // Resources returns mock resource information about the pod. The mock output

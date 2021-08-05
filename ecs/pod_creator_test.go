@@ -62,7 +62,9 @@ func TestBasicECSPodCreator(t *testing.T) {
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
-			defer c.Close(ctx)
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
 
 			smc, err := secret.NewBasicSecretsManagerClient(awsutil.ClientOptions{
 				Creds:  credentials.NewEnvCredentials(),
@@ -109,7 +111,9 @@ func TestECSPodCreator(t *testing.T) {
 
 			c, err := NewBasicECSClient(*awsOpts)
 			require.NoError(t, err)
-			defer c.Close(tctx)
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
 
 			podCreator, err := NewBasicECSPodCreator(c, nil)
 			require.NoError(t, err)

@@ -105,8 +105,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				require.NoError(t, p.Delete(ctx))
 			}()
 
-			stat := p.Status()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			checkPodStatus(t, p, cocoa.StatusStarting)
 		},
 		"CreatePodSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			containerDef := cocoa.NewECSContainerDefinition().
@@ -134,8 +133,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				require.NoError(t, p.Delete(ctx))
 			}()
 
-			stat := p.Status()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			checkPodStatus(t, p, cocoa.StatusStarting)
 		},
 	}
 }
@@ -207,9 +205,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				require.NoError(t, p.Delete(ctx))
 			}()
 
-			stat := p.Status()
-			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			checkPodStatus(t, p, cocoa.StatusStarting)
 		},
 		"CreatePodSucceedsWithNewlyCreatedRepoCreds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			storedCreds := cocoa.NewStoredRepositoryCredentials().
@@ -248,9 +244,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				require.NoError(t, p.Delete(ctx))
 			}()
 
-			stat := p.Status()
-			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			checkPodStatus(t, p, cocoa.StatusStarting)
 		},
 	}
 }
