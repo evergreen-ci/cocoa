@@ -38,6 +38,9 @@ type ECSPodCreationOptions struct {
 	// specified, then each container is required to specify its own CPU.
 	// This is ignored for pods running Windows containers.
 	CPU *int
+	// NetworkMode describes the networking capabilities of the pod's
+	// containers. If unspecified, the default value is bridge.
+	NetworkMode *ECSNetworkMode
 	// TaskRole is the role that the pod can use. Depending on the
 	// configuration, this may be required if
 	// (ECSPodExecutionOptions).SupportsDebugMode is true.
@@ -90,6 +93,13 @@ func (o *ECSPodCreationOptions) SetCPU(cpu int) *ECSPodCreationOptions {
 	return o
 }
 
+// SetNetworkMode sets the network mode that applies for all the pod's
+// containers.
+func (o *ECSPodCreationOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodCreationOptions {
+	o.NetworkMode = &mode
+	return o
+}
+
 // SetTaskRole sets the task role that the pod can use.
 func (o *ECSPodCreationOptions) SetTaskRole(role string) *ECSPodCreationOptions {
 	o.TaskRole = &role
@@ -126,15 +136,36 @@ func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions)
 	return o
 }
 
-// validateContainerDefinitions checks that all the individual container definitions are valid.
+// validateContainerDefinitions checks that all the individual container
+// definitions are valid.
 func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
-	var totalContainerMemMB, totalContainerCPU int
 	catcher := grip.NewBasicCatcher()
 
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
 
+	var networkMode ECSNetworkMode
+	if o.NetworkMode != nil {
+		networkMode = *o.NetworkMode
+	} else {
+		networkMode = NetworkModeBridge
+	}
+	catcher.Wrap(networkMode.Validate(), "invalid network mode")
+
+	var totalContainerMemMB, totalContainerCPU int
 	for i, def := range o.ContainerDefinitions {
 		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", def.Name)
+
+		switch networkMode {
+		case NetworkModeNone:
+			catcher.NewWhen(len(def.PortMappings) != 0, "cannot specify port mappings because networking is disabled")
+		case NetworkModeHost, NetworkModeAWSVPC:
+			for _, pm := range def.PortMappings {
+				containerPort := utility.FromIntPtr(pm.ContainerPort)
+				hostPort := utility.FromIntPtr(pm.HostPort)
+				catcher.ErrorfWhen(pm.HostPort != nil && hostPort != containerPort,
+					"host port '%d' must be omitted or identical to the container port '%d' when network mode is '%s'", hostPort, containerPort, networkMode)
+			}
+		}
 
 		if def.MemoryMB != nil {
 			totalContainerMemMB += *def.MemoryMB
@@ -175,6 +206,10 @@ func (o *ECSPodCreationOptions) Validate() error {
 	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
 
 	catcher.Wrap(o.validateContainerDefinitions(), "invalid container definitions")
+
+	if o.NetworkMode != nil {
+		catcher.Wrap(o.NetworkMode.Validate(), "invalid network mode")
+	}
 
 	if o.ExecutionOpts != nil {
 		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
@@ -243,37 +278,6 @@ func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOp
 	return merged
 }
 
-// MergeECSPodExecutionOptions merges all the given options to execute an ECS pod.
-// Options are applied in the order that they're specified and conflicting
-// options are overwritten.
-func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutionOptions {
-	merged := ECSPodExecutionOptions{}
-
-	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-
-		if opt.Cluster != nil {
-			merged.Cluster = opt.Cluster
-		}
-
-		if opt.PlacementOpts != nil {
-			merged.PlacementOpts = opt.PlacementOpts
-		}
-
-		if opt.SupportsDebugMode != nil {
-			merged.SupportsDebugMode = opt.SupportsDebugMode
-		}
-
-		if opt.Tags != nil {
-			merged.Tags = opt.Tags
-		}
-	}
-
-	return merged
-}
-
 // ECSContainerDefinition defines settings that apply to a single container
 // within an ECS pod.
 type ECSContainerDefinition struct {
@@ -300,6 +304,9 @@ type ECSContainerDefinition struct {
 	// RepoCreds are private repository credentials for using images that
 	// require authentication.
 	RepoCreds *RepositoryCredentials
+	// PortMappings are mappings between the ports within the container to
+	// expose in the network interface for external traffic.
+	PortMappings []PortMapping
 }
 
 // NewECSContainerDefinition returns a new uninitialized container definition.
@@ -365,8 +372,22 @@ func (d *ECSContainerDefinition) SetRepositoryCredentials(creds RepositoryCreden
 	return d
 }
 
-// Validate checks that the image is provided and that all of its environment
-// variables are valid.
+// SetPortMappings sets the port mappings for the container. This overwrites any
+// existing port mappings.
+func (d *ECSContainerDefinition) SetPortMappings(mappings []PortMapping) *ECSContainerDefinition {
+	d.PortMappings = mappings
+	return d
+}
+
+// AddPortMappings adds new port mappings to the existing ones for the
+// container.
+func (d *ECSContainerDefinition) AddPortMappings(mappings ...PortMapping) *ECSContainerDefinition {
+	d.PortMappings = append(d.PortMappings, mappings...)
+	return d
+}
+
+// Validate checks that the container definition is valid and sets defaults
+// where possible.
 func (d *ECSContainerDefinition) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(d.Image == nil, "must specify an image")
@@ -378,6 +399,9 @@ func (d *ECSContainerDefinition) Validate() error {
 	}
 	if d.RepoCreds != nil {
 		catcher.Wrap(d.RepoCreds.Validate(), "invalid repository credentials")
+	}
+	for _, pm := range d.PortMappings {
+		catcher.Wrapf(pm.Validate(), "invalid port mapping")
 	}
 	if catcher.HasErrors() {
 		return catcher.Resolve()
@@ -578,6 +602,56 @@ func (c *StoredRepositoryCredentials) Validate() error {
 	return catcher.Resolve()
 }
 
+// PortMapping represents a mapping from a container port to a port in the
+// container instance. The transport protocol is TCP.
+type PortMapping struct {
+	// ContainerPort is the port within the container to expose.
+	ContainerPort *int
+	// HostPort is the port within the container instance to which the container
+	// port will be bound.
+	// If the pod's network mode is NetworkModeAWSVPC or NetworkModeHost, then
+	// this will be set to the same value as ContainerPort.
+	// If the pod's network mode is NetworkModeBridge, this can either be
+	// explicitly set or omitted to be assigned a port at random.
+	HostPort *int
+}
+
+// NewPortMapping returns a new uninitialized port mapping.
+func NewPortMapping() *PortMapping {
+	return &PortMapping{}
+}
+
+// SetContainerPort sets the port within the container to expose.
+func (m *PortMapping) SetContainerPort(port int) *PortMapping {
+	m.ContainerPort = &port
+	return m
+}
+
+// SetHostPort sets the port within the container instance to which the
+// container port will be bound.
+func (m *PortMapping) SetHostPort(port int) *PortMapping {
+	m.HostPort = &port
+	return m
+}
+
+// Validate checks that the required port mapping settings are given. It does
+// not check that the pod-level network mode is valid with the port mapping.
+func (m *PortMapping) Validate() error {
+	const (
+		minPort = 0
+		maxPort = 2 << 15
+	)
+	catcher := grip.NewBasicCatcher()
+	containerPort := utility.FromIntPtr(m.ContainerPort)
+	catcher.NewWhen(m.ContainerPort == nil, "must specify a container port")
+	catcher.ErrorfWhen(containerPort <= minPort || containerPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
+	if m.HostPort != nil {
+		hostPort := utility.FromIntPtr(m.HostPort)
+		catcher.ErrorfWhen(hostPort <= minPort || hostPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
+	}
+	return catcher.Resolve()
+}
+
 // ECSPodExecutionOptions represent options to configure how a pod is started.
 type ECSPodExecutionOptions struct {
 	// Cluster is the name of the cluster where the pod will run. If none is
@@ -653,6 +727,37 @@ func (o *ECSPodExecutionOptions) Validate() error {
 	}
 
 	return nil
+}
+
+// MergeECSPodExecutionOptions merges all the given options to execute an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutionOptions {
+	merged := ECSPodExecutionOptions{}
+
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+
+		if opt.Cluster != nil {
+			merged.Cluster = opt.Cluster
+		}
+
+		if opt.PlacementOpts != nil {
+			merged.PlacementOpts = opt.PlacementOpts
+		}
+
+		if opt.SupportsDebugMode != nil {
+			merged.SupportsDebugMode = opt.SupportsDebugMode
+		}
+
+		if opt.Tags != nil {
+			merged.Tags = opt.Tags
+		}
+	}
+
+	return merged
 }
 
 // ECSPodPlacementOptions represent options to control how an ECS pod is
@@ -785,6 +890,36 @@ const (
 	// container instances (i.e. hosts).
 	StrategyParamSpreadHost ECSStrategyParameter = "host"
 )
+
+// ECSNetworkMode represents possible kinds of networking configuration for a
+// pod in ECS.
+type ECSNetworkMode string
+
+const (
+	// kim: TODO: continue documenting the different networking modes.
+	// NetworkModeNone indicates that networking is disabled entirely. The pod
+	// does not allow any external connectivity and container ports cannot be
+	// exposed.
+	NetworkModeNone ECSNetworkMode = "none"
+	// NetworkModeAWSVPC. If this is set, container ports can be mapped This is supported for Linux and Window containers.
+	NetworkModeAWSVPC ECSNetworkMode = "awsvpc"
+	// NetworkModeBridge indicates that the . This is only supported for Linux
+	// containers.
+	NetworkModeBridge ECSNetworkMode = "bridge"
+	// NetworkModeHost indicates that the container will use the underlying
+	// host's . This is only supported for Linux containers.
+	NetworkModeHost ECSNetworkMode = "host"
+)
+
+// Validate checks that the ECS network mode is one of the recognized modes.
+func (m ECSNetworkMode) Validate() error {
+	switch m {
+	case NetworkModeNone, NetworkModeAWSVPC, NetworkModeBridge, NetworkModeHost:
+		return nil
+	default:
+		return errors.Errorf("unrecognized network mode '%s'", m)
+	}
+}
 
 // ECSTaskDefinition represents options for an existing ECS task definition.
 type ECSTaskDefinition struct {
