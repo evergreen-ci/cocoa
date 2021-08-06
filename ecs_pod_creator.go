@@ -39,7 +39,10 @@ type ECSPodCreationOptions struct {
 	// This is ignored for pods running Windows containers.
 	CPU *int
 	// NetworkMode describes the networking capabilities of the pod's
-	// containers. If unspecified, the default value is bridge.
+	// containers. If the NetworkMode is unspecified for a pod running Linux
+	// containers, the default value is NetworkModeBridge. If the NetworkMode is
+	// unspecified for a pod running Windows containers, the default network
+	// mode is to use the Windows NAT network.
 	NetworkMode *ECSNetworkMode
 	// TaskRole is the role that the pod can use. Depending on the
 	// configuration, this may be required if
@@ -305,7 +308,7 @@ type ECSContainerDefinition struct {
 	// require authentication.
 	RepoCreds *RepositoryCredentials
 	// PortMappings are mappings between the ports within the container to
-	// expose in the network interface for external traffic.
+	// allow network traffic.
 	PortMappings []PortMapping
 }
 
@@ -605,7 +608,8 @@ func (c *StoredRepositoryCredentials) Validate() error {
 // PortMapping represents a mapping from a container port to a port in the
 // container instance. The transport protocol is TCP.
 type PortMapping struct {
-	// ContainerPort is the port within the container to expose.
+	// ContainerPort is the port within the container to expose to network
+	// traffic.
 	ContainerPort *int
 	// HostPort is the port within the container instance to which the container
 	// port will be bound.
@@ -621,7 +625,8 @@ func NewPortMapping() *PortMapping {
 	return &PortMapping{}
 }
 
-// SetContainerPort sets the port within the container to expose.
+// SetContainerPort sets the port within the container to expose to network
+// traffic.
 func (m *PortMapping) SetContainerPort(port int) *PortMapping {
 	m.ContainerPort = &port
 	return m
@@ -896,18 +901,21 @@ const (
 type ECSNetworkMode string
 
 const (
-	// kim: TODO: continue documenting the different networking modes.
 	// NetworkModeNone indicates that networking is disabled entirely. The pod
-	// does not allow any external connectivity and container ports cannot be
-	// exposed.
+	// does not allow any external network connectivity and container ports
+	// cannot be mapped.
 	NetworkModeNone ECSNetworkMode = "none"
-	// NetworkModeAWSVPC. If this is set, container ports can be mapped This is supported for Linux and Window containers.
+	// NetworkModeAWSVPC indicates that the pod will be allocated its own
+	// virtual network interface and IPv4 address. This is supported for Linux
+	// and Window containers.
 	NetworkModeAWSVPC ECSNetworkMode = "awsvpc"
-	// NetworkModeBridge indicates that the . This is only supported for Linux
-	// containers.
+	// NetworkModeBridge indicates that the container will use Docker's built-in
+	// virtual network inside the container instance running the pod. This is
+	// only supported for Linux containers.
 	NetworkModeBridge ECSNetworkMode = "bridge"
-	// NetworkModeHost indicates that the container will use the underlying
-	// host's . This is only supported for Linux containers.
+	// NetworkModeHost indicates that the container will directly map its ports
+	// to the underlying container instance's network interface.
+	// This is only supported for Linux containers.
 	NetworkModeHost ECSNetworkMode = "host"
 )
 
