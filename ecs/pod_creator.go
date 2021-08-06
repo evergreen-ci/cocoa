@@ -170,7 +170,7 @@ func (pc *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.Sec
 }
 
 // getRepoCreds retrieves the secret repository credentials for each container.
-func (m *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map[string]cocoa.SecretOptions, error) {
+func (pc *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map[string]cocoa.SecretOptions, error) {
 	containerCreds := map[string]cocoa.SecretOptions{}
 
 	for _, def := range opts.ContainerDefinitions {
@@ -197,7 +197,7 @@ func (m *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map
 
 // mergeSecrets merges the secrets for each container with the secret repository
 // credentials for each container.
-func (m *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptions, repoCreds map[string]cocoa.SecretOptions) map[string][]cocoa.SecretOptions {
+func (pc *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptions, repoCreds map[string]cocoa.SecretOptions) map[string][]cocoa.SecretOptions {
 	merged := map[string][]cocoa.SecretOptions{}
 
 	for containerName, secrets := range secrets {
@@ -213,11 +213,13 @@ func (m *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptio
 // exportTags converts a mapping of tag names to values into ECS tags.
 func (pc *BasicECSPodCreator) exportTags(tags map[string]string) []*ecs.Tag {
 	var ecsTags []*ecs.Tag
+
 	for k, v := range tags {
-		ecsTag := &ecs.Tag{}
-		ecsTag.SetKey(k).SetValue(v)
-		ecsTags = append(ecsTags, ecsTag)
+		var tag ecs.Tag
+		tag.SetKey(k).SetValue(v)
+		ecsTags = append(ecsTags, &tag)
 	}
+
 	return ecsTags
 }
 
@@ -233,11 +235,13 @@ func (pc *BasicECSPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions)
 // constraints.
 func (pc *BasicECSPodCreator) exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
 	var constraints []*ecs.PlacementConstraint
+
 	for _, filter := range opts.InstanceFilters {
 		var constraint ecs.PlacementConstraint
 		constraint.SetType("memberOf").SetExpression(filter)
 		constraints = append(constraints, &constraint)
 	}
+
 	return constraints
 }
 
@@ -264,12 +268,14 @@ func (pc *BasicECSPodCreator) exportSecrets(envVars []cocoa.EnvironmentVariable)
 	var secrets []*ecs.Secret
 
 	for _, envVar := range envVars {
-		if envVar.SecretOpts != nil {
-			var secret ecs.Secret
-			secret.SetName(utility.FromStringPtr(envVar.Name))
-			secret.SetValueFrom(utility.FromStringPtr(envVar.SecretOpts.Name))
-			secrets = append(secrets, &secret)
+		if envVar.SecretOpts == nil {
+			continue
 		}
+
+		var secret ecs.Secret
+		secret.SetName(utility.FromStringPtr(envVar.Name))
+		secret.SetValueFrom(utility.FromStringPtr(envVar.SecretOpts.Name))
+		secrets = append(secrets, &secret)
 	}
 
 	return secrets
