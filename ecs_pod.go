@@ -266,7 +266,7 @@ const (
 // Validate checks that the ECS status is one of the recognized statuses.
 func (s ECSStatus) Validate() error {
 	switch s {
-	case StatusStarting, StatusRunning, StatusStopped, StatusDeleted:
+	case StatusStarting, StatusRunning, StatusStopped, StatusDeleted, StatusUnknown:
 		return nil
 	default:
 		return errors.Errorf("unrecognized status '%s'", s)

@@ -176,6 +176,7 @@ func TestECSStatus(t *testing.T) {
 			StatusRunning,
 			StatusStopped,
 			StatusDeleted,
+			StatusUnknown,
 		} {
 			t.Run(fmt.Sprintf("SucceedsForStatus=%s", s), func(t *testing.T) {
 				assert.NoError(t, s.Validate())
