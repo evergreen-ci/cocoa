@@ -31,7 +31,7 @@ func NewBasicECSPodCreator(c cocoa.ECSClient, v cocoa.Vault) (*BasicECSPodCreato
 }
 
 // CreatePod creates a new pod backed by AWS ECS.
-func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
+func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
 	mergedPodCreationOpts := cocoa.MergeECSPodCreationOptions(opts...)
 	mergedPodExecutionOpts := cocoa.MergeECSPodExecutionOptions(mergedPodCreationOpts.ExecutionOpts)
 
@@ -43,21 +43,21 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		return nil, errors.Wrap(err, "invalid pod execution options")
 	}
 
-	secrets := m.getSecrets(mergedPodCreationOpts)
+	secrets := pc.getSecrets(mergedPodCreationOpts)
 
-	repoCreds, err := m.getRepoCreds(mergedPodCreationOpts)
+	repoCreds, err := pc.getRepoCreds(mergedPodCreationOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting secret repository credentials")
 	}
 
-	resolvedSecrets, err := m.createSecrets(ctx, m.mergeSecrets(secrets, repoCreds))
+	resolvedSecrets, err := pc.createSecrets(ctx, pc.mergeSecrets(secrets, repoCreds))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating secret repository credentials")
 	}
 
-	taskDefinition := m.exportPodCreationOptions(mergedPodCreationOpts)
+	taskDefinition := pc.exportPodCreationOptions(mergedPodCreationOpts)
 
-	registerOut, err := m.client.RegisterTaskDefinition(ctx, taskDefinition)
+	registerOut, err := pc.client.RegisterTaskDefinition(ctx, taskDefinition)
 	if err != nil {
 		return nil, errors.Wrap(err, "registering task definition")
 	}
@@ -70,9 +70,9 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 		SetID(utility.FromStringPtr(registerOut.TaskDefinition.TaskDefinitionArn)).
 		SetOwned(true)
 
-	runTask := m.exportTaskExecutionOptions(mergedPodExecutionOpts, *taskDef)
+	runTask := pc.exportTaskExecutionOptions(mergedPodExecutionOpts, *taskDef)
 
-	runOut, err := m.client.RunTask(ctx, runTask)
+	runOut, err := pc.client.RunTask(ctx, runTask)
 	if err != nil {
 		return nil, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(runTask.TaskDefinition), utility.FromStringPtr(runTask.Cluster))
 	}
@@ -91,14 +91,14 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 
 	resources := cocoa.NewECSPodResources().
 		SetCluster(utility.FromStringPtr(mergedPodExecutionOpts.Cluster)).
-		SetContainers(translateContainerResources(runOut.Tasks[0].Containers, resolvedSecrets)).
+		SetContainers(pc.translateContainerResources(runOut.Tasks[0].Containers, resolvedSecrets)).
 		SetTaskDefinition(*taskDef).
 		SetTaskID(utility.FromStringPtr(runOut.Tasks[0].TaskArn))
 
 	podOpts := NewBasicECSPodOptions().
-		SetClient(m.client).
-		SetVault(m.vault).
-		SetStatusInfo(translatePodStatusInfo(runOut.Tasks[0])).
+		SetClient(pc.client).
+		SetVault(pc.vault).
+		SetStatusInfo(pc.translatePodStatusInfo(runOut.Tasks[0])).
 		SetResources(*resources)
 
 	p, err := NewBasicECSPod(podOpts)
@@ -111,13 +111,13 @@ func (m *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPo
 
 // CreatePodFromExistingDefinition creates a new pod backed by AWS ECS from an
 // existing definition.
-func (m *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...*cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
+func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...*cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }
 
 // getSecrets retrieves the secrets from the secret environment variables for
 // each container.
-func (m *BasicECSPodCreator) getSecrets(opts cocoa.ECSPodCreationOptions) map[string][]cocoa.SecretOptions {
+func (pc *BasicECSPodCreator) getSecrets(opts cocoa.ECSPodCreationOptions) map[string][]cocoa.SecretOptions {
 	containerSecrets := map[string][]cocoa.SecretOptions{}
 
 	for _, def := range opts.ContainerDefinitions {
@@ -133,12 +133,12 @@ func (m *BasicECSPodCreator) getSecrets(opts cocoa.ECSPodCreationOptions) map[st
 }
 
 // createSecrets creates secrets that do not already exist for each container.
-func (m *BasicECSPodCreator) createSecrets(ctx context.Context, containerSecrets map[string][]cocoa.SecretOptions) (map[string][]cocoa.SecretOptions, error) {
+func (pc *BasicECSPodCreator) createSecrets(ctx context.Context, containerSecrets map[string][]cocoa.SecretOptions) (map[string][]cocoa.SecretOptions, error) {
 	resolvedSecrets := map[string][]cocoa.SecretOptions{}
 
 	for containerName, secrets := range containerSecrets {
 		for _, opts := range secrets {
-			resolvedOpts, err := m.createSecret(ctx, opts)
+			resolvedOpts, err := pc.createSecret(ctx, opts)
 			if err != nil {
 				return nil, errors.Wrapf(err, "creating secret '%s' for container '%s'", utility.FromStringPtr(opts.ContainerSecret.Name), containerName)
 			}
@@ -151,14 +151,14 @@ func (m *BasicECSPodCreator) createSecrets(ctx context.Context, containerSecrets
 
 // createSecret creates a single secret for a container if it does not exist
 // yet.
-func (m *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.SecretOptions) (*cocoa.SecretOptions, error) {
+func (pc *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.SecretOptions) (*cocoa.SecretOptions, error) {
 	if utility.FromBoolPtr(secret.Exists) {
 		return &secret, nil
 	}
-	if m.vault == nil {
+	if pc.vault == nil {
 		return nil, errors.New("no vault was specified")
 	}
-	arn, err := m.vault.CreateSecret(ctx, secret.ContainerSecret.NamedSecret)
+	arn, err := pc.vault.CreateSecret(ctx, secret.ContainerSecret.NamedSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (m *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.Secr
 }
 
 // getRepoCreds retrieves the secret repository credentials for each container.
-func (m *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map[string]cocoa.SecretOptions, error) {
+func (pc *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map[string]cocoa.SecretOptions, error) {
 	containerCreds := map[string]cocoa.SecretOptions{}
 
 	for _, def := range opts.ContainerDefinitions {
@@ -197,7 +197,7 @@ func (m *BasicECSPodCreator) getRepoCreds(opts cocoa.ECSPodCreationOptions) (map
 
 // mergeSecrets merges the secrets for each container with the secret repository
 // credentials for each container.
-func (m *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptions, repoCreds map[string]cocoa.SecretOptions) map[string][]cocoa.SecretOptions {
+func (pc *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptions, repoCreds map[string]cocoa.SecretOptions) map[string][]cocoa.SecretOptions {
 	merged := map[string][]cocoa.SecretOptions{}
 
 	for containerName, secrets := range secrets {
@@ -210,41 +210,46 @@ func (m *BasicECSPodCreator) mergeSecrets(secrets map[string][]cocoa.SecretOptio
 	return merged
 }
 
-// exportTags converts a mapping of string-string into ECS tags.
-func exportTags(tags map[string]string) []*ecs.Tag {
+// exportTags converts a mapping of tag names to values into ECS tags.
+func (pc *BasicECSPodCreator) exportTags(tags map[string]string) []*ecs.Tag {
 	var ecsTags []*ecs.Tag
+
 	for k, v := range tags {
-		ecsTag := &ecs.Tag{}
-		ecsTag.SetKey(k).SetValue(v)
-		ecsTags = append(ecsTags, ecsTag)
+		var tag ecs.Tag
+		tag.SetKey(k).SetValue(v)
+		ecsTags = append(ecsTags, &tag)
 	}
+
 	return ecsTags
 }
 
 // exportStrategy converts the strategy and parameter into an ECS placement
 // strategy.
-func exportStrategy(strategy *cocoa.ECSPlacementStrategy, param *cocoa.ECSStrategyParameter) []*ecs.PlacementStrategy {
+func (pc *BasicECSPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementStrategy {
 	var placementStrat ecs.PlacementStrategy
-	placementStrat.SetType(string(*strategy)).SetField(utility.FromStringPtr(param))
+	placementStrat.SetType(string(*opts.Strategy)).SetField(utility.FromStringPtr(opts.StrategyParameter))
 	return []*ecs.PlacementStrategy{&placementStrat}
 }
 
-// exportPlacementConstraints converts the placement options into placement
+// exportPlacementConstraints converts the placement options into ECS placement
 // constraints.
-func exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
+func (pc *BasicECSPodCreator) exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
 	var constraints []*ecs.PlacementConstraint
+
 	for _, filter := range opts.InstanceFilters {
 		var constraint ecs.PlacementConstraint
 		constraint.SetType("memberOf").SetExpression(filter)
 		constraints = append(constraints, &constraint)
 	}
+
 	return constraints
 }
 
 // exportEnvVars converts the non-secret environment variables into ECS
 // environment variables.
-func exportEnvVars(envVars []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
+func (pc *BasicECSPodCreator) exportEnvVars(envVars []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
 	var converted []*ecs.KeyValuePair
+
 	for _, envVar := range envVars {
 		if envVar.SecretOpts != nil {
 			continue
@@ -253,27 +258,32 @@ func exportEnvVars(envVars []cocoa.EnvironmentVariable) []*ecs.KeyValuePair {
 		pair.SetName(utility.FromStringPtr(envVar.Name)).SetValue(utility.FromStringPtr(envVar.Value))
 		converted = append(converted, &pair)
 	}
+
 	return converted
 }
 
 // exportSecrets converts environment variables backed by secrets into ECS
 // Secrets.
-func exportSecrets(envVars []cocoa.EnvironmentVariable) []*ecs.Secret {
+func (pc *BasicECSPodCreator) exportSecrets(envVars []cocoa.EnvironmentVariable) []*ecs.Secret {
 	var secrets []*ecs.Secret
+
 	for _, envVar := range envVars {
-		if envVar.SecretOpts != nil {
-			var secret ecs.Secret
-			secret.SetName(utility.FromStringPtr(envVar.Name))
-			secret.SetValueFrom(utility.FromStringPtr(envVar.SecretOpts.Name))
-			secrets = append(secrets, &secret)
+		if envVar.SecretOpts == nil {
+			continue
 		}
+
+		var secret ecs.Secret
+		secret.SetName(utility.FromStringPtr(envVar.Name))
+		secret.SetValueFrom(utility.FromStringPtr(envVar.SecretOpts.Name))
+		secrets = append(secrets, &secret)
 	}
+
 	return secrets
 }
 
-// translateContainerResources translates the created containers and stored
-// secrets into the resources associated with each container.
-func translateContainerResources(containers []*ecs.Container, containerSecrets map[string][]cocoa.SecretOptions) []cocoa.ECSContainerResources {
+// translateContainerResources translates the stored secrets into the resources
+// associated with each container.
+func (pc *BasicECSPodCreator) translateContainerResources(containers []*ecs.Container, containerSecrets map[string][]cocoa.SecretOptions) []cocoa.ECSContainerResources {
 	containerResourcesSet := map[string]cocoa.ECSContainerResources{}
 
 	for _, container := range containers {
@@ -288,7 +298,7 @@ func translateContainerResources(containers []*ecs.Container, containerSecrets m
 
 	for name, opts := range containerSecrets {
 		res := containerResourcesSet[name]
-		res.SetSecrets(translateContainerSecrets(opts))
+		res.SetSecrets(pc.translateContainerSecrets(opts))
 		containerResourcesSet[name] = res
 	}
 
@@ -301,13 +311,13 @@ func translateContainerResources(containers []*ecs.Container, containerSecrets m
 	return containerResources
 }
 
-func translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
+func (pc *BasicECSPodCreator) translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
 	return *cocoa.NewECSPodStatusInfo().
-		SetStatus(translateECSStatus(task.LastStatus)).
-		SetContainers(translateContainerStatusInfo(task.Containers))
+		SetStatus(pc.translateECSStatus(task.LastStatus)).
+		SetContainers(pc.translateContainerStatusInfo(task.Containers))
 }
 
-func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContainerStatusInfo {
+func (pc *BasicECSPodCreator) translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContainerStatusInfo {
 	var statuses []cocoa.ECSContainerStatusInfo
 
 	for _, container := range containers {
@@ -317,14 +327,16 @@ func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContai
 		status := cocoa.NewECSContainerStatusInfo().
 			SetContainerID(utility.FromStringPtr(container.ContainerArn)).
 			SetName(utility.FromStringPtr(container.Name)).
-			SetStatus(translateECSStatus(container.LastStatus))
+			SetStatus(pc.translateECSStatus(container.LastStatus))
 		statuses = append(statuses, *status)
 	}
 
 	return statuses
 }
 
-func translateECSStatus(status *string) cocoa.ECSStatus {
+// translateECSStatus translate the ECS status into its equivalent cocoa
+// status.
+func (pc *BasicECSPodCreator) translateECSStatus(status *string) cocoa.ECSStatus {
 	if status == nil {
 		return cocoa.StatusUnknown
 	}
@@ -341,7 +353,7 @@ func translateECSStatus(status *string) cocoa.ECSStatus {
 }
 
 // translateContainerSecrets translates secret options into container secrets.
-func translateContainerSecrets(secrets []cocoa.SecretOptions) []cocoa.ContainerSecret {
+func (pc *BasicECSPodCreator) translateContainerSecrets(secrets []cocoa.SecretOptions) []cocoa.ContainerSecret {
 	var containerSecrets []cocoa.ContainerSecret
 
 	for _, secret := range secrets {
@@ -351,13 +363,14 @@ func translateContainerSecrets(secrets []cocoa.SecretOptions) []cocoa.ContainerS
 	return containerSecrets
 }
 
-// exportPodCreationOptions converts options to create a pod into its equivalent ECS task definition.
-func (m *BasicECSPodCreator) exportPodCreationOptions(opts cocoa.ECSPodCreationOptions) *ecs.RegisterTaskDefinitionInput {
+// exportPodCreationOptions converts options to create a pod into its equivalent
+// ECS task definition.
+func (pc *BasicECSPodCreator) exportPodCreationOptions(opts cocoa.ECSPodCreationOptions) *ecs.RegisterTaskDefinitionInput {
 	var taskDef ecs.RegisterTaskDefinitionInput
 
 	var containerDefs []*ecs.ContainerDefinition
 	for _, def := range opts.ContainerDefinitions {
-		containerDefs = append(containerDefs, exportContainerDefinition(def))
+		containerDefs = append(containerDefs, pc.exportContainerDefinition(def))
 	}
 	taskDef.SetContainerDefinitions(containerDefs)
 
@@ -369,17 +382,21 @@ func (m *BasicECSPodCreator) exportPodCreationOptions(opts cocoa.ECSPodCreationO
 		taskDef.SetCpu(strconv.Itoa(cpu))
 	}
 
+	if opts.NetworkMode != nil {
+		taskDef.SetNetworkMode(string(*opts.NetworkMode))
+	}
+
 	taskDef.SetFamily(utility.FromStringPtr(opts.Name)).
 		SetTaskRoleArn(utility.FromStringPtr(opts.TaskRole)).
 		SetExecutionRoleArn(utility.FromStringPtr(opts.ExecutionRole)).
-		SetTags(exportTags(opts.Tags))
+		SetTags(pc.exportTags(opts.Tags))
 
 	return &taskDef
 }
 
 // exportContainerDefinition converts a container definition into an ECS
 // container definition input.
-func exportContainerDefinition(def cocoa.ECSContainerDefinition) *ecs.ContainerDefinition {
+func (pc *BasicECSPodCreator) exportContainerDefinition(def cocoa.ECSContainerDefinition) *ecs.ContainerDefinition {
 	var containerDef ecs.ContainerDefinition
 	if mem := utility.FromIntPtr(def.MemoryMB); mem != 0 {
 		containerDef.SetMemory(int64(mem))
@@ -393,20 +410,33 @@ func exportContainerDefinition(def cocoa.ECSContainerDefinition) *ecs.ContainerD
 	containerDef.SetCommand(utility.ToStringPtrSlice(def.Command)).
 		SetImage(utility.FromStringPtr(def.Image)).
 		SetName(utility.FromStringPtr(def.Name)).
-		SetEnvironment(exportEnvVars(def.EnvVars)).
-		SetSecrets(exportSecrets(def.EnvVars))
+		SetEnvironment(pc.exportEnvVars(def.EnvVars)).
+		SetSecrets(pc.exportSecrets(def.EnvVars)).
+		SetPortMappings(pc.exportPortMappings(def.PortMappings))
 	return &containerDef
 }
 
 // exportTaskExecutionOptions converts execution options and a task definition
 // into an ECS task execution input.
-func (m *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
+func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
 	var runTask ecs.RunTaskInput
 	runTask.SetCluster(utility.FromStringPtr(opts.Cluster)).
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
-		SetTags(exportTags(opts.Tags)).
+		SetTags(pc.exportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
-		SetPlacementStrategy(exportStrategy(opts.PlacementOpts.Strategy, opts.PlacementOpts.StrategyParameter)).
-		SetPlacementConstraints(exportPlacementConstraints(opts.PlacementOpts))
+		SetPlacementStrategy(pc.exportStrategy(opts.PlacementOpts)).
+		SetPlacementConstraints(pc.exportPlacementConstraints(opts.PlacementOpts))
 	return &runTask
+}
+
+// exportPortMappings converts port mappings into ECS port mappings.
+func (pc *BasicECSPodCreator) exportPortMappings(mappings []cocoa.PortMapping) []*ecs.PortMapping {
+	var converted []*ecs.PortMapping
+	for _, pm := range mappings {
+		mapping := &ecs.PortMapping{}
+		mapping.SetContainerPort(int64(utility.FromIntPtr(pm.ContainerPort))).
+			SetHostPort(int64(utility.FromIntPtr(pm.HostPort)))
+		converted = append(converted, mapping)
+	}
+	return converted
 }
