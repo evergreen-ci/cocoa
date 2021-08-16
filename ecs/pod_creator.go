@@ -434,8 +434,12 @@ func (pc *BasicECSPodCreator) exportPortMappings(mappings []cocoa.PortMapping) [
 	var converted []*ecs.PortMapping
 	for _, pm := range mappings {
 		mapping := &ecs.PortMapping{}
-		mapping.SetContainerPort(int64(utility.FromIntPtr(pm.ContainerPort))).
-			SetHostPort(int64(utility.FromIntPtr(pm.HostPort)))
+		if pm.ContainerPort != nil {
+			mapping.SetContainerPort(int64(utility.FromIntPtr(pm.ContainerPort)))
+		}
+		if pm.HostPort != nil {
+			mapping.SetHostPort(int64(utility.FromIntPtr(pm.HostPort)))
+		}
 		converted = append(converted, mapping)
 	}
 	return converted

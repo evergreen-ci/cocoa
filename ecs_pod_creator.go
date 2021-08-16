@@ -164,9 +164,11 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 		case NetworkModeHost, NetworkModeAWSVPC:
 			for _, pm := range def.PortMappings {
 				containerPort := utility.FromIntPtr(pm.ContainerPort)
-				hostPort := utility.FromIntPtr(pm.HostPort)
-				catcher.ErrorfWhen(pm.HostPort != nil && hostPort != containerPort,
-					"host port '%d' must be omitted or identical to the container port '%d' when network mode is '%s'", hostPort, containerPort, networkMode)
+				if pm.HostPort != nil {
+					hostPort := utility.FromIntPtr(pm.HostPort)
+					catcher.ErrorfWhen(hostPort != containerPort,
+						"host port '%d' must be omitted or identical to the container port '%d' when network mode is '%s'", hostPort, containerPort, networkMode)
+				}
 			}
 		}
 
