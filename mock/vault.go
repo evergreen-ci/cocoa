@@ -53,7 +53,7 @@ func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id strin
 	return m.Vault.CreateSecret(ctx, s)
 }
 
-// UpdateSecret saves the input options and if the secret does not exist,
+// UpsertSecret saves the input options and if the secret does not exist,
 // creates it; if it already exists, it updates the secret value. The mock
 // output can be customized. By default, it will call the backing Vault
 // implementation's UpdateValue.
