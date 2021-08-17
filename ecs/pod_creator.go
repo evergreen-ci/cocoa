@@ -158,7 +158,7 @@ func (pc *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.Sec
 	if pc.vault == nil {
 		return nil, errors.New("no vault was specified")
 	}
-	arn, err := pc.vault.CreateSecret(ctx, secret.ContainerSecret.NamedSecret)
+	arn, err := pc.vault.UpsertSecret(ctx, secret.ContainerSecret.NamedSecret)
 	if err != nil {
 		return nil, err
 	}

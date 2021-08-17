@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
@@ -37,9 +38,40 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		return "", err
 	}
 	if out == nil || out.ARN == nil {
-		return "", errors.New("expected an ID, but nont was returned from Secrets Manager")
+		return "", errors.New("expected an ID, but none was returned from Secrets Manager")
 	}
 	return *out.ARN, nil
+}
+
+// UpsertSecret creates a new secret if it doesn't exist, or updates the secret
+// if it already exists.
+// kim: TODO: test
+func (m *BasicSecretsManager) UpsertSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
+	id, err = m.CreateSecret(ctx, s)
+	if err == nil {
+		return id, nil
+	}
+	if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() != secretsmanager.ErrCodeResourceExistsException {
+		return "", err
+	}
+
+	describeSecret, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
+		SecretId: s.Name,
+	})
+	if err != nil {
+		return "", err
+	}
+	if describeSecret == nil || describeSecret.ARN == nil {
+		return "", errors.New("expected an ID for an existing secret, but not was returned from Secrets Manager")
+	}
+
+	arn := utility.FromStringPtr(describeSecret.ARN)
+	updated := cocoa.NewNamedSecret().SetName(arn).SetValue(utility.FromStringPtr(s.Value))
+	if err := m.UpdateValue(ctx, *updated); err != nil {
+		return "", err
+	}
+
+	return arn, nil
 }
 
 // GetValue returns an existing secret's decrypted value.
@@ -60,8 +92,8 @@ func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val stri
 
 // UpdateValue updates an existing secret's value.
 func (m *BasicSecretsManager) UpdateValue(ctx context.Context, s cocoa.NamedSecret) error {
-	if utility.FromStringPtr(s.Name) == "" {
-		return errors.New("must specify a non-empty id")
+	if err := s.Validate(); err != nil {
+		return errors.Wrap(err, "invalid secret")
 	}
 	_, err := m.client.UpdateSecretValue(ctx, &secretsmanager.UpdateSecretInput{
 		SecretId:     s.Name,

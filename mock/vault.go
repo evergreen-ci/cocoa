@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 )
 
 // Vault provides a mock implementation of a cocoa.Vault backed by any vault by
@@ -15,13 +16,21 @@ type Vault struct {
 
 	CreateSecretInput  *cocoa.NamedSecret
 	CreateSecretOutput *string
+	CreateSecretError  error
+
+	UpsertSecretInput  *cocoa.NamedSecret
+	UpsertSecretOutput *string
+	UpsertSecretError  error
 
 	GetValueInput  *string
 	GetValueOutput *string
+	GetValueError  error
 
 	UpdateValueInput *cocoa.NamedSecret
+	UpdateValueError error
 
 	DeleteSecretInput *string
+	DeleteSecretError error
 }
 
 // NewVault creates a mock Vault backed by the given Vault.
@@ -37,11 +46,25 @@ func NewVault(v cocoa.Vault) *Vault {
 func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	m.CreateSecretInput = &s
 
-	if m.CreateSecretOutput != nil {
-		return *m.CreateSecretOutput, nil
+	if m.CreateSecretOutput != nil || m.CreateSecretError != nil {
+		return utility.FromStringPtr(m.CreateSecretOutput), m.CreateSecretError
 	}
 
 	return m.Vault.CreateSecret(ctx, s)
+}
+
+// UpdateValue saves the input options and if the secret does not exist, creates
+// it; if it already exists, it updates the secret value. The mock output can be
+// customized. By default, it will call the backing Vault implementation's
+// UpdateValue.
+func (m *Vault) UpsertSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
+	m.UpsertSecretInput = &s
+
+	if m.UpsertSecretOutput != nil || m.UpsertSecretError != nil {
+		return utility.FromStringPtr(m.UpsertSecretOutput), m.UpsertSecretError
+	}
+
+	return m.Vault.UpsertSecret(ctx, s)
 }
 
 // GetValue saves the input options and returns an existing mock secret's value.
@@ -50,8 +73,8 @@ func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id strin
 func (m *Vault) GetValue(ctx context.Context, id string) (val string, err error) {
 	m.GetValueInput = &id
 
-	if m.GetValueOutput != nil {
-		return *m.GetValueOutput, nil
+	if m.GetValueOutput != nil || m.GetValueError != nil {
+		return utility.FromStringPtr(m.GetValueOutput), m.GetValueError
 	}
 
 	return m.Vault.GetValue(ctx, id)
@@ -63,6 +86,10 @@ func (m *Vault) GetValue(ctx context.Context, id string) (val string, err error)
 func (m *Vault) UpdateValue(ctx context.Context, s cocoa.NamedSecret) error {
 	m.UpdateValueInput = &s
 
+	if m.UpdateValueError != nil {
+		return m.UpdateValueError
+	}
+
 	return m.Vault.UpdateValue(ctx, s)
 }
 
@@ -71,6 +98,10 @@ func (m *Vault) UpdateValue(ctx context.Context, s cocoa.NamedSecret) error {
 // implementation's DeleteSecret.
 func (m *Vault) DeleteSecret(ctx context.Context, id string) error {
 	m.DeleteSecretInput = &id
+
+	if m.DeleteSecretError != nil {
+		return m.DeleteSecretError
+	}
 
 	return m.Vault.DeleteSecret(ctx, id)
 }

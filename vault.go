@@ -11,6 +11,10 @@ type Vault interface {
 	// CreateSecret creates a new secret and returns the unique identifier for
 	// the stored secret.
 	CreateSecret(ctx context.Context, s NamedSecret) (id string, err error)
+	// UpsertSecret creates a new secret if it does not exist and updates its
+	// value if it already exists. It returns the unique identifier for the
+	// stored secret.
+	UpsertSecret(ctx context.Context, s NamedSecret) (id string, err error)
 	// GetValue returns the value of the secret identified by ID.
 	GetValue(ctx context.Context, id string) (val string, err error)
 	// UpdateValue updates an existing secret's value by ID.
