@@ -263,6 +263,10 @@ func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOp
 			merged.CPU = opt.CPU
 		}
 
+		if opt.NetworkMode != nil {
+			merged.NetworkMode = opt.NetworkMode
+		}
+
 		if opt.TaskRole != nil {
 			merged.TaskRole = opt.TaskRole
 		}

@@ -6,15 +6,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/cocoa/secret"
 	"github.com/evergreen-ci/utility"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func cleanupECSAndSecretsManagerCache() {
+	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
+	GlobalSecretCache = map[string]StoredSecret{}
+}
 
 func TestECSPodCreator(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &ECSPodCreator{})
@@ -22,12 +29,12 @@ func TestECSPodCreator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
-
 	for tName, tCase := range ecsPodCreatorTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
+
+			cleanupECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -55,6 +62,8 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
 
+			cleanupECSAndSecretsManagerCache()
+
 			c := &ECSClient{}
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
@@ -63,9 +72,9 @@ func TestECSPodCreator(t *testing.T) {
 			pc, err := ecs.NewBasicECSPodCreator(c, nil)
 			require.NoError(t, err)
 
-			podCreator := NewECSPodCreator(pc)
+			mpc := NewECSPodCreator(pc)
 
-			tCase(tctx, t, podCreator)
+			tCase(tctx, t, mpc)
 		})
 	}
 
@@ -73,6 +82,8 @@ func TestECSPodCreator(t *testing.T) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
+
+			cleanupECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -89,9 +100,9 @@ func TestECSPodCreator(t *testing.T) {
 			pc, err := ecs.NewBasicECSPodCreator(c, v)
 			require.NoError(t, err)
 
-			podCreator := NewECSPodCreator(pc)
+			mpc := NewECSPodCreator(pc)
 
-			tCase(tctx, t, podCreator)
+			tCase(tctx, t, mpc)
 		})
 	}
 }
@@ -126,6 +137,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetCPU(1024).
 				SetTaskRole("task_role").
 				SetExecutionRole("execution_role").
+				SetNetworkMode(cocoa.NetworkModeAWSVPC).
 				SetTags(map[string]string{"creation_tag": "creation_val"}).
 				AddContainerDefinitions(*containerDef).
 				SetExecutionOptions(*execOpts)
@@ -141,6 +153,8 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
+			require.NotZero(t, opts.NetworkMode)
+			assert.EqualValues(t, *opts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
 			assert.Equal(t, utility.FromStringPtr(opts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 1)
@@ -222,6 +236,61 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
+		},
+		"CreatingNewSecretsIsIdempotent": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+			secretOpts := cocoa.NewSecretOptions().
+				SetName("secret_name").
+				SetValue("secret_value")
+			envVar := cocoa.NewEnvironmentVariable().
+				SetName("env_var_name").
+				SetSecretOptions(*secretOpts)
+			containerDef := cocoa.NewECSContainerDefinition().
+				SetName("name").
+				SetImage("image").
+				SetCommand([]string{"echo", "foo"}).
+				AddEnvironmentVariables(*envVar)
+			placementOpts := cocoa.NewECSPodPlacementOptions().
+				SetStrategy(cocoa.StrategyBinpack).
+				SetStrategyParameter(cocoa.StrategyParamBinpackMemory)
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName()).
+				SetPlacementOptions(*placementOpts)
+			opts := cocoa.NewECSPodCreationOptions().
+				SetMemoryMB(512).
+				SetCPU(1024).
+				SetExecutionRole("execution_role").
+				AddContainerDefinitions(*containerDef).
+				SetExecutionOptions(*execOpts)
+
+			c.RegisterTaskDefinitionError = errors.New("fake error")
+			c.RunTaskError = errors.New("fake error")
+
+			_, err := pc.CreatePod(ctx, opts)
+			require.Error(t, err)
+
+			var found bool
+			for name, secret := range GlobalSecretCache {
+				if name == utility.FromStringPtr(secretOpts.Name) {
+					assert.Equal(t, utility.FromStringPtr(secretOpts.Value), secret.Value)
+					found = true
+					break
+				}
+			}
+			require.True(t, found, "secret should have been created in cache")
+
+			c.RegisterTaskDefinitionError = nil
+			c.RunTaskError = nil
+
+			p, err := pc.CreatePod(ctx, opts)
+			require.NoError(t, err)
+
+			require.Len(t, p.Resources().Containers, 1)
+			require.Len(t, p.Resources().Containers[0].Secrets, 1)
+
+			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].Name})
+			require.NoError(t, err)
+			require.NotZero(t, getSecretOut)
+			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(getSecretOut.SecretString))
 		},
 	}
 }

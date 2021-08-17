@@ -45,7 +45,6 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 
 // UpsertSecret creates a new secret if it doesn't exist, or updates the secret
 // if it already exists.
-// kim: TODO: test
 func (m *BasicSecretsManager) UpsertSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	id, err = m.CreateSecret(ctx, s)
 	if err == nil {
