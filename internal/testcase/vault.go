@@ -3,7 +3,6 @@ package testcase
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -26,56 +25,6 @@ func VaultTests(cleanupSecret func(ctx context.Context, t *testing.T, v cocoa.Va
 		},
 		"CreateSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
 			id, err := v.CreateSecret(ctx, cocoa.NamedSecret{})
-			assert.Error(t, err)
-			assert.Zero(t, id)
-		},
-		"UpsertSecretWithNonexistentSecretCreatesNewSecret": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
-			val := "hello"
-			id, err := v.UpsertSecret(ctx, *cocoa.NewNamedSecret().SetName(testutil.NewSecretName(t.Name())).SetValue(val))
-			require.NoError(t, err)
-			require.NotZero(t, id)
-
-			defer cleanupSecret(ctx, t, v, id)
-
-			storedVal, err := v.GetValue(ctx, id)
-			require.NoError(t, err)
-			assert.Equal(t, val, storedVal)
-		},
-		"UpsertSecretWithExistingSecretUpdatesValue": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
-			name := testutil.NewSecretName(t.Name())
-			id, err := v.CreateSecret(ctx, *cocoa.NewNamedSecret().SetName(name).SetValue("hello"))
-			require.NoError(t, err)
-			require.NotZero(t, id)
-
-			defer cleanupSecret(ctx, t, v, id)
-
-			updatedVal := "bye"
-			updatedID, err := v.UpsertSecret(ctx, *cocoa.NewNamedSecret().SetName(name).SetValue(updatedVal))
-			require.NoError(t, err)
-			assert.Equal(t, id, updatedID)
-
-			// Secrets Manager is only eventually consistent, so we have to poll
-			// until the new value is reflected.
-			timer := time.NewTimer(0)
-			defer timer.Stop()
-
-		checkValue:
-			for {
-				select {
-				case <-ctx.Done():
-					require.FailNow(t, ctx.Err().Error())
-				case <-timer.C:
-					storedVal, err := v.GetValue(ctx, updatedID)
-					require.NoError(t, err)
-					if storedVal == updatedVal {
-						break checkValue
-					}
-					timer.Reset(100 * time.Millisecond)
-				}
-			}
-		},
-		"UpsertSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
-			id, err := v.UpsertSecret(ctx, *cocoa.NewNamedSecret())
 			assert.Error(t, err)
 			assert.Zero(t, id)
 		},

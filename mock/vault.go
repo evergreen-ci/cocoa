@@ -18,10 +18,6 @@ type Vault struct {
 	CreateSecretOutput *string
 	CreateSecretError  error
 
-	UpsertSecretInput  *cocoa.NamedSecret
-	UpsertSecretOutput *string
-	UpsertSecretError  error
-
 	GetValueInput  *string
 	GetValueOutput *string
 	GetValueError  error
@@ -51,20 +47,6 @@ func (m *Vault) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id strin
 	}
 
 	return m.Vault.CreateSecret(ctx, s)
-}
-
-// UpsertSecret saves the input options and if the secret does not exist,
-// creates it; if it already exists, it updates the secret value. The mock
-// output can be customized. By default, it will call the backing Vault
-// implementation's UpdateValue.
-func (m *Vault) UpsertSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
-	m.UpsertSecretInput = &s
-
-	if m.UpsertSecretOutput != nil || m.UpsertSecretError != nil {
-		return utility.FromStringPtr(m.UpsertSecretOutput), m.UpsertSecretError
-	}
-
-	return m.Vault.UpsertSecret(ctx, s)
 }
 
 // GetValue saves the input options and returns an existing mock secret's value.

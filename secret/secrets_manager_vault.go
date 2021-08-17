@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/utility"
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -25,7 +24,9 @@ func NewBasicSecretsManager(c cocoa.SecretsManagerClient) *BasicSecretsManager {
 	}
 }
 
-// CreateSecret creates a new secret.
+// CreateSecret creates a new secret. If the secret already exists, it will
+// return the secret ID without modifying the secret value. To update an
+// existing secret, see UpdateValue.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	if err := s.Validate(); err != nil {
 		return "", errors.Wrap(err, "invalid secret")
@@ -35,42 +36,23 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		SecretString: s.Value,
 	})
 	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == secretsmanager.ErrCodeResourceExistsException {
+			// The secret already exists, so describe it to get the ARN.
+			describeOut, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{SecretId: s.Name})
+			if err != nil {
+				return "", err
+			}
+			if describeOut == nil || describeOut.ARN == nil {
+				return "", errors.New("expected an ID for an existing secret, but none was returned from Secrets Manager")
+			}
+			return *describeOut.ARN, nil
+		}
 		return "", err
 	}
 	if out == nil || out.ARN == nil {
 		return "", errors.New("expected an ID, but none was returned from Secrets Manager")
 	}
 	return *out.ARN, nil
-}
-
-// UpsertSecret creates a new secret if it doesn't exist, or updates the secret
-// if it already exists.
-func (m *BasicSecretsManager) UpsertSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
-	id, err = m.CreateSecret(ctx, s)
-	if err == nil {
-		return id, nil
-	}
-	if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() != secretsmanager.ErrCodeResourceExistsException {
-		return "", err
-	}
-
-	describeSecret, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
-		SecretId: s.Name,
-	})
-	if err != nil {
-		return "", err
-	}
-	if describeSecret == nil || describeSecret.ARN == nil {
-		return "", errors.New("expected an ID for an existing secret, but not was returned from Secrets Manager")
-	}
-
-	arn := utility.FromStringPtr(describeSecret.ARN)
-	updated := cocoa.NewNamedSecret().SetName(arn).SetValue(utility.FromStringPtr(s.Value))
-	if err := m.UpdateValue(ctx, *updated); err != nil {
-		return "", err
-	}
-
-	return arn, nil
 }
 
 // GetValue returns an existing secret's decrypted value.
