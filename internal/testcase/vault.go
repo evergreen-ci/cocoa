@@ -3,6 +3,7 @@ package testcase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -53,9 +54,25 @@ func VaultTests(cleanupSecret func(ctx context.Context, t *testing.T, v cocoa.Va
 			require.NoError(t, err)
 			assert.Equal(t, id, updatedID)
 
-			storedVal, err := v.GetValue(ctx, updatedID)
-			require.NoError(t, err)
-			assert.Equal(t, updatedVal, storedVal)
+			// Secrets Manager is only eventually consistent, so we have to poll
+			// until the new value is reflected.
+			timer := time.NewTimer(0)
+			defer timer.Stop()
+
+		checkValue:
+			for {
+				select {
+				case <-ctx.Done():
+					require.FailNow(t, ctx.Err().Error())
+				case <-timer.C:
+					storedVal, err := v.GetValue(ctx, updatedID)
+					require.NoError(t, err)
+					if storedVal == updatedVal {
+						break checkValue
+					}
+					timer.Reset(100 * time.Millisecond)
+				}
+			}
 		},
 		"UpsertSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
 			id, err := v.UpsertSecret(ctx, *cocoa.NewNamedSecret())
