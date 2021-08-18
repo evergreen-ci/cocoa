@@ -268,15 +268,9 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			_, err := pc.CreatePod(ctx, opts)
 			require.Error(t, err)
 
-			var found bool
-			for name, secret := range GlobalSecretCache {
-				if name == utility.FromStringPtr(secretOpts.Name) {
-					assert.Equal(t, utility.FromStringPtr(secretOpts.Value), secret.Value)
-					found = true
-					break
-				}
-			}
-			require.True(t, found, "secret should have been created in cache")
+			secret, ok := GlobalSecretCache[utility.FromStringPtr(secretOpts.Name)]
+			require.True(t, ok)
+			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), secret.Value)
 
 			c.RegisterTaskDefinitionError = nil
 			c.RunTaskError = nil
