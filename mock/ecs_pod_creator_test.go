@@ -127,9 +127,13 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetStrategy(cocoa.StrategyBinpack).
 				SetStrategyParameter(cocoa.StrategyParamBinpackMemory).
 				AddInstanceFilters("runningTaskCount == 0")
+			awsvpcOpts := cocoa.NewAWSVPCOptions().
+				AddSubnets("subnet-12345").
+				AddSecurityGroups("sg-12345")
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()).
 				SetPlacementOptions(*placementOpts).
+				SetAWSVPCOptions(*awsvpcOpts).
 				SetTags(map[string]string{"execution_tag": "execution_val"}).
 				SetSupportsDebugMode(true)
 			opts := cocoa.NewECSPodCreationOptions().
@@ -172,12 +176,17 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(envVar.Value), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Value))
 
 			require.NotZero(t, c.RunTaskInput)
+			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
 			require.Len(t, c.RunTaskInput.PlacementConstraints, 1)
 			assert.Equal(t, placementOpts.InstanceFilters[0], utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Expression))
 			assert.Equal(t, "memberOf", utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Type))
+			require.NotZero(t, c.RunTaskInput.NetworkConfiguration)
+			require.NotZero(t, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration)
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets))
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups))
 			require.Len(t, c.RunTaskInput.Tags, 1)
 			assert.Equal(t, "execution_tag", utility.FromStringPtr(c.RunTaskInput.Tags[0].Key))
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))

@@ -31,16 +31,14 @@ func TestECSPodCreationOptions(t *testing.T) {
 		assert.Empty(t, opts.ContainerDefinitions)
 	})
 	t.Run("AddContainerDefinitions", func(t *testing.T) {
-		containerDef0 := NewECSContainerDefinition().SetImage("image0")
-		containerDef1 := NewECSContainerDefinition().SetImage("image1")
-		def := NewECSPodCreationOptions().AddContainerDefinitions(*containerDef0, *containerDef1)
-		require.Len(t, def.ContainerDefinitions, 2)
-		assert.Equal(t, *containerDef0, def.ContainerDefinitions[0])
-		assert.Equal(t, *containerDef1, def.ContainerDefinitions[1])
+		cDefs := []ECSContainerDefinition{
+			*NewECSContainerDefinition().SetImage("image0"),
+			*NewECSContainerDefinition().SetImage("image1"),
+		}
+		def := NewECSPodCreationOptions().AddContainerDefinitions(cDefs...)
+		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
 		def.AddContainerDefinitions()
-		require.Len(t, def.ContainerDefinitions, 2)
-		assert.Equal(t, *containerDef0, def.ContainerDefinitions[0])
-		assert.Equal(t, *containerDef1, def.ContainerDefinitions[1])
+		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
 	})
 	t.Run("SetMemoryMB", func(t *testing.T) {
 		mem := 128
@@ -83,15 +81,9 @@ func TestECSPodCreationOptions(t *testing.T) {
 	t.Run("AddTags", func(t *testing.T) {
 		tags := map[string]string{"key0": "val0", "key1": "val1"}
 		opts := NewECSPodCreationOptions().AddTags(tags)
-		require.Len(t, opts.Tags, len(tags))
-		for k, v := range tags {
-			assert.Equal(t, v, opts.Tags[k])
-		}
+		assert.Equal(t, tags, opts.Tags)
 		opts.AddTags(map[string]string{})
-		assert.Len(t, opts.Tags, len(tags))
-		for k, v := range tags {
-			assert.Equal(t, v, opts.Tags[k])
-		}
+		assert.Equal(t, tags, opts.Tags)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
@@ -250,28 +242,76 @@ func TestECSPodCreationOptions(t *testing.T) {
 				SetNetworkMode(NetworkModeNone)
 			assert.Error(t, opts.Validate())
 		})
-		t.Run("PortMappingToIdenticalPortWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
+		t.Run("AWSVPCOptionsWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("MissingExecutionOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			opts := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("MissingAWSVPCOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			opts := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC).
+				SetExecutionOptions(*NewECSPodExecutionOptions())
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("AWSVPCOptionsWithoutNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetExecutionOptions(*execOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("PortMappingToIdenticalPortAndAWSVPCOptionsWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
 			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
 			containerDef := NewECSContainerDefinition().
 				SetImage("image").
 				AddPortMappings(*pm)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
 			opts := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC)
+				SetNetworkMode(NetworkModeAWSVPC).
+				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 		})
-		t.Run("PortMappingToUnspecifiedHostPortWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
+		t.Run("PortMappingToUnspecifiedHostPortAndAWSVPCOptionsWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
 			pm := NewPortMapping().SetContainerPort(1337)
 			containerDef := NewECSContainerDefinition().
 				SetImage("image").
 				AddPortMappings(*pm)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
 			opts := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC)
+				SetNetworkMode(NetworkModeAWSVPC).
+				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("PortMappingsToMismatchedPortWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
@@ -281,11 +321,14 @@ func TestECSPodCreationOptions(t *testing.T) {
 			containerDef := NewECSContainerDefinition().
 				SetImage("image").
 				AddPortMappings(*pm)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
 			opts := NewECSPodCreationOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC)
+				SetNetworkMode(NetworkModeAWSVPC).
+				SetExecutionOptions(*execOpts)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("PortMappingToIdenticalPortWithNetworkModeHostIsValid", func(t *testing.T) {
@@ -435,16 +478,14 @@ func TestECSContainerDefinition(t *testing.T) {
 		assert.Empty(t, def.EnvVars)
 	})
 	t.Run("AddEnvironmentVariables", func(t *testing.T) {
-		ev0 := NewEnvironmentVariable().SetName("name0").SetValue("value0")
-		ev1 := NewEnvironmentVariable().SetName("name1").SetValue("value1")
-		def := NewECSContainerDefinition().AddEnvironmentVariables(*ev0, *ev1)
-		require.Len(t, def.EnvVars, 2)
-		assert.Equal(t, *ev0, def.EnvVars[0])
-		assert.Equal(t, *ev1, def.EnvVars[1])
+		envVars := []EnvironmentVariable{
+			*NewEnvironmentVariable().SetName("name0").SetValue("value0"),
+			*NewEnvironmentVariable().SetName("name1").SetValue("value1"),
+		}
+		def := NewECSContainerDefinition().AddEnvironmentVariables(envVars...)
+		assert.ElementsMatch(t, envVars, def.EnvVars)
 		def.AddEnvironmentVariables()
-		require.Len(t, def.EnvVars, 2)
-		assert.Equal(t, *ev0, def.EnvVars[0])
-		assert.Equal(t, *ev1, def.EnvVars[1])
+		assert.ElementsMatch(t, envVars, def.EnvVars)
 	})
 	t.Run("SetRepositoryCredentials", func(t *testing.T) {
 		creds := NewRepositoryCredentials().SetSecretName("name")
@@ -463,24 +504,21 @@ func TestECSContainerDefinition(t *testing.T) {
 		assert.Empty(t, def.PortMappings)
 	})
 	t.Run("AddPortMappings", func(t *testing.T) {
-		pm0 := NewPortMapping().SetContainerPort(1337)
-		pm1 := NewPortMapping().SetContainerPort(23456)
-
-		def := NewECSContainerDefinition().AddPortMappings(*pm0, *pm1)
-		require.Len(t, def.PortMappings, 2)
-		assert.Equal(t, *pm0, def.PortMappings[0])
-		assert.Equal(t, *pm1, def.PortMappings[1])
+		pms := []PortMapping{
+			*NewPortMapping().SetContainerPort(1337),
+			*NewPortMapping().SetContainerPort(23456),
+		}
+		def := NewECSContainerDefinition().AddPortMappings(pms...)
+		assert.ElementsMatch(t, pms, def.PortMappings)
 
 		def.AddPortMappings()
-		require.Len(t, def.PortMappings, 2)
-		assert.Equal(t, *pm0, def.PortMappings[0])
-		assert.Equal(t, *pm1, def.PortMappings[1])
+		assert.ElementsMatch(t, pms, def.PortMappings)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsInvalid", func(t *testing.T) {
 			assert.Error(t, NewECSContainerDefinition().Validate())
 		})
-		t.Run("OnlyImageIsValid", func(t *testing.T) {
+		t.Run("JustImageIsValid", func(t *testing.T) {
 			def := NewECSContainerDefinition().SetImage("image")
 			assert.NoError(t, def.Validate())
 		})
@@ -819,6 +857,14 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		require.NotZero(t, opts.PlacementOpts)
 		assert.Equal(t, *placementOpts, *opts.PlacementOpts)
 	})
+	t.Run("SetAWSVPCOptions", func(t *testing.T) {
+		awsvpcOpts := NewAWSVPCOptions().
+			AddSubnets("subnet-12345").
+			AddSecurityGroups("sg-12345")
+		opts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+		require.NotZero(t, opts.AWSVPCOpts)
+		assert.Equal(t, *awsvpcOpts, *opts.AWSVPCOpts)
+	})
 	t.Run("SetSupportsDebugMode", func(t *testing.T) {
 		opts := NewECSPodExecutionOptions().SetSupportsDebugMode(true)
 		assert.True(t, utility.FromBoolPtr(opts.SupportsDebugMode))
@@ -831,18 +877,14 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		assert.Equal(t, value, opts.Tags[key])
 	})
 	t.Run("AddTags", func(t *testing.T) {
-		key0 := "key0"
-		val0 := "val0"
-		key1 := "key1"
-		val1 := "val1"
-		opts := NewECSPodExecutionOptions().AddTags(map[string]string{key0: val0, key1: val1})
-		require.Len(t, opts.Tags, 2)
-		assert.Equal(t, val0, opts.Tags[key0])
-		assert.Equal(t, val1, opts.Tags[key1])
+		tags := map[string]string{
+			"key0": "val0",
+			"key1": "val1",
+		}
+		opts := NewECSPodExecutionOptions().AddTags(tags)
+		assert.Equal(t, tags, opts.Tags)
 		opts.AddTags(map[string]string{})
-		assert.Len(t, opts.Tags, 2)
-		assert.Equal(t, val0, opts.Tags[key0])
-		assert.Equal(t, val1, opts.Tags[key1])
+		assert.Equal(t, tags, opts.Tags)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("EmptyIsValid", func(t *testing.T) {
@@ -860,6 +902,15 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		t.Run("BadPlacementOptionsAreInvalid", func(t *testing.T) {
 			placementOpts := NewECSPodPlacementOptions().SetStrategy("foo")
 			opts := NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("GoodAWSVPCOptionsIsValid", func(t *testing.T) {
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			opts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("BadAWSVPCOptionsIsInvalid", func(t *testing.T) {
+			opts := NewECSPodExecutionOptions().SetAWSVPCOptions(*NewAWSVPCOptions())
 			assert.Error(t, opts.Validate())
 		})
 	})
@@ -939,7 +990,7 @@ func TestECSPodPlacementOptions(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack).SetStrategyParameter("foo")
 			assert.Error(t, opts.Validate())
 		})
-		t.Run("SpreadyWithoutParameterDefaultsToHostSpread", func(t *testing.T) {
+		t.Run("SpreadWithoutParameterDefaultsToHostSpread", func(t *testing.T) {
 			opts := NewECSPodPlacementOptions().SetStrategy(StrategySpread)
 			require.NoError(t, opts.Validate())
 			require.NotZero(t, opts.Strategy)
@@ -959,6 +1010,62 @@ func TestECSPodPlacementOptions(t *testing.T) {
 			require.NotZero(t, opts.Strategy)
 			assert.Equal(t, StrategySpread, *opts.Strategy)
 			assert.Equal(t, "custom", utility.FromStringPtr(opts.StrategyParameter))
+		})
+	})
+}
+
+func TestAWSVPCOptions(t *testing.T) {
+	t.Run("NewAWSVPCOptions", func(t *testing.T) {
+		opts := NewAWSVPCOptions()
+		require.NotZero(t, opts)
+		assert.Zero(t, *opts)
+	})
+	t.Run("SetSubnets", func(t *testing.T) {
+		subnets := []string{"subnet-12345", "subnet-67890"}
+		opts := NewAWSVPCOptions().SetSubnets(subnets)
+		assert.ElementsMatch(t, subnets, opts.Subnets)
+		opts.SetSubnets(nil)
+		assert.Empty(t, opts.Subnets)
+	})
+	t.Run("AddSubnets", func(t *testing.T) {
+		subnets := []string{"subnet-12345", "subnet-67890"}
+		opts := NewAWSVPCOptions().AddSubnets(subnets...)
+		assert.ElementsMatch(t, subnets, opts.Subnets)
+		opts.AddSubnets()
+		assert.ElementsMatch(t, subnets, opts.Subnets)
+	})
+	t.Run("SetSecurityGroups", func(t *testing.T) {
+		groups := []string{"sg-12345", "sg-67890"}
+		opts := NewAWSVPCOptions().SetSecurityGroups(groups)
+		assert.ElementsMatch(t, groups, opts.SecurityGroups)
+		opts.SetSecurityGroups(nil)
+		assert.Empty(t, opts.SecurityGroups)
+	})
+	t.Run("AddSecurityGroups", func(t *testing.T) {
+		groups := []string{"sg-12345", "sg-67890"}
+		opts := NewAWSVPCOptions().AddSecurityGroups(groups...)
+		assert.ElementsMatch(t, groups, opts.SecurityGroups)
+		opts.AddSecurityGroups()
+		assert.ElementsMatch(t, groups, opts.SecurityGroups)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("Succeeds", func(t *testing.T) {
+			opts := NewAWSVPCOptions().
+				AddSubnets("subnet-12345").
+				AddSecurityGroups("sg-12345")
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithJustSubnets", func(t *testing.T) {
+			opts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithEmpty", func(t *testing.T) {
+			opts := NewAWSVPCOptions()
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("FailsWithoutSubnets", func(t *testing.T) {
+			opts := NewAWSVPCOptions().AddSecurityGroups("sg-12345")
+			assert.Error(t, opts.Validate())
 		})
 	})
 }
