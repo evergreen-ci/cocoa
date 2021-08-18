@@ -139,6 +139,41 @@ func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions)
 	return o
 }
 
+// Validate checks that all the required parameters are given and the values are
+// valid.
+func (o *ECSPodCreationOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
+	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
+	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
+
+	catcher.Wrap(o.validateContainerDefinitions(), "invalid container definitions")
+
+	networkMode := o.getNetworkMode()
+	catcher.Wrap(networkMode.Validate(), "invalid network mode")
+	catcher.NewWhen(networkMode == NetworkModeAWSVPC && (o.ExecutionOpts == nil || o.ExecutionOpts.AWSVPCOpts == nil), "must specify AWSVPC configuration when using AWSVPC network mode")
+	catcher.NewWhen(networkMode != NetworkModeAWSVPC && o.ExecutionOpts != nil && o.ExecutionOpts.AWSVPCOpts != nil, "cannot specify AWSVPC configuration when network mode is not AWSVPC")
+
+	if o.ExecutionOpts != nil {
+		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
+	}
+
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	if o.Name == nil {
+		o.Name = utility.ToStringPtr(utility.RandomString())
+	}
+
+	if o.ExecutionOpts == nil {
+		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack).SetStrategyParameter(StrategyParamBinpackMemory)
+		o.ExecutionOpts = NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
+	}
+
+	return nil
+}
+
 // validateContainerDefinitions checks that all the individual container
 // definitions are valid.
 func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
@@ -146,14 +181,7 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
 
-	var networkMode ECSNetworkMode
-	if o.NetworkMode != nil {
-		networkMode = *o.NetworkMode
-	} else {
-		networkMode = NetworkModeBridge
-	}
-	catcher.Wrap(networkMode.Validate(), "invalid network mode")
-
+	networkMode := o.getNetworkMode()
 	var totalContainerMemMB, totalContainerCPU int
 	for i, def := range o.ContainerDefinitions {
 		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", def.Name)
@@ -202,38 +230,13 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 	return catcher.Resolve()
 }
 
-// Validate checks that all the required parameters are given and the values are
-// valid.
-func (o *ECSPodCreationOptions) Validate() error {
-	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
-	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
-	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
-
-	catcher.Wrap(o.validateContainerDefinitions(), "invalid container definitions")
-
+// getNetworkMode returns the network mode. If no network mode is explicitly
+// set, this returns the default network mode.
+func (o *ECSPodCreationOptions) getNetworkMode() ECSNetworkMode {
 	if o.NetworkMode != nil {
-		catcher.Wrap(o.NetworkMode.Validate(), "invalid network mode")
+		return *o.NetworkMode
 	}
-
-	if o.ExecutionOpts != nil {
-		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
-	}
-
-	if catcher.HasErrors() {
-		return catcher.Resolve()
-	}
-
-	if o.Name == nil {
-		o.Name = utility.ToStringPtr(utility.RandomString())
-	}
-
-	if o.ExecutionOpts == nil {
-		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack).SetStrategyParameter(StrategyParamBinpackMemory)
-		o.ExecutionOpts = NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
-	}
-
-	return nil
+	return NetworkModeBridge
 }
 
 // MergeECSPodCreationOptions merges all the given options to create an ECS pod.
@@ -671,6 +674,9 @@ type ECSPodExecutionOptions struct {
 	// PlacementOptions specify options that determine how a pod is assigned to
 	// a container instance.
 	PlacementOpts *ECSPodPlacementOptions
+	// AWSVPCOpts specify additional networking configuration when using
+	// NetworkModeAWSVPC.
+	AWSVPCOpts *AWSVPCOptions
 	// SupportsDebugMode indicates that the ECS pod should support debugging, so
 	// you can run exec in the pod's containers. In order for this to work, the
 	// pod must have the correct permissions to perform this operation when it's
@@ -695,6 +701,13 @@ func (o *ECSPodExecutionOptions) SetCluster(cluster string) *ECSPodExecutionOpti
 // a container instance.
 func (o *ECSPodExecutionOptions) SetPlacementOptions(opts ECSPodPlacementOptions) *ECSPodExecutionOptions {
 	o.PlacementOpts = &opts
+	return o
+}
+
+// SetAWSVPCOptions sets the options that configure a pod using
+// NetworkModeAWSVPC.
+func (o *ECSPodExecutionOptions) SetAWSVPCOptions(opts AWSVPCOptions) *ECSPodExecutionOptions {
+	o.AWSVPCOpts = &opts
 	return o
 }
 
@@ -729,6 +742,9 @@ func (o *ECSPodExecutionOptions) Validate() error {
 	if o.PlacementOpts != nil {
 		catcher.Wrap(o.PlacementOpts.Validate(), "invalid placement options")
 	}
+	if o.AWSVPCOpts != nil {
+		catcher.Wrap(o.AWSVPCOpts.Validate(), "invalid AWSVPC options")
+	}
 	if catcher.HasErrors() {
 		return catcher.Resolve()
 	}
@@ -757,6 +773,10 @@ func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutio
 
 		if opt.PlacementOpts != nil {
 			merged.PlacementOpts = opt.PlacementOpts
+		}
+
+		if opt.AWSVPCOpts != nil {
+			merged.AWSVPCOpts = opt.AWSVPCOpts
 		}
 
 		if opt.SupportsDebugMode != nil {
@@ -891,16 +911,65 @@ func (s ECSPlacementStrategy) Validate() error {
 type ECSStrategyParameter = string
 
 const (
-	// StrategyParamBinpackMemory indicates ECS should optimize its binpacking strategy based
-	// on memory usage.
+	// StrategyParamBinpackMemory indicates ECS should optimize its binpacking
+	// strategy based on memory usage.
 	StrategyParamBinpackMemory ECSStrategyParameter = "memory"
-	// StrategyParamBinpackCPU indicates ECS should optimize its binpacking strategy based
-	// on CPU usage.
+	// StrategyParamBinpackCPU indicates ECS should optimize its binpacking
+	// strategy based on CPU usage.
 	StrategyParamBinpackCPU ECSStrategyParameter = "cpu"
-	// StrategyParamSpreadHost indicates the ECS should spread pods evenly across all
-	// container instances (i.e. hosts).
+	// StrategyParamSpreadHost indicates the ECS should spread pods evenly
+	// across all container instances (i.e. hosts).
 	StrategyParamSpreadHost ECSStrategyParameter = "host"
 )
+
+// AWSVPCOptions represent options to configure networking when the network mode
+// is NetworkModeAWSVPC.
+type AWSVPCOptions struct {
+	// Subnets are all the subnet IDs associated with the pod. This is required.
+	Subnets []string
+	// SecurityGroups are all the security group IDs associated with the pod. If
+	// this is not specified, the default security group for the VPC will be
+	// used.
+	SecurityGroups []string
+}
+
+// NewAWSVPCOptions returns new uninitialized options for NetworkModeAWSVPC.
+func NewAWSVPCOptions() *AWSVPCOptions {
+	return &AWSVPCOptions{}
+}
+
+// SetSubnets sets the subnets associated with the pod. This overwrites any
+// existing subnets.
+func (o *AWSVPCOptions) SetSubnets(subnets []string) *AWSVPCOptions {
+	o.Subnets = subnets
+	return o
+}
+
+// AddSubnets adds new subnets to the existing ones for the pod.
+func (o *AWSVPCOptions) AddSubnets(subnets ...string) *AWSVPCOptions {
+	o.Subnets = append(o.Subnets, subnets...)
+	return o
+}
+
+// SetSecurityGroups sets the security groups associated with the pod. This
+// overwrites any existing security groups.
+func (o *AWSVPCOptions) SetSecurityGroups(groups []string) *AWSVPCOptions {
+	o.SecurityGroups = groups
+	return o
+}
+
+// AddSecurityGroups adds new security groups to the existing ones for the pod.
+func (o *AWSVPCOptions) AddSecurityGroups(groups ...string) *AWSVPCOptions {
+	o.SecurityGroups = append(o.SecurityGroups, groups...)
+	return o
+}
+
+// Validate checks that subnets are set.
+func (o *AWSVPCOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(len(o.Subnets) == 0, "must specify at least one subnet")
+	return catcher.Resolve()
+}
 
 // ECSNetworkMode represents possible kinds of networking configuration for a
 // pod in ECS.
