@@ -212,7 +212,6 @@ func (r *ECSContainerResources) AddSecrets(secrets ...ContainerSecret) *ECSConta
 
 // Validate checks that the container ID is given and that all given container
 // secrets are valid.
-// kim: TODO: test
 func (r *ECSContainerResources) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(r.ContainerID == nil, "must specify a container ID")
@@ -258,10 +257,9 @@ func (s *ContainerSecret) SetOwned(owned bool) *ContainerSecret {
 }
 
 // Validate checks that the secret has either a name or ID
-// kim: TODO: test
 func (s *ContainerSecret) Validate() error {
 	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(s.ID == nil && s.Name == nil, "cannot have a secret with neither an ID nor a name")
+	catcher.NewWhen(s.ID == nil, "missing ID")
 	catcher.NewWhen(s.ID != nil && utility.FromStringPtr(s.ID) == "", "cannot have an empty ID")
 	catcher.NewWhen(s.Name != nil && utility.FromStringPtr(s.Name) == "", "cannot have an empty name")
 	return catcher.Resolve()

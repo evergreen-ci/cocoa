@@ -178,12 +178,7 @@ func (p *BasicECSPod) Delete(ctx context.Context) error {
 				continue
 			}
 
-			var id string
-			if s.ID != nil {
-				id = utility.FromStringPtr(s.ID)
-			} else {
-				id = utility.FromStringPtr(s.Name)
-			}
+			id := utility.FromStringPtr(s.ID)
 			catcher.Wrapf(p.vault.DeleteSecret(ctx, id), "deleting secret '%s' for container '%s'", id, utility.FromStringPtr(c.Name))
 		}
 	}

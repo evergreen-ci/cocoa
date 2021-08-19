@@ -118,8 +118,6 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
 		"StopSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			// kim: TODO: deal with the fact that the secrets might be out of
-			// order.
 			secret := cocoa.NewEnvironmentVariable().
 				SetName("secret").
 				SetSecretOptions(*cocoa.NewSecretOptions().

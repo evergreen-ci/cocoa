@@ -29,6 +29,31 @@ func TestContainerSecret(t *testing.T) {
 		s := NewContainerSecret().SetOwned(true)
 		assert.True(t, utility.FromBoolPtr(s.Owned))
 	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
+			s := NewContainerSecret().
+				SetID("id").
+				SetName("name").
+				SetOwned(true)
+			assert.NoError(t, s.Validate())
+		})
+		t.Run("SucceedsWithJustID", func(t *testing.T) {
+			s := NewContainerSecret().SetID("id")
+			assert.NoError(t, s.Validate())
+		})
+		t.Run("FailsWithEmpty", func(t *testing.T) {
+			s := NewContainerSecret()
+			assert.Error(t, s.Validate())
+		})
+		t.Run("FailsWithoutID", func(t *testing.T) {
+			s := NewContainerSecret().SetName("name").SetOwned(true)
+			assert.Error(t, s.Validate())
+		})
+		t.Run("FailsWithEmptyID", func(t *testing.T) {
+			s := NewContainerSecret().SetID("")
+			assert.Error(t, s.Validate())
+		})
+	})
 }
 
 func TestECSPodResources(t *testing.T) {
@@ -107,6 +132,33 @@ func TestECSContainerResources(t *testing.T) {
 		assert.ElementsMatch(t, secrets, res.Secrets)
 		res.AddSecrets()
 		assert.ElementsMatch(t, secrets, res.Secrets)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
+			r := NewECSContainerResources().
+				SetContainerID("container_id").
+				SetName("name").
+				AddSecrets(*NewContainerSecret().SetID("id"))
+			assert.NoError(t, r.Validate())
+		})
+		t.Run("FailsWithEmpty", func(t *testing.T) {
+			r := NewECSContainerResources()
+			assert.Error(t, r.Validate())
+		})
+		t.Run("SucceedsWithJustContainerID", func(t *testing.T) {
+			r := NewECSContainerResources().SetContainerID("container_id")
+			assert.NoError(t, r.Validate())
+		})
+		t.Run("FailsWithBadContainerID", func(t *testing.T) {
+			r := NewECSContainerResources().SetContainerID("")
+			assert.Error(t, r.Validate())
+		})
+		t.Run("FailsWithBadSecret", func(t *testing.T) {
+			r := NewECSContainerResources().
+				SetContainerID("container_id").
+				AddSecrets(*NewContainerSecret())
+			assert.Error(t, r.Validate())
+		})
 	})
 }
 

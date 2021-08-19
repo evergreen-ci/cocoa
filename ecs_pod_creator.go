@@ -478,8 +478,11 @@ func (e *EnvironmentVariable) Validate() error {
 // SecretOptions represents a secret with a name and value that may or may not
 // be owned by its container.
 type SecretOptions struct {
-	// kim: TODO: determine if the secret name is the name or ID based on
-	// Exists.
+	// NamedSecret includes the name of the existing secret or secret to create
+	// and the value if the secret must be created. If the secret does not
+	// exist, it will be created with the given friendly name. Otherwise, if the
+	// secret exists already, the name should be the secret's unique resource
+	// identifier.
 	NamedSecret
 	// Owned determines whether or not the secret is owned by its container or
 	// not.
@@ -1030,7 +1033,6 @@ func (d *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
 }
 
 // Validate checsk that the task definition ID is given.
-// kim: TODO: test
 func (d *ECSTaskDefinition) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(d.ID == nil, "must specify a task definition ID")
