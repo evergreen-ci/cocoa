@@ -290,7 +290,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.Len(t, p.Resources().Containers, 1)
 			require.Len(t, p.Resources().Containers[0].Secrets, 1)
 
-			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].Name})
+			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].ID})
 			require.NoError(t, err)
 			require.NotZero(t, getSecretOut)
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(getSecretOut.SecretString))

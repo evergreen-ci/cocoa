@@ -15,15 +15,15 @@ func TestContainerSecret(t *testing.T) {
 		require.NotZero(t, s)
 		assert.Zero(t, *s)
 	})
+	t.Run("SetID", func(t *testing.T) {
+		id := "id"
+		s := NewContainerSecret().SetID(id)
+		assert.Equal(t, id, utility.FromStringPtr(s.ID))
+	})
 	t.Run("SetName", func(t *testing.T) {
 		name := "name"
 		s := NewContainerSecret().SetName(name)
 		assert.Equal(t, name, utility.FromStringPtr(s.Name))
-	})
-	t.Run("SetValue", func(t *testing.T) {
-		val := "val"
-		s := NewContainerSecret().SetValue(val)
-		assert.Equal(t, val, utility.FromStringPtr(s.Value))
 	})
 	t.Run("SetOwned", func(t *testing.T) {
 		s := NewContainerSecret().SetOwned(true)
@@ -89,83 +89,92 @@ func TestECSContainerResources(t *testing.T) {
 		assert.Equal(t, id, utility.FromStringPtr(res.Name))
 	})
 	t.Run("SetSecrets", func(t *testing.T) {
-		s := NewContainerSecret().SetName("name").SetValue("value")
-		res := NewECSContainerResources().SetSecrets([]ContainerSecret{*s})
-		require.Len(t, res.Secrets, 1)
-		assert.Equal(t, *s, res.Secrets[0])
+		secrets := []ContainerSecret{
+			*NewContainerSecret().SetID("id0").SetName("name0"),
+			*NewContainerSecret().SetID("id1").SetName("name1"),
+		}
+		res := NewECSContainerResources().SetSecrets(secrets)
+		assert.ElementsMatch(t, secrets, res.Secrets)
+		res.SetSecrets(nil)
+		assert.Empty(t, res.Secrets)
 	})
 	t.Run("AddSecrets", func(t *testing.T) {
-		s0 := NewContainerSecret().SetName("name0").SetValue("value0")
-		s1 := NewContainerSecret().SetName("name1").SetValue("value1")
-		res := NewECSContainerResources().AddSecrets(*s0, *s1)
-		require.Len(t, res.Secrets, 2)
-		assert.Equal(t, *s0, res.Secrets[0])
-		assert.Equal(t, *s1, res.Secrets[1])
+		secrets := []ContainerSecret{
+			*NewContainerSecret().SetID("id0").SetName("name0"),
+			*NewContainerSecret().SetID("id1").SetName("name1"),
+		}
+		res := NewECSContainerResources().AddSecrets(secrets...)
+		assert.ElementsMatch(t, secrets, res.Secrets)
+		res.AddSecrets()
+		assert.ElementsMatch(t, secrets, res.Secrets)
 	})
 }
 
 func TestECSStatusInfo(t *testing.T) {
 	t.Run("NewECSPodStatusInfo", func(t *testing.T) {
-		stat := NewECSPodStatusInfo()
-		require.NotZero(t, stat)
-		assert.Zero(t, *stat)
+		ps := NewECSPodStatusInfo()
+		require.NotZero(t, ps)
+		assert.Zero(t, *ps)
 	})
 	t.Run("SetStatus", func(t *testing.T) {
-		stat := NewECSPodStatusInfo().SetStatus(StatusRunning)
-		assert.Equal(t, StatusRunning, stat.Status)
+		ps := NewECSPodStatusInfo().SetStatus(StatusRunning)
+		assert.Equal(t, StatusRunning, ps.Status)
 	})
 	t.Run("SetContainers", func(t *testing.T) {
-		containerStat0 := NewECSContainerStatusInfo().
-			SetContainerID("container_id0").
-			SetName("container_name0").
-			SetStatus(StatusRunning)
-		containerStat1 := NewECSContainerStatusInfo().
-			SetContainerID("container_id1").
-			SetName("container_name1").
-			SetStatus(StatusRunning)
-		stat := NewECSPodStatusInfo().SetContainers([]ECSContainerStatusInfo{
-			*containerStat0, *containerStat1,
-		})
-		require.Len(t, stat.Containers, 2)
-		assert.Equal(t, *containerStat0, stat.Containers[0])
-		assert.Equal(t, *containerStat1, stat.Containers[1])
+		cs := []ECSContainerStatusInfo{
+			*NewECSContainerStatusInfo().
+				SetContainerID("container_id0").
+				SetName("container_name0").
+				SetStatus(StatusRunning),
+			*NewECSContainerStatusInfo().
+				SetContainerID("container_id1").
+				SetName("container_name1").
+				SetStatus(StatusStopped),
+		}
+		ps := NewECSPodStatusInfo().SetContainers(cs)
+		assert.ElementsMatch(t, ps.Containers, cs)
+		ps.SetContainers(nil)
+		assert.Empty(t, ps.Containers)
 	})
 	t.Run("AddContainers", func(t *testing.T) {
-		containerStat := NewECSContainerStatusInfo().
-			SetContainerID("container_id0").
-			SetName("container_name0").
-			SetStatus(StatusRunning)
+		cs := []ECSContainerStatusInfo{
+			*NewECSContainerStatusInfo().
+				SetContainerID("container_id0").
+				SetName("container_name0").
+				SetStatus(StatusRunning),
+			*NewECSContainerStatusInfo().
+				SetContainerID("container_id1").
+				SetName("container_name1").
+				SetStatus(StatusStopped),
+		}
 
-		stat := NewECSPodStatusInfo().AddContainers(*containerStat)
-		require.Len(t, stat.Containers, 1)
-		assert.Equal(t, *containerStat, stat.Containers[0])
-
-		stat.AddContainers()
-		require.Len(t, stat.Containers, 1)
-		assert.Equal(t, *containerStat, stat.Containers[0])
+		ps := NewECSPodStatusInfo().AddContainers(cs...)
+		assert.ElementsMatch(t, cs, ps.Containers)
+		ps.AddContainers()
+		assert.ElementsMatch(t, cs, ps.Containers)
 	})
 }
 
 func TestECSContainerStatusInfo(t *testing.T) {
 	t.Run("NewECSContainerStatusInfo", func(t *testing.T) {
-		stat := NewECSContainerStatusInfo()
-		require.NotZero(t, stat)
-		assert.Zero(t, *stat)
+		cs := NewECSContainerStatusInfo()
+		require.NotZero(t, cs)
+		assert.Zero(t, *cs)
 	})
 	t.Run("SetContainerID", func(t *testing.T) {
 		id := "container_id"
-		stat := NewECSContainerStatusInfo().SetContainerID(id)
-		assert.Equal(t, id, utility.FromStringPtr(stat.ContainerID))
+		cs := NewECSContainerStatusInfo().SetContainerID(id)
+		assert.Equal(t, id, utility.FromStringPtr(cs.ContainerID))
 	})
 	t.Run("SetName", func(t *testing.T) {
 		name := "name"
-		stat := NewECSContainerStatusInfo().SetName(name)
-		assert.Equal(t, name, utility.FromStringPtr(stat.Name))
+		cs := NewECSContainerStatusInfo().SetName(name)
+		assert.Equal(t, name, utility.FromStringPtr(cs.Name))
 	})
 	t.Run("SetStatus", func(t *testing.T) {
 		status := StatusRunning
-		stat := NewECSContainerStatusInfo().SetStatus(status)
-		assert.Equal(t, status, stat.Status)
+		cs := NewECSContainerStatusInfo().SetStatus(status)
+		assert.Equal(t, status, cs.Status)
 	})
 }
 

@@ -46,8 +46,8 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				require.NoError(t, p.Delete(ctx))
 			}()
 
-			stat := p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			ps := p.StatusInfo()
+			assert.Equal(t, cocoa.StatusStarting, ps.Status)
 		},
 		"CreatePodFailsWithInvalidCreationOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			opts := cocoa.NewECSPodCreationOptions()

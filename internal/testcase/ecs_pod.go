@@ -69,8 +69,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			defer cleanupPod(ctx, t, p, c, v)
 
-			stat := p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			ps := p.StatusInfo()
+			assert.Equal(t, cocoa.StatusStarting, ps.Status)
 
 			res := p.Resources()
 			require.NoError(t, err)
@@ -80,12 +80,10 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
-			for _, s := range res.Containers[0].Secrets {
-				val, err := v.GetValue(ctx, utility.FromStringPtr(s.Name))
-				require.NoError(t, err)
-				assert.Equal(t, utility.FromStringPtr(s.Value), val)
-				assert.True(t, utility.FromBoolPtr(s.Owned))
-			}
+			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
+			require.NoError(t, err)
+			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].EnvVars[0].SecretOpts.Value), val)
+			assert.True(t, utility.FromBoolPtr(res.Containers[0].Secrets[0].Owned))
 
 			require.True(t, utility.FromBoolPtr(res.TaskDefinition.Owned))
 			def, err := c.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
@@ -149,15 +147,17 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			res = p.Resources()
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 2)
-			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
-			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
-
-			// kim: need to deal with the fact that the secrets may be out of
-			// order in the resulting ECSPod.
-			val, err = v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[1].Name))
-			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+			for _, s := range res.Containers[0].Secrets {
+				if utility.FromBoolPtr(s.Owned) {
+					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					require.NoError(t, err)
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+				} else {
+					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					require.NoError(t, err)
+					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
+				}
+			}
 
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
@@ -216,16 +216,17 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			res := p.Resources()
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 2)
-
-			// kim: need to deal with the fact that the secrets may be out of
-			// order in the resulting ECSPod.
-			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
-			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
-
-			val, err = v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[1].Name))
-			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+			for _, s := range res.Containers[0].Secrets {
+				if utility.FromBoolPtr(s.Owned) {
+					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					require.NoError(t, err)
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+				} else {
+					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					require.NoError(t, err)
+					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
+				}
+			}
 
 			require.NoError(t, p.Delete(ctx))
 
@@ -269,7 +270,7 @@ func cleanupPod(ctx context.Context, t *testing.T, p cocoa.ECSPod, c cocoa.ECSCl
 
 	for _, containerRes := range res.Containers {
 		for _, s := range containerRes.Secrets {
-			assert.NoError(t, v.DeleteSecret(ctx, utility.FromStringPtr(s.Name)))
+			assert.NoError(t, v.DeleteSecret(ctx, utility.FromStringPtr(s.ID)))
 		}
 	}
 }
@@ -301,14 +302,14 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 	}
 
 	for _, containerRes := range res.Containers {
-		for _, secret := range containerRes.Secrets {
-			if utility.FromBoolPtr(secret.Owned) {
-				_, err := v.GetValue(ctx, utility.FromStringPtr(secret.Name))
+		for _, s := range containerRes.Secrets {
+			if utility.FromBoolPtr(s.Owned) {
+				_, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 				require.Error(t, err)
 			} else {
-				val, err := v.GetValue(ctx, utility.FromStringPtr(secret.Name))
+				val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 				require.NoError(t, err)
-				assert.NotZero(t, utility.FromStringPtr(secret.Value), val)
+				assert.NotZero(t, val)
 			}
 		}
 	}
@@ -316,9 +317,9 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 
 // checkPodStatus checks that the current pod status matches the expected one.
 func checkPodStatus(t *testing.T, p cocoa.ECSPod, status cocoa.ECSStatus) {
-	stat := p.StatusInfo()
-	assert.Equal(t, status, stat.Status)
-	for _, container := range stat.Containers {
+	ps := p.StatusInfo()
+	assert.Equal(t, status, ps.Status)
+	for _, container := range ps.Containers {
 		assert.Equal(t, status, container.Status)
 	}
 }

@@ -478,9 +478,12 @@ func (e *EnvironmentVariable) Validate() error {
 // SecretOptions represents a secret with a name and value that may or may not
 // be owned by its container.
 type SecretOptions struct {
-	// kim: TODO: convert this into NamedSecret + Owned. When translating the
-	// pod, determine if the name is a friendly name or an ID based on Exists.
-	ContainerSecret
+	// kim: TODO: determine if the secret name is the name or ID based on
+	// Exists.
+	NamedSecret
+	// Owned determines whether or not the secret is owned by its container or
+	// not.
+	Owned *bool
 	// Exists determines whether or not the secret already exists or must be
 	// created before it can be used.
 	Exists *bool
@@ -491,13 +494,15 @@ func NewSecretOptions() *SecretOptions {
 	return &SecretOptions{}
 }
 
-// SetName sets the secret name.
+// SetName sets the secret name. If the secret does not yet exist, this is the
+// friendly secret name. Otherwise, if the secret already exists, this name
+// should be the unique identifier for the secret.
 func (s *SecretOptions) SetName(name string) *SecretOptions {
 	s.Name = &name
 	return s
 }
 
-// SetValue sets the secret value.
+// SetValue sets the secret value if the secret does not already exist.
 func (s *SecretOptions) SetValue(val string) *SecretOptions {
 	s.Value = &val
 	return s
@@ -1022,4 +1027,13 @@ func (d *ECSTaskDefinition) SetID(id string) *ECSTaskDefinition {
 func (d *ECSTaskDefinition) SetOwned(owned bool) *ECSTaskDefinition {
 	d.Owned = &owned
 	return d
+}
+
+// Validate checsk that the task definition ID is given.
+// kim: TODO: test
+func (d *ECSTaskDefinition) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(d.ID == nil, "must specify a task definition ID")
+	catcher.NewWhen(utility.FromStringPtr(d.ID) == "", "must specify a non-empty task definition ID")
+	return catcher.Resolve()
 }

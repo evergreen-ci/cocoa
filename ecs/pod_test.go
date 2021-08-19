@@ -34,20 +34,20 @@ func TestBasicECSPod(t *testing.T) {
 		},
 		"InfoIsPopulated": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			res := cocoa.NewECSPodResources().SetTaskID("task_id")
-			stat := cocoa.NewECSPodStatusInfo().
+			ps := cocoa.NewECSPodStatusInfo().
 				SetStatus(cocoa.StatusRunning).
 				AddContainers(*cocoa.NewECSContainerStatusInfo().
 					SetContainerID("container_id").
 					SetName("name").
 					SetStatus(cocoa.StatusRunning))
-			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatusInfo(*stat)
+			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatusInfo(*ps)
 
 			p, err := NewBasicECSPod(opts)
 			require.NoError(t, err)
 
 			podRes := p.Resources()
 			assert.Equal(t, *res, podRes)
-			assert.Equal(t, *stat, p.StatusInfo())
+			assert.Equal(t, *ps, p.StatusInfo())
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
@@ -149,10 +149,10 @@ func TestBasicECSPodOptions(t *testing.T) {
 		assert.Equal(t, *res, *opts.Resources)
 	})
 	t.Run("SetStatusInfo", func(t *testing.T) {
-		stat := cocoa.NewECSPodStatusInfo().SetStatus(cocoa.StatusRunning)
-		opts := NewBasicECSPodOptions().SetStatusInfo(*stat)
+		ps := cocoa.NewECSPodStatusInfo().SetStatus(cocoa.StatusRunning)
+		opts := NewBasicECSPodOptions().SetStatusInfo(*ps)
 		require.NotNil(t, opts.StatusInfo)
-		assert.Equal(t, *stat, *opts.StatusInfo)
+		assert.Equal(t, *ps, *opts.StatusInfo)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		validResources := func() cocoa.ECSPodResources {

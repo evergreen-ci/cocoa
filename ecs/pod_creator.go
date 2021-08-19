@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
-	"github.com/k0kubun/pp"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
@@ -61,37 +60,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 		return nil, errors.Wrap(err, "creating secret environment variables")
 	}
 
-	// kim: TODO: make a helper for this logic
-	// kim: TODO: test
-	for i, c := range mergedPodCreationOpts.ContainerDefinitions {
-		name := utility.FromStringPtr(c.Name)
-
-		resolved, ok := resolvedSecrets[name]
-		if !ok {
-			// kim: NOTE: do not just continue because we might have to update the
-			// repo creds.
-			continue
-		}
-
-		for j, envVar := range c.EnvVars {
-			if envVar.SecretOpts == nil {
-				continue
-			}
-
-			resolvedSecretOpts, ok := resolved.envVars[utility.FromStringPtr(envVar.Name)]
-			if !ok {
-				continue
-			}
-
-			envVar.SecretOpts = &resolvedSecretOpts
-			mergedPodCreationOpts.ContainerDefinitions[i].EnvVars[j] = envVar
-			pp.Println("set environment variable: ", envVar.Name, envVar.SecretOpts)
-		}
-
-		if resolved.repoCreds != nil {
-			c.RepoCreds.SecretName = resolved.repoCreds.Name
-		}
-	}
+	pc.updateSecrets(&mergedPodCreationOpts, resolvedSecrets)
 
 	taskDefinition := pc.exportPodCreationOptions(mergedPodCreationOpts)
 
@@ -154,8 +123,10 @@ func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Contex
 	return nil, errors.New("TODO: implement")
 }
 
+// kim: TODO: remove containerSecrets type
 type containerSecrets map[string]containerSecret
 
+// kim: TODO: rename to containerSecrets
 type containerSecret struct {
 	envVars   map[string]cocoa.SecretOptions
 	repoCreds *cocoa.SecretOptions
@@ -234,7 +205,7 @@ func (pc *BasicECSPodCreator) createSecret(ctx context.Context, secret cocoa.Sec
 	if pc.vault == nil {
 		return nil, errors.New("no vault was specified")
 	}
-	arn, err := pc.vault.CreateSecret(ctx, secret.ContainerSecret.NamedSecret)
+	arn, err := pc.vault.CreateSecret(ctx, secret.NamedSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -298,6 +269,41 @@ func (pc *BasicECSPodCreator) mergeSecrets(allSecrets ...containerSecrets) conta
 		}
 	}
 	return merged
+}
+
+// updateSecrets updates the secrets for each container definition in the
+// options after they have been created.
+func (pc *BasicECSPodCreator) updateSecrets(opts *cocoa.ECSPodCreationOptions, resolved containerSecrets) {
+	for i, c := range opts.ContainerDefinitions {
+		name := utility.FromStringPtr(c.Name)
+
+		resolved, ok := resolved[name]
+		if !ok {
+			continue
+		}
+
+		for j, envVar := range c.EnvVars {
+			if envVar.SecretOpts == nil {
+				continue
+			}
+			if utility.FromBoolPtr(envVar.SecretOpts.Exists) {
+				continue
+			}
+
+			resolvedSecretOpts, ok := resolved.envVars[utility.FromStringPtr(envVar.Name)]
+			if !ok {
+				continue
+			}
+
+			envVar.SecretOpts = &resolvedSecretOpts
+			opts.ContainerDefinitions[i].EnvVars[j] = envVar
+		}
+
+		if resolved.repoCreds != nil && c.RepoCreds.NewCreds != nil {
+			opts.ContainerDefinitions[i].RepoCreds.SecretName = resolved.repoCreds.Name
+		}
+	}
+
 }
 
 // translateSecrets translates all container secrets into a map of container
@@ -461,13 +467,16 @@ func (pc *BasicECSPodCreator) translateECSStatus(status *string) cocoa.ECSStatus
 
 // translateContainerSecrets translates secret options into container secrets.
 func (pc *BasicECSPodCreator) translateContainerSecrets(secrets []cocoa.SecretOptions) []cocoa.ContainerSecret {
-	var containerSecrets []cocoa.ContainerSecret
+	var translated []cocoa.ContainerSecret
 
 	for _, secret := range secrets {
-		containerSecrets = append(containerSecrets, secret.ContainerSecret)
+		cs := cocoa.NewContainerSecret().
+			SetID(utility.FromStringPtr(secret.Name)).
+			SetOwned(utility.FromBoolPtr(secret.Owned))
+		translated = append(translated, *cs)
 	}
 
-	return containerSecrets
+	return translated
 }
 
 // exportPodCreationOptions converts options to create a pod into its equivalent

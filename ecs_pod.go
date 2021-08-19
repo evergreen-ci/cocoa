@@ -210,10 +210,25 @@ func (r *ECSContainerResources) AddSecrets(secrets ...ContainerSecret) *ECSConta
 	return r
 }
 
+// Validate checks that the container ID is given and that all given container
+// secrets are valid.
+// kim: TODO: test
+func (r *ECSContainerResources) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(r.ContainerID == nil, "must specify a container ID")
+	catcher.NewWhen(utility.FromStringPtr(r.ContainerID) == "", "must specify a non-empty container ID")
+	for _, s := range r.Secrets {
+		catcher.Wrapf(s.Validate(), "invalid secret")
+	}
+	return catcher.Resolve()
+}
+
 // ContainerSecret is a named secret that may or may not be owned by its container.
 type ContainerSecret struct {
-	// kim: TODO: convert this into just Name and ID. Either can be set.
-	NamedSecret
+	// ID is the unique resource identifier for the secret.
+	ID *string
+	// Name is the friendly name of the secret.
+	Name *string
 	// Owned determines whether or not the secret is owned by its container or
 	// not.
 	Owned *bool
@@ -224,15 +239,15 @@ func NewContainerSecret() *ContainerSecret {
 	return &ContainerSecret{}
 }
 
-// SetName sets the secret's name.
-func (s *ContainerSecret) SetName(name string) *ContainerSecret {
-	s.Name = &name
+// SetID sets the secret's unique resource identifier.
+func (s *ContainerSecret) SetID(id string) *ContainerSecret {
+	s.ID = &id
 	return s
 }
 
-// SetValue sets the secret's value.
-func (s *ContainerSecret) SetValue(val string) *ContainerSecret {
-	s.Value = &val
+// SetName sets the secret's friendly name.
+func (s *ContainerSecret) SetName(name string) *ContainerSecret {
+	s.Name = &name
 	return s
 }
 
@@ -240,6 +255,16 @@ func (s *ContainerSecret) SetValue(val string) *ContainerSecret {
 func (s *ContainerSecret) SetOwned(owned bool) *ContainerSecret {
 	s.Owned = &owned
 	return s
+}
+
+// Validate checks that the secret has either a name or ID
+// kim: TODO: test
+func (s *ContainerSecret) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(s.ID == nil && s.Name == nil, "cannot have a secret with neither an ID nor a name")
+	catcher.NewWhen(s.ID != nil && utility.FromStringPtr(s.ID) == "", "cannot have an empty ID")
+	catcher.NewWhen(s.Name != nil && utility.FromStringPtr(s.Name) == "", "cannot have an empty name")
+	return catcher.Resolve()
 }
 
 // ECSStatus represents the different statuses possible for an ECS pod or
