@@ -2,6 +2,7 @@ package testcase
 
 import (
 	"context"
+	"encoding/json"
 	"math/rand"
 	"testing"
 	"time"
@@ -117,6 +118,36 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
+		"StopSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
+			creds := cocoa.NewRepositoryCredentials().
+				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
+				SetOwned(true)
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
+
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			defer cleanupPod(ctx, t, p, c, v)
+
+			checkPodStatus(t, p, cocoa.StatusStarting)
+
+			require.NoError(t, p.Stop(ctx))
+
+			checkPodStatus(t, p, cocoa.StatusStopped)
+
+			res := p.Resources()
+
+			require.Len(t, res.Containers, 1)
+			require.Len(t, res.Containers[0].Secrets, 1)
+
+			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
+			require.NoError(t, err)
+			checkCreds := cocoa.NewStoredRepositoryCredentials()
+			require.NoError(t, json.Unmarshal([]byte(stored), checkCreds))
+			assert.Equal(t, utility.FromStringPtr(creds.NewCreds.Username), utility.FromStringPtr(checkCreds.Username))
+			assert.Equal(t, utility.FromStringPtr(creds.NewCreds.Password), utility.FromStringPtr(checkCreds.Password))
+		},
 		"StopSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().
 				SetName("secret").
@@ -195,7 +226,35 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			checkPodStatus(t, p, cocoa.StatusDeleted)
 		},
-		// kim: TODO: test with repo creds
+		"DeleteSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
+			creds := cocoa.NewRepositoryCredentials().
+				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
+				SetOwned(true)
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
+
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			defer cleanupPod(ctx, t, p, c, v)
+
+			checkPodStatus(t, p, cocoa.StatusStarting)
+
+			res := p.Resources()
+			require.Len(t, res.Containers, 1)
+			require.Len(t, res.Containers[0].Secrets, 1)
+
+			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
+			require.NoError(t, err)
+			checkCreds := cocoa.NewStoredRepositoryCredentials()
+			require.NoError(t, json.Unmarshal([]byte(stored), checkCreds))
+			assert.Equal(t, utility.FromStringPtr(creds.NewCreds.Username), utility.FromStringPtr(checkCreds.Username))
+			assert.Equal(t, utility.FromStringPtr(creds.NewCreds.Password), utility.FromStringPtr(checkCreds.Password))
+
+			require.NoError(t, p.Delete(ctx))
+
+			checkPodDeleted(ctx, t, c, v, p)
+		},
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
 				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value1"))
