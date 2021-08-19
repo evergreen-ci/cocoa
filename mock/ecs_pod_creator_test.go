@@ -146,7 +146,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddContainerDefinitions(*containerDef).
 				SetExecutionOptions(*execOpts)
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
@@ -217,7 +217,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddContainerDefinitions(*containerDef).
 				SetExecutionOptions(*execOpts)
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
@@ -274,7 +274,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			c.RegisterTaskDefinitionError = errors.New("fake error")
 			c.RunTaskError = errors.New("fake error")
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.Error(t, err)
 
 			secret, ok := GlobalSecretCache[utility.FromStringPtr(secretOpts.Name)]
@@ -284,7 +284,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			c.RegisterTaskDefinitionError = nil
 			c.RunTaskError = nil
 
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.Len(t, p.Resources().Containers, 1)

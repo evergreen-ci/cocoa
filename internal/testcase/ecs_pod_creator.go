@@ -38,7 +38,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 			require.NotNil(t, p)
 
@@ -52,7 +52,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 		"CreatePodFailsWithInvalidCreationOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			opts := cocoa.NewECSPodCreationOptions()
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -79,7 +79,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -107,7 +107,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -140,7 +140,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetName(testutil.NewTaskDefinitionFamily(t.Name()))
 			assert.Error(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -173,7 +173,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 			require.NotNil(t, p)
 
@@ -212,7 +212,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
-			p, err := c.CreatePod(ctx, opts)
+			p, err := c.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 			require.NotNil(t, p)
 

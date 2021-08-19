@@ -212,6 +212,7 @@ func (r *ECSContainerResources) AddSecrets(secrets ...ContainerSecret) *ECSConta
 
 // ContainerSecret is a named secret that may or may not be owned by its container.
 type ContainerSecret struct {
+	// kim: TODO: convert this into just Name and ID. Either can be set.
 	NamedSecret
 	// Owned determines whether or not the secret is owned by its container or
 	// not.

@@ -15,10 +15,10 @@ type ECSPodCreator interface {
 	// CreatePod creates a new pod backed by ECS with the given options. Options
 	// are applied in the order they're specified and conflicting options are
 	// overwritten.
-	CreatePod(ctx context.Context, opts ...*ECSPodCreationOptions) (ECSPod, error)
+	CreatePod(ctx context.Context, opts ...ECSPodCreationOptions) (ECSPod, error)
 	// CreatePodFromExistingDefinition creates a new pod backed by ECS from an
 	// existing task definition.
-	CreatePodFromExistingDefinition(ctx context.Context, def ECSTaskDefinition, opts ...*ECSPodExecutionOptions) (ECSPod, error)
+	CreatePodFromExistingDefinition(ctx context.Context, def ECSTaskDefinition, opts ...ECSPodExecutionOptions) (ECSPod, error)
 }
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
@@ -242,14 +242,10 @@ func (o *ECSPodCreationOptions) getNetworkMode() ECSNetworkMode {
 // MergeECSPodCreationOptions merges all the given options to create an ECS pod.
 // Options are applied in the order that they're specified and conflicting
 // options are overwritten.
-func MergeECSPodCreationOptions(opts ...*ECSPodCreationOptions) ECSPodCreationOptions {
+func MergeECSPodCreationOptions(opts ...ECSPodCreationOptions) ECSPodCreationOptions {
 	merged := ECSPodCreationOptions{}
 
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-
 		if opt.Name != nil {
 			merged.Name = opt.Name
 		}
@@ -482,6 +478,8 @@ func (e *EnvironmentVariable) Validate() error {
 // SecretOptions represents a secret with a name and value that may or may not
 // be owned by its container.
 type SecretOptions struct {
+	// kim: TODO: convert this into NamedSecret + Owned. When translating the
+	// pod, determine if the name is a friendly name or an ID based on Exists.
 	ContainerSecret
 	// Exists determines whether or not the secret already exists or must be
 	// created before it can be used.
@@ -759,14 +757,10 @@ func (o *ECSPodExecutionOptions) Validate() error {
 // MergeECSPodExecutionOptions merges all the given options to execute an ECS pod.
 // Options are applied in the order that they're specified and conflicting
 // options are overwritten.
-func MergeECSPodExecutionOptions(opts ...*ECSPodExecutionOptions) ECSPodExecutionOptions {
+func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecutionOptions {
 	merged := ECSPodExecutionOptions{}
 
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-
 		if opt.Cluster != nil {
 			merged.Cluster = opt.Cluster
 		}

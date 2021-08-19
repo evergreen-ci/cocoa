@@ -2,7 +2,9 @@ package testcase
 
 import (
 	"context"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
@@ -11,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 // ECSPodTestCase represents a test case for a cocoa.ECSPod.
 type ECSPodTestCase func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault)
@@ -58,7 +64,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -104,7 +110,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -114,8 +120,10 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
 		"StopSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
+			// kim: TODO: deal with the fact that the secrets might be out of
+			// order.
 			secret := cocoa.NewEnvironmentVariable().
-				SetName(utility.RandomString()).
+				SetName("secret").
 				SetSecretOptions(*cocoa.NewSecretOptions().
 					SetName(testutil.NewSecretName(t.Name())).
 					SetValue(utility.RandomString()))
@@ -125,7 +133,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 				AddContainerDefinitions(*makeContainerDef(t).
 					AddEnvironmentVariables(*secret, *ownedSecret))
 
-			p, err := pc.CreatePod(ctx, secretOpts)
+			p, err := pc.CreatePod(ctx, *secretOpts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -141,11 +149,12 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			res = p.Resources()
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 2)
-
 			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
 
+			// kim: need to deal with the fact that the secrets may be out of
+			// order in the resulting ECSPod.
 			val, err = v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[1].Name))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
@@ -158,7 +167,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -177,7 +186,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -188,15 +197,16 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			checkPodStatus(t, p, cocoa.StatusDeleted)
 		},
+		// kim: TODO: test with repo creds
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
 				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value1"))
 			ownedSecret := cocoa.NewEnvironmentVariable().SetName("secret2").
 				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value2").SetOwned(true))
 
-			secretOpts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
 
-			p, err := pc.CreatePod(ctx, secretOpts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -206,6 +216,9 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			res := p.Resources()
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 2)
+
+			// kim: need to deal with the fact that the secrets may be out of
+			// order in the resulting ECSPod.
 			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
@@ -224,7 +237,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					*makeEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NoError(t, p.Delete(ctx))

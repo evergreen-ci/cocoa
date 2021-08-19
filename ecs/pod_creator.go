@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
+	"github.com/k0kubun/pp"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
@@ -31,9 +32,12 @@ func NewBasicECSPodCreator(c cocoa.ECSClient, v cocoa.Vault) (*BasicECSPodCreato
 }
 
 // CreatePod creates a new pod backed by AWS ECS.
-func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
+func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
 	mergedPodCreationOpts := cocoa.MergeECSPodCreationOptions(opts...)
-	mergedPodExecutionOpts := cocoa.MergeECSPodExecutionOptions(mergedPodCreationOpts.ExecutionOpts)
+	var mergedPodExecutionOpts cocoa.ECSPodExecutionOptions
+	if mergedPodCreationOpts.ExecutionOpts != nil {
+		mergedPodExecutionOpts = cocoa.MergeECSPodExecutionOptions(*mergedPodCreationOpts.ExecutionOpts)
+	}
 
 	if err := mergedPodCreationOpts.Validate(); err != nil {
 		return nil, errors.Wrap(err, "invalid pod creation options")
@@ -58,6 +62,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSP
 	}
 
 	// kim: TODO: make a helper for this logic
+	// kim: TODO: test
 	for i, c := range mergedPodCreationOpts.ContainerDefinitions {
 		name := utility.FromStringPtr(c.Name)
 
@@ -80,8 +85,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSP
 
 			envVar.SecretOpts = &resolvedSecretOpts
 			mergedPodCreationOpts.ContainerDefinitions[i].EnvVars[j] = envVar
-
-			break
+			pp.Println("set environment variable: ", envVar.Name, envVar.SecretOpts)
 		}
 
 		if resolved.repoCreds != nil {
@@ -146,7 +150,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...*cocoa.ECSP
 
 // CreatePodFromExistingDefinition creates a new pod backed by AWS ECS from an
 // existing definition.
-func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...*cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
+func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
 	return nil, errors.New("TODO: implement")
 }
 
@@ -460,10 +464,7 @@ func (pc *BasicECSPodCreator) translateContainerSecrets(secrets []cocoa.SecretOp
 	var containerSecrets []cocoa.ContainerSecret
 
 	for _, secret := range secrets {
-		cs := cocoa.NewContainerSecret().
-			SetID(utility.FromStringPtr(secret.Name)).
-			SetOwned(utility.FromBoolPtr(secret.Owned))
-		containerSecrets = append(containerSecrets, *cs)
+		containerSecrets = append(containerSecrets, secret.ContainerSecret)
 	}
 
 	return containerSecrets
