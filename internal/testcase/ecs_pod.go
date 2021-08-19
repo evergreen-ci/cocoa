@@ -60,10 +60,9 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 	return map[string]ECSPodTestCase{
 		"InfoIsPopulated": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
+			secret := makeSecretEnvVar(t)
 			opts := makePodCreationOpts(t).AddContainerDefinitions(
-				*makeContainerDef(t).AddEnvironmentVariables(
-					*makeSecretEnvVar(t),
-				),
+				*makeContainerDef(t).AddEnvironmentVariables(*secret),
 			)
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
@@ -81,6 +80,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
+			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Name), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].EnvVars[0].SecretOpts.Value), val)
@@ -141,6 +141,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
 
+			assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
 			checkCreds := cocoa.NewStoredRepositoryCredentials()
@@ -177,14 +178,17 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 2)
 			for _, s := range res.Containers[0].Secrets {
-				if utility.FromBoolPtr(s.Owned) {
-					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
-					require.NoError(t, err)
-					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
-				} else {
+				switch utility.FromStringPtr(s.Name) {
+				case utility.FromStringPtr(secret.SecretOpts.Name):
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
 					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
+				case utility.FromStringPtr(ownedSecret.SecretOpts.Name):
+					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					require.NoError(t, err)
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+				default:
+					assert.Fail(t, "found unexpected secret in container", "secret '%s' in container '%s'", utility.FromStringPtr(s.Name), utility.FromStringPtr(res.Containers[0].Name))
 				}
 			}
 
@@ -244,6 +248,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
 
+			assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
 			checkCreds := cocoa.NewStoredRepositoryCredentials()
