@@ -263,7 +263,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
 				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value1"))
-			ownedSecret := cocoa.NewEnvironmentVariable().SetName("secret2").
+			ownedSecret := cocoa.NewEnvironmentVariable().SetName(t.Name() + "-owned").
 				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value2").SetOwned(true))
 
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
@@ -280,10 +280,12 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers[0].Secrets, 2)
 			for _, s := range res.Containers[0].Secrets {
 				if utility.FromBoolPtr(s.Owned) {
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Name), utility.FromStringPtr(s.Name))
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
 					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
 				} else {
+					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Name), utility.FromStringPtr(s.Name))
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
 					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
