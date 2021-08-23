@@ -61,7 +61,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
 					SetName(testutil.NewSecretName("name")).
-					SetValue("value"))
+					SetNewValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
 				AddEnvironmentVariables(*envVar).
@@ -88,7 +88,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetUsername("username").
 				SetPassword("password")
 			creds := cocoa.NewRepositoryCredentials().
-				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t.Name())).
 				SetNewCredentials(*storedCreds)
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
@@ -121,7 +121,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			envVar := cocoa.NewEnvironmentVariable().SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
 					SetName(testutil.NewSecretName("name")).
-					SetValue("value"))
+					SetNewValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
 				AddEnvironmentVariables(*envVar).
 				SetMemoryMB(128).
@@ -149,9 +149,8 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
 					SetName(testutil.NewSecretName("name")).
-					SetValue("value").
-					SetExists(false))
-			envVar.SecretOpts.SetOwned(true)
+					SetNewValue("value").
+					SetOwned(true))
 
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
@@ -188,7 +187,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetUsername("username").
 				SetPassword("password")
 			creds := cocoa.NewRepositoryCredentials().
-				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t.Name())).
 				SetNewCredentials(*storedCreds).
 				SetOwned(true)
 

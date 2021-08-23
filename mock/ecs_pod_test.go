@@ -85,7 +85,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			SetName(t.Name()).
 			SetSecretOptions(*cocoa.NewSecretOptions().
 				SetName(t.Name()).
-				SetValue(utility.RandomString()).
+				SetNewValue(utility.RandomString()).
 				SetOwned(true))
 	}
 	makeContainerDef := func(t *testing.T) *cocoa.ECSContainerDefinition {

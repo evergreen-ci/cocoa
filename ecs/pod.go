@@ -61,15 +61,9 @@ func (o *BasicECSPodOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(o.Client == nil, "must specify a client")
 	if o.Resources != nil {
-		catcher.NewWhen(o.Resources.TaskID == nil, "must specify task ID of the pod")
-		if o.Resources.TaskDefinition != nil {
-			catcher.Wrapf(o.Resources.TaskDefinition.Validate(), "invalid task definition")
-		}
-		for _, c := range o.Resources.Containers {
-			catcher.Wrapf(c.Validate(), "container '%s'", utility.FromStringPtr(c.Name))
-		}
+		catcher.Wrap(o.Resources.Validate(), "invalid resources")
 	} else {
-		catcher.New("must specify at least task ID of the pod")
+		catcher.New("missing pod resources")
 	}
 	if o.StatusInfo != nil {
 		catcher.Add(o.StatusInfo.Validate())

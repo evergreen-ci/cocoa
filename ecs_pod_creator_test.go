@@ -203,7 +203,7 @@ func TestECSPodCreationOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithSecretEnvironmentVariablesWithoutExecutionRole", func(t *testing.T) {
-			secretOpts := NewSecretOptions().SetName("name").SetValue("value")
+			secretOpts := NewSecretOptions().SetName("name").SetNewValue("value")
 			ev := NewEnvironmentVariable().SetName("name").SetSecretOptions(*secretOpts)
 			containerDef := NewECSContainerDefinition().SetImage("image").AddEnvironmentVariables(*ev)
 			opts := NewECSPodCreationOptions().
@@ -488,10 +488,10 @@ func TestECSContainerDefinition(t *testing.T) {
 		assert.ElementsMatch(t, envVars, def.EnvVars)
 	})
 	t.Run("SetRepositoryCredentials", func(t *testing.T) {
-		creds := NewRepositoryCredentials().SetSecretName("name")
+		creds := NewRepositoryCredentials().SetName("name")
 		def := NewECSContainerDefinition().SetRepositoryCredentials(*creds)
 		require.NotZero(t, def.RepoCreds)
-		assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(def.RepoCreds.SecretName))
+		assert.Equal(t, utility.FromStringPtr(creds.Name), utility.FromStringPtr(def.RepoCreds.Name))
 	})
 	t.Run("SetPortMappings", func(t *testing.T) {
 		pm := NewPortMapping().SetContainerPort(1337)
@@ -593,11 +593,11 @@ func TestEnvironmentVariable(t *testing.T) {
 		assert.Equal(t, val, utility.FromStringPtr(ev.Value))
 	})
 	t.Run("SetSecretOptions", func(t *testing.T) {
-		opts := NewSecretOptions().SetName("name").SetValue("value")
+		opts := NewSecretOptions().SetName("name").SetNewValue("value")
 		ev := NewEnvironmentVariable().SetSecretOptions(*opts)
 		require.NotNil(t, ev.SecretOpts)
 		assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(ev.SecretOpts.Name))
-		assert.Equal(t, utility.FromStringPtr(opts.Value), utility.FromStringPtr(ev.SecretOpts.Value))
+		assert.Equal(t, utility.FromStringPtr(opts.NewValue), utility.FromStringPtr(ev.SecretOpts.NewValue))
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("SucceedsWithNameAndValue", func(t *testing.T) {
@@ -612,7 +612,7 @@ func TestEnvironmentVariable(t *testing.T) {
 				SetName("name").
 				SetSecretOptions(*NewSecretOptions().
 					SetName("secret_name").
-					SetValue("secret_value"))
+					SetNewValue("secret_value"))
 			assert.NoError(t, ev.Validate())
 		})
 		t.Run("FailsWithNameAndBadNewSecretOptions", func(t *testing.T) {
@@ -633,7 +633,7 @@ func TestEnvironmentVariable(t *testing.T) {
 				SetValue("value").
 				SetSecretOptions(*NewSecretOptions().
 					SetName("secret_name").
-					SetValue("secret_value"))
+					SetNewValue("secret_value"))
 			assert.Error(t, ev.Validate())
 		})
 		t.Run("FailsWithoutValueOrSecretOptions", func(t *testing.T) {
@@ -649,10 +649,10 @@ func TestRepositoryCredentials(t *testing.T) {
 		require.NotZero(t, creds)
 		assert.Zero(t, *creds)
 	})
-	t.Run("SetSecretName", func(t *testing.T) {
+	t.Run("SetName", func(t *testing.T) {
 		name := "secret_name"
-		creds := NewRepositoryCredentials().SetSecretName(name)
-		assert.Equal(t, name, utility.FromStringPtr(creds.SecretName))
+		creds := NewRepositoryCredentials().SetName(name)
+		assert.Equal(t, name, utility.FromStringPtr(creds.Name))
 	})
 	t.Run("SetOwned", func(t *testing.T) {
 		creds := NewRepositoryCredentials().SetOwned(true)
@@ -667,33 +667,48 @@ func TestRepositoryCredentials(t *testing.T) {
 		assert.Equal(t, *storedCreds, *creds.NewCreds)
 	})
 	t.Run("Validate", func(t *testing.T) {
-		t.Run("SucceedsIfNewCredsAreSet", func(t *testing.T) {
+		t.Run("SucceedsWithNewCredsAndName", func(t *testing.T) {
 			storedCreds := NewStoredRepositoryCredentials().
 				SetUsername("username").
 				SetPassword("password")
 			creds := NewRepositoryCredentials().
-				SetSecretName("name").
+				SetName("name").
 				SetNewCredentials(*storedCreds)
 			assert.NoError(t, creds.Validate())
 		})
-		t.Run("SucceedsWithJustSecretNameForExistingSecret", func(t *testing.T) {
-			creds := NewRepositoryCredentials().SetSecretName("name")
+		t.Run("SucceedsWithJustID", func(t *testing.T) {
+			creds := NewRepositoryCredentials().SetID("id")
 			assert.NoError(t, creds.Validate())
 		})
-		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
+		t.Run("FailsWithEmpty", func(t *testing.T) {
 			creds := NewRepositoryCredentials()
 			assert.Error(t, creds.Validate())
 		})
-		t.Run("FailsWithoutSecretName", func(t *testing.T) {
+		t.Run("FailsWithEmptyID", func(t *testing.T) {
+			creds := NewRepositoryCredentials().SetID("")
+			assert.Error(t, creds.Validate())
+		})
+		t.Run("FailsWithJustNewCreds", func(t *testing.T) {
 			storedCreds := NewStoredRepositoryCredentials().
 				SetUsername("username").
 				SetPassword("password")
 			creds := NewRepositoryCredentials().SetNewCredentials(*storedCreds)
 			assert.Error(t, creds.Validate())
 		})
+		t.Run("FailsWithJustName", func(t *testing.T) {
+			creds := NewRepositoryCredentials().SetName("name")
+			assert.Error(t, creds.Validate())
+		})
 		t.Run("FailsWithBadNewCredentials", func(t *testing.T) {
 			storedCreds := NewStoredRepositoryCredentials()
-			creds := NewRepositoryCredentials().SetNewCredentials(*storedCreds)
+			creds := NewRepositoryCredentials().SetName("name").SetNewCredentials(*storedCreds)
+			assert.Error(t, creds.Validate())
+		})
+		t.Run("FailsWithIDAndNewCreds", func(t *testing.T) {
+			storedCreds := NewStoredRepositoryCredentials().
+				SetUsername("username").
+				SetPassword("password")
+			creds := NewRepositoryCredentials().SetID("id").SetNewCredentials(*storedCreds)
 			assert.Error(t, creds.Validate())
 		})
 	})
@@ -734,19 +749,20 @@ func TestSecretOptions(t *testing.T) {
 		require.NotZero(t, opts)
 		assert.Zero(t, *opts)
 	})
+	t.Run("SetID", func(t *testing.T) {
+		id := "id"
+		opts := NewSecretOptions().SetID(id)
+		assert.Equal(t, id, utility.FromStringPtr(opts.ID))
+	})
 	t.Run("SetName", func(t *testing.T) {
 		name := "name"
 		opts := NewSecretOptions().SetName(name)
 		assert.Equal(t, name, utility.FromStringPtr(opts.Name))
 	})
-	t.Run("SetValue", func(t *testing.T) {
+	t.Run("SetNewValue", func(t *testing.T) {
 		val := "value"
-		opts := NewSecretOptions().SetValue(val)
-		assert.Equal(t, val, utility.FromStringPtr(opts.Value))
-	})
-	t.Run("SetExists", func(t *testing.T) {
-		opts := NewSecretOptions().SetExists(true)
-		assert.True(t, utility.FromBoolPtr(opts.Exists))
+		opts := NewSecretOptions().SetNewValue(val)
+		assert.Equal(t, val, utility.FromStringPtr(opts.NewValue))
 	})
 	t.Run("SetOwned", func(t *testing.T) {
 		opts := NewSecretOptions().SetOwned(true)
@@ -754,23 +770,35 @@ func TestSecretOptions(t *testing.T) {
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("SucceedsWithNameAndNewValue", func(t *testing.T) {
-			s := NewSecretOptions().SetName("name").SetValue("value")
+			s := NewSecretOptions().SetName("name").SetNewValue("value")
 			assert.NoError(t, s.Validate())
 		})
-		t.Run("SucceedsWithNameAndExistingSecret", func(t *testing.T) {
-			s := NewSecretOptions().SetName("name").SetExists(true)
+		t.Run("SucceedsWithID", func(t *testing.T) {
+			s := NewSecretOptions().SetID("id")
 			assert.NoError(t, s.Validate())
 		})
-		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
+		t.Run("SucceedsWithIDAndName", func(t *testing.T) {
+			s := NewSecretOptions().SetID("id").SetName("name")
+			assert.NoError(t, s.Validate())
+		})
+		t.Run("FailsWithEmpty", func(t *testing.T) {
 			s := NewSecretOptions()
 			assert.Error(t, s.Validate())
 		})
-		t.Run("FailsWithoutName", func(t *testing.T) {
-			s := NewSecretOptions().SetValue("value")
+		t.Run("FailsWithEmptyID", func(t *testing.T) {
+			s := NewSecretOptions().SetID("")
 			assert.Error(t, s.Validate())
 		})
-		t.Run("FailsWithExistingSecretAndNewValue", func(t *testing.T) {
-			s := NewSecretOptions().SetName("name").SetExists(true).SetValue("value")
+		t.Run("FailsWithJustName", func(t *testing.T) {
+			s := NewSecretOptions().SetName("name")
+			assert.Error(t, s.Validate())
+		})
+		t.Run("FailsWithJustNewValue", func(t *testing.T) {
+			s := NewSecretOptions().SetNewValue("value")
+			assert.Error(t, s.Validate())
+		})
+		t.Run("FailsWithIDAndNewValue", func(t *testing.T) {
+			s := NewSecretOptions().SetID("id").SetNewValue("value")
 			assert.Error(t, s.Validate())
 		})
 	})

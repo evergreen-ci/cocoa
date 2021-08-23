@@ -168,6 +168,20 @@ func (r *ECSPodResources) AddContainers(containers ...ECSContainerResources) *EC
 	return r
 }
 
+// Validate checks that the task ID is set, the task definition is valid, and
+// all container resources are valid.
+func (r *ECSPodResources) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(r.TaskID == nil, "must specify task ID of the pod")
+	if r.TaskDefinition != nil {
+		catcher.Wrapf(r.TaskDefinition.Validate(), "invalid task definition")
+	}
+	for _, c := range r.Containers {
+		catcher.Wrapf(c.Validate(), "container '%s'", utility.FromStringPtr(c.Name))
+	}
+	return catcher.Resolve()
+}
+
 // ECSContainerResources are ECS-specific resources associated with a container.
 type ECSContainerResources struct {
 	// ContainerID is the resource identifier for the container.

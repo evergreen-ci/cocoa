@@ -35,7 +35,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			SetName(t.Name()).
 			SetSecretOptions(*cocoa.NewSecretOptions().
 				SetName(testutil.NewSecretName(t.Name())).
-				SetValue(utility.RandomString()).
+				SetNewValue(utility.RandomString()).
 				SetOwned(true))
 	}
 
@@ -83,7 +83,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Name), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].EnvVars[0].SecretOpts.Value), val)
+			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].EnvVars[0].SecretOpts.NewValue), val)
 			assert.True(t, utility.FromBoolPtr(res.Containers[0].Secrets[0].Owned))
 
 			require.True(t, utility.FromBoolPtr(res.TaskDefinition.Owned))
@@ -120,7 +120,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		},
 		"StopSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			creds := cocoa.NewRepositoryCredentials().
-				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t.Name())).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
@@ -141,7 +141,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
 
-			assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
+			assert.Equal(t, utility.FromStringPtr(creds.Name), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
 			checkCreds := cocoa.NewStoredRepositoryCredentials()
@@ -154,7 +154,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 				SetName("secret").
 				SetSecretOptions(*cocoa.NewSecretOptions().
 					SetName(testutil.NewSecretName(t.Name())).
-					SetValue(utility.RandomString()))
+					SetNewValue(utility.RandomString()))
 			ownedSecret := makeSecretEnvVar(t)
 
 			secretOpts := makePodCreationOpts(t).
@@ -182,11 +182,11 @@ func ECSPodTests() map[string]ECSPodTestCase {
 				case utility.FromStringPtr(secret.SecretOpts.Name):
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
-					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
+					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.NewValue), val)
 				case utility.FromStringPtr(ownedSecret.SecretOpts.Name):
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
-					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.NewValue), val)
 				default:
 					assert.Fail(t, "found unexpected secret in container", "secret '%s' in container '%s'", utility.FromStringPtr(s.Name), utility.FromStringPtr(res.Containers[0].Name))
 				}
@@ -232,7 +232,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		},
 		"DeleteSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			creds := cocoa.NewRepositoryCredentials().
-				SetSecretName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t.Name())).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
@@ -248,7 +248,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
 
-			assert.Equal(t, utility.FromStringPtr(creds.SecretName), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
+			assert.Equal(t, utility.FromStringPtr(creds.Name), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			stored, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
 			checkCreds := cocoa.NewStoredRepositoryCredentials()
@@ -262,9 +262,14 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		},
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value1"))
+				SetSecretOptions(*cocoa.NewSecretOptions().
+					SetName(testutil.NewSecretName(t.Name())).
+					SetNewValue("value1"))
 			ownedSecret := cocoa.NewEnvironmentVariable().SetName(t.Name() + "-owned").
-				SetSecretOptions(*cocoa.NewSecretOptions().SetName(testutil.NewSecretName(t.Name())).SetValue("value2").SetOwned(true))
+				SetSecretOptions(*cocoa.NewSecretOptions().
+					SetName(testutil.NewSecretName(t.Name())).
+					SetNewValue("value2").
+					SetOwned(true))
 
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
 
@@ -283,12 +288,12 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Name), utility.FromStringPtr(s.Name))
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
-					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.Value), val)
+					assert.Equal(t, utility.FromStringPtr(ownedSecret.SecretOpts.NewValue), val)
 				} else {
 					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Name), utility.FromStringPtr(s.Name))
 					val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 					require.NoError(t, err)
-					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Value), val)
+					assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.NewValue), val)
 				}
 			}
 

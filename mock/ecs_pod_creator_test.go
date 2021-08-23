@@ -194,7 +194,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 		"RegistersTaskDefinitionAndRunsTaskWithCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
-				SetValue("secret_value")
+				SetNewValue("secret_value")
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetSecretOptions(*secretOpts)
@@ -231,11 +231,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].ValueFrom))
 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
 		"RegistersTaskDefinitionAndRunsTaskWithCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			repoCreds := cocoa.NewRepositoryCredentials().
-				SetSecretName("repo_creds_secret_name").
+				SetName("repo_creds_secret_name").
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().
 					SetUsername("username").
 					SetPassword("password"))
@@ -273,7 +273,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.NotZero(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].RepositoryCredentials, 1)
 			assert.Equal(t, utility.FromStringPtr(res.Containers[0].Secrets[0].ID), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].RepositoryCredentials.CredentialsParameter))
 
-			assert.Equal(t, utility.FromStringPtr(repoCreds.SecretName), utility.FromStringPtr(sm.CreateSecretInput.Name))
+			assert.Equal(t, utility.FromStringPtr(repoCreds.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
 			storedCreds, err := json.Marshal(repoCreds.NewCreds)
 			require.NoError(t, err)
 			assert.Equal(t, string(storedCreds), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
@@ -281,7 +281,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 		"CreatingNewSecretsIsRetryable": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
-				SetValue("secret_value")
+				SetNewValue("secret_value")
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetSecretOptions(*secretOpts)
@@ -311,7 +311,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			secret, ok := GlobalSecretCache[utility.FromStringPtr(secretOpts.Name)]
 			require.True(t, ok)
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), secret.Value)
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), secret.Value)
 
 			c.RegisterTaskDefinitionError = nil
 			c.RunTaskError = nil
@@ -325,7 +325,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].ID})
 			require.NoError(t, err)
 			require.NotZero(t, getSecretOut)
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(getSecretOut.SecretString))
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
 		},
 	}
 }

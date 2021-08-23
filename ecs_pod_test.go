@@ -93,6 +93,35 @@ func TestECSPodResources(t *testing.T) {
 		assert.Equal(t, *containerRes0, res.Containers[0])
 		assert.Equal(t, *containerRes1, res.Containers[1])
 	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
+			opts := NewECSPodResources().
+				SetTaskID("task_id").
+				SetCluster("cluster").
+				SetTaskDefinition(*NewECSTaskDefinition().SetID("task_definition_id")).
+				AddContainers(*NewECSContainerResources().SetContainerID("container_id"))
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithJustTaskID", func(t *testing.T) {
+			opts := NewECSPodResources().SetTaskID("task_id")
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithEmpty", func(t *testing.T) {
+			assert.Error(t, NewECSPodResources().Validate())
+		})
+		t.Run("FailsWithInvalidTaskDefinition", func(t *testing.T) {
+			opts := NewECSPodResources().
+				SetTaskID("task_id").
+				SetTaskDefinition(*NewECSTaskDefinition())
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("FailsWithInvalidContainer", func(t *testing.T) {
+			opts := NewECSPodResources().
+				SetTaskID("task_id").
+				AddContainers(*NewECSContainerResources())
+			assert.Error(t, opts.Validate())
+		})
+	})
 }
 
 func TestECSContainerResources(t *testing.T) {
