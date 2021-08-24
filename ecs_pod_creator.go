@@ -617,7 +617,7 @@ func (c *StoredRepositoryCredentials) SetPassword(pwd string) *StoredRepositoryC
 	return c
 }
 
-// Validate checks that the secret name, username, and password are set.
+// Validate checks that the username and password are set.
 func (c *StoredRepositoryCredentials) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username")
