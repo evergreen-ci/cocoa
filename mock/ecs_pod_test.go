@@ -85,7 +85,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			SetName(t.Name()).
 			SetSecretOptions(*cocoa.NewSecretOptions().
 				SetName(t.Name()).
-				SetValue(utility.RandomString()).
+				SetNewValue(utility.RandomString()).
 				SetOwned(true))
 	}
 	makeContainerDef := func(t *testing.T) *cocoa.ECSContainerDefinition {
@@ -108,8 +108,8 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 	}
 
 	checkPodDeleted := func(ctx context.Context, t *testing.T, p cocoa.ECSPod, c cocoa.ECSClient, smc cocoa.SecretsManagerClient, opts cocoa.ECSPodCreationOptions) {
-		stat := p.StatusInfo()
-		assert.Equal(t, cocoa.StatusDeleted, stat.Status)
+		ps := p.StatusInfo()
+		assert.Equal(t, cocoa.StatusDeleted, ps.Status)
 
 		res := p.Resources()
 
@@ -132,11 +132,11 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 		for _, containerRes := range res.Containers {
 			for _, s := range containerRes.Secrets {
 				_, err := smc.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
-					SecretId: s.Name,
+					SecretId: s.ID,
 				})
 				assert.NoError(t, err)
 				_, err = smc.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-					SecretId: s.Name,
+					SecretId: s.ID,
 				})
 				assert.Error(t, err)
 			}
@@ -146,21 +146,21 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient){
 		"StopIsIdempotentWhenItFails": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			c.StopTaskError = errors.New("fake error")
 
 			require.Error(t, p.Stop(ctx))
 
-			stat := p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			ps := p.StatusInfo()
+			assert.Equal(t, cocoa.StatusStarting, ps.Status)
 
 			c.StopTaskError = nil
 
 			require.NoError(t, p.Stop(ctx))
-			stat = p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStopped, stat.Status)
+			ps = p.StatusInfo()
+			assert.Equal(t, cocoa.StatusStopped, ps.Status)
 		},
 		"DeleteIsIdempotentWhenStoppingTaskFails": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(
@@ -168,16 +168,16 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			c.StopTaskError = errors.New("fake error")
 
 			require.Error(t, p.Delete(ctx))
 
-			stat := p.StatusInfo()
+			ps := p.StatusInfo()
 			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStarting, stat.Status)
+			assert.Equal(t, cocoa.StatusStarting, ps.Status)
 
 			c.StopTaskError = nil
 
@@ -191,16 +191,16 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			c.DeregisterTaskDefinitionError = errors.New("fake error")
 
 			require.Error(t, p.Delete(ctx))
 
-			stat := p.StatusInfo()
+			ps := p.StatusInfo()
 			require.NoError(t, err)
-			assert.Equal(t, cocoa.StatusStopped, stat.Status)
+			assert.Equal(t, cocoa.StatusStopped, ps.Status)
 
 			c.DeregisterTaskDefinitionError = nil
 
@@ -214,15 +214,15 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 					*makeSecretEnvVar(t),
 				),
 			)
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			smc.DeleteSecretError = errors.New("fake error")
 
 			require.Error(t, p.Delete(ctx))
 
-			stat := p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStopped, stat.Status)
+			ps := p.StatusInfo()
+			assert.Equal(t, cocoa.StatusStopped, ps.Status)
 
 			smc.DeleteSecretError = nil
 

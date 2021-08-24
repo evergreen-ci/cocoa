@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -146,7 +147,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddContainerDefinitions(*containerDef).
 				SetExecutionOptions(*execOpts)
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
@@ -165,9 +166,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
 			assert.Equal(t, opts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			left, right := utility.StringSliceSymmetricDifference(containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
-			assert.Empty(t, left)
-			assert.Empty(t, right)
+			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
 			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory))
 			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu))
@@ -195,7 +194,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 		"RegistersTaskDefinitionAndRunsTaskWithCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
-				SetValue("secret_value")
+				SetNewValue("secret_value")
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetSecretOptions(*secretOpts)
@@ -204,12 +203,8 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				AddEnvironmentVariables(*envVar)
-			placementOpts := cocoa.NewECSPodPlacementOptions().
-				SetStrategy(cocoa.StrategyBinpack).
-				SetStrategyParameter(cocoa.StrategyParamBinpackMemory)
 			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName()).
-				SetPlacementOptions(*placementOpts)
+				SetCluster(testutil.ECSClusterName())
 			opts := cocoa.NewECSPodCreationOptions().
 				SetMemoryMB(512).
 				SetCPU(1024).
@@ -217,7 +212,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddContainerDefinitions(*containerDef).
 				SetExecutionOptions(*execOpts)
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
@@ -228,28 +223,65 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
-			assert.Equal(t, utility.FromStringPtr(opts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			left, right := utility.StringSliceSymmetricDifference(containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
-			assert.Empty(t, left)
-			assert.Empty(t, right)
+			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].Name))
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].ValueFrom))
 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
+		},
+		"RegistersTaskDefinitionAndRunsTaskWithCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+			repoCreds := cocoa.NewRepositoryCredentials().
+				SetName("repo_creds_secret_name").
+				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().
+					SetUsername("username").
+					SetPassword("password"))
+			containerDef := cocoa.NewECSContainerDefinition().
+				SetName("name").
+				SetImage("image").
+				SetCommand([]string{"echo", "foo"}).
+				SetRepositoryCredentials(*repoCreds)
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName())
+			opts := cocoa.NewECSPodCreationOptions().
+				SetMemoryMB(512).
+				SetCPU(1024).
+				SetExecutionRole("execution_role").
+				AddContainerDefinitions(*containerDef).
+				SetExecutionOptions(*execOpts)
 
-			require.NotZero(t, c.RunTaskInput)
-			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
-			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
-			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			require.NotZero(t, c.RegisterTaskDefinitionInput)
+
+			mem, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Memory))
+			require.NoError(t, err)
+			assert.Equal(t, utility.FromIntPtr(opts.MemoryMB), mem)
+			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
+			require.NoError(t, err)
+			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
+			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
+			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			res := p.Resources()
+			require.Len(t, res.Containers, 1)
+			require.Len(t, res.Containers[0].Secrets, 1)
+			require.NotZero(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].RepositoryCredentials, 1)
+			assert.Equal(t, utility.FromStringPtr(res.Containers[0].Secrets[0].ID), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].RepositoryCredentials.CredentialsParameter))
+
+			assert.Equal(t, utility.FromStringPtr(repoCreds.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
+			storedCreds, err := json.Marshal(repoCreds.NewCreds)
+			require.NoError(t, err)
+			assert.Equal(t, string(storedCreds), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
 		"CreatingNewSecretsIsRetryable": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
-				SetValue("secret_value")
+				SetNewValue("secret_value")
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetSecretOptions(*secretOpts)
@@ -274,26 +306,26 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			c.RegisterTaskDefinitionError = errors.New("fake error")
 			c.RunTaskError = errors.New("fake error")
 
-			_, err := pc.CreatePod(ctx, opts)
+			_, err := pc.CreatePod(ctx, *opts)
 			require.Error(t, err)
 
 			secret, ok := GlobalSecretCache[utility.FromStringPtr(secretOpts.Name)]
 			require.True(t, ok)
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), secret.Value)
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), secret.Value)
 
 			c.RegisterTaskDefinitionError = nil
 			c.RunTaskError = nil
 
-			p, err := pc.CreatePod(ctx, opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.Len(t, p.Resources().Containers, 1)
 			require.Len(t, p.Resources().Containers[0].Secrets, 1)
 
-			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].Name})
+			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].ID})
 			require.NoError(t, err)
 			require.NotZero(t, getSecretOut)
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Value), utility.FromStringPtr(getSecretOut.SecretString))
+			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
 		},
 	}
 }
