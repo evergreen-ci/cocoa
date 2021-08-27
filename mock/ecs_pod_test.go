@@ -101,8 +101,8 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			SetName(testutil.NewTaskDefinitionFamily(t.Name())).
 			SetMemoryMB(128).
 			SetCPU(128).
-			SetTaskRole(testutil.TaskRole()).
-			SetExecutionRole(testutil.ExecutionRole()).
+			SetTaskRole(testutil.ECSTaskRole()).
+			SetExecutionRole(testutil.ECSExecutionRole()).
 			SetExecutionOptions(*cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()))
 	}

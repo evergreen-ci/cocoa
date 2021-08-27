@@ -158,6 +158,7 @@ func (c *BasicSecretsManagerClient) DescribeSecret(ctx context.Context, in *secr
 	return out, nil
 }
 
+// ListSecrets lists the metadata information for secrets matching the filters.
 func (c *BasicSecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanager.ListSecretsInput) (*secretsmanager.ListSecretsOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")

@@ -74,8 +74,8 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.TaskRole()).
-				SetExecutionRole(testutil.ExecutionRole()).
+				SetTaskRole(testutil.ECSTaskRole()).
+				SetExecutionRole(testutil.ECSExecutionRole()).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -102,8 +102,8 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.TaskRole()).
-				SetExecutionRole(testutil.ExecutionRole()).
+				SetTaskRole(testutil.ECSTaskRole()).
+				SetExecutionRole(testutil.ECSExecutionRole()).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -135,7 +135,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.TaskRole()).
+				SetTaskRole(testutil.ECSTaskRole()).
 				SetExecutionOptions(*execOpts).
 				SetName(testutil.NewTaskDefinitionFamily(t.Name()))
 			assert.Error(t, opts.Validate())
@@ -167,8 +167,8 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.TaskRole()).
-				SetExecutionRole(testutil.ExecutionRole()).
+				SetTaskRole(testutil.ECSTaskRole()).
+				SetExecutionRole(testutil.ECSExecutionRole()).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -206,8 +206,8 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.TaskRole()).
-				SetExecutionRole(testutil.ExecutionRole()).
+				SetTaskRole(testutil.ECSTaskRole()).
+				SetExecutionRole(testutil.ECSExecutionRole()).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 

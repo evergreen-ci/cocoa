@@ -1,16 +1,25 @@
 package testutil
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
+	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
+	"github.com/mongodb/grip"
+	"github.com/mongodb/grip/message"
+	"github.com/stretchr/testify/assert"
 )
 
 // NewTaskDefinitionFamily makes a new test family for a task definition with a
 // common prefix, the given name, and a random string.
 func NewTaskDefinitionFamily(name string) string {
-	return strings.Join([]string{TaskDefinitionPrefix(), "cocoa", strings.ReplaceAll(name, "/", "-"), utility.RandomString()}, "-")
+	return strings.Join([]string{strings.TrimSuffix(TaskDefinitionPrefix(), "-"), projectName, strings.ReplaceAll(name, "/", "-"), utility.RandomString()}, "-")
 }
 
 // TaskDefinitionPrefix returns the prefix name for task definitions from the
@@ -24,22 +33,103 @@ func ECSClusterName() string {
 	return os.Getenv("AWS_ECS_CLUSTER")
 }
 
-// AWSRegion returns the AWS region from the environment variable.
-func AWSRegion() string {
-	return os.Getenv("AWS_REGION")
-}
-
-// AWSRole returns the AWS IAM role from the environment variable.
-func AWSRole() string {
-	return os.Getenv("AWS_ROLE")
-}
-
-// TaskRole returns the AWS task role from the environment variable.
-func TaskRole() string {
+// ECSTaskRole returns the ECS task role from the environment variable.
+func ECSTaskRole() string {
 	return os.Getenv("AWS_ECS_TASK_ROLE")
 }
 
-// ExecutionRole returns the AWS execution role from the environment variable.
-func ExecutionRole() string {
+// ECSExecutionRole returns the ECS execution role from the environment
+// variable.
+func ECSExecutionRole() string {
 	return os.Getenv("AWS_ECS_EXECUTION_ROLE")
+}
+
+// CleanupTaskDefinitions cleans up all existing task definitions used in Cocoa
+// tests.
+func CleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+	for token := cleanupTaskDefinitionsWithToken(ctx, t, c, nil); token != nil; cleanupTaskDefinitionsWithToken(ctx, t, c, token) {
+	}
+}
+
+// cleanupTaskDefinitionsWithToken cleans up all existing task definitions used
+// in Cocoa tests based on the results from the pagination token.
+func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient, token *string) (nextToken *string) {
+	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
+		Status:    aws.String(ecs.TaskDefinitionStatusActive),
+		NextToken: token,
+	})
+	if !assert.NoError(t, err) {
+		return nil
+	}
+	if !assert.NotZero(t, out) {
+		return nil
+	}
+
+	for _, arn := range out.TaskDefinitionArns {
+		if arn == nil {
+			continue
+		}
+
+		taskDefARN := *arn
+
+		// Ignore task definitions that were not generated within Cocoa.
+		name := strings.Join([]string{strings.TrimSuffix(TaskDefinitionPrefix(), "-"), "cocoa"}, "-")
+		if !strings.Contains(taskDefARN, name) {
+			continue
+		}
+
+		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			TaskDefinition: arn,
+		})
+		if assert.NoError(t, err) {
+			grip.Info(message.Fields{
+				"message": "cleaned up leftover task definition",
+				"arn":     taskDefARN,
+				"test":    t.Name(),
+			})
+		}
+	}
+
+	return out.NextToken
+}
+
+// CleanupTasks cleans up all tasks used in Cocoa tests.
+func CleanupTasks(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+	for token := cleanupTasksWithToken(ctx, t, c, nil); token != nil; token = cleanupTasksWithToken(ctx, t, c, token) {
+	}
+}
+
+// cleanupTasksWithToken cleans up all existing tasks used in Cocoa tests based
+// on the results from the pagination token.
+func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient, token *string) (nextToken *string) {
+	out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
+		Cluster: aws.String(ECSClusterName()),
+	})
+	if !assert.NoError(t, err) {
+		return nil
+	}
+	if !assert.NotZero(t, out) {
+		return nil
+	}
+
+	for _, arn := range out.TaskArns {
+		if arn == nil {
+			continue
+		}
+
+		_, err := c.StopTask(ctx, &ecs.StopTaskInput{
+			Cluster: aws.String(ECSClusterName()),
+			Reason:  aws.String(fmt.Sprintf("cocoa test teardown for test '%s'", t.Name())),
+			Task:    arn,
+		})
+		if assert.NoError(t, err) {
+			grip.Info(message.Fields{
+				"message": "cleaned up leftover task",
+				"arn":     *arn,
+				"test":    t.Name(),
+			})
+		}
+	}
+
+	return out.NextToken
 }

@@ -184,27 +184,24 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 		if filter == nil {
 			continue
 		}
+
 		if filter.Key != nil {
 			name := utility.FromStringPtr(filter.Key)
 			s, ok := GlobalSecretCache[name]
 			if !ok {
 				continue
 			}
+
 			matched[name] = s
 		}
+
 		for _, v := range filter.Values {
 			if v == nil {
 				continue
 			}
-			val := utility.FromStringPtr(v)
 
-			for name, s := range GlobalSecretCache {
-				if strings.HasPrefix(val, "!") && s.Value != val[1:] {
-					matched[name] = s
-				}
-				if !strings.HasPrefix(val, "!") && s.Value == val {
-					matched[name] = s
-				}
+			for _, name := range c.namesMatchingValue(utility.FromStringPtr(v)) {
+				matched[name] = GlobalSecretCache[name]
 			}
 		}
 	}
@@ -224,6 +221,21 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 	return &secretsmanager.ListSecretsOutput{
 		SecretList: converted,
 	}, nil
+}
+
+// namesMatchingValue returns the names of all secrets that match the given
+// value. If the value begins with a "!", the match is negated.
+func (c *SecretsManagerClient) namesMatchingValue(val string) []string {
+	var names []string
+	for name, s := range GlobalSecretCache {
+		if strings.HasPrefix(val, "!") && s.Value != val[1:] {
+			names = append(names, name)
+		}
+		if !strings.HasPrefix(val, "!") && s.Value == val {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // UpdateSecretValue saves the input options and returns an updated mock secret
