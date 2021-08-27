@@ -115,23 +115,50 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 	if !assert.NotZero(t, out) {
 		return nil
 	}
+	if len(out.TaskArns) == 0 {
+		return nil
+	}
 
-	for _, arn := range out.TaskArns {
-		if arn == nil {
+	describeOut, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+		Cluster: aws.String(ECSClusterName()),
+		Tasks:   out.TaskArns,
+	})
+	if !assert.NoError(t, err) {
+		return nil
+	}
+	if !assert.NotZero(t, out) {
+		return nil
+	}
+
+	for _, task := range describeOut.Tasks {
+		if task == nil {
+			continue
+		}
+		if task.TaskArn == nil {
+			continue
+		}
+		if task.TaskDefinitionArn == nil {
 			continue
 		}
 
-		taskARN := *arn
+		// Ignore tasks created from task definitions not generated within this
+		// test.
+		taskDef := taskDefinitionFamily(t)
+		if !strings.Contains(*task.TaskDefinitionArn, taskDef) {
+			continue
+		}
+
+		arn := *task.TaskArn
 
 		_, err := c.StopTask(ctx, &ecs.StopTaskInput{
 			Cluster: aws.String(ECSClusterName()),
 			Reason:  aws.String(fmt.Sprintf("cocoa test teardown for test '%s'", t.Name())),
-			Task:    arn,
+			Task:    task.TaskArn,
 		})
 		if assert.NoError(t, err) {
 			grip.Info(message.Fields{
 				"message": "cleaned up leftover task",
-				"arn":     taskARN,
+				"arn":     arn,
 				"test":    t.Name(),
 			})
 		}
