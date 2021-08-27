@@ -22,6 +22,8 @@ func TestECSClient(t *testing.T) {
 
 	c := &ECSClient{}
 	defer func() {
+		cleanupECSAndSecretsManagerCache()
+
 		assert.NoError(t, c.Close(ctx))
 	}()
 
@@ -54,18 +56,12 @@ func TestECSClient(t *testing.T) {
 	require.NotZero(t, registerOut)
 	require.NotZero(t, registerOut.TaskDefinition)
 
-	defer func() {
-		testutil.CleanupTaskDefinitions(ctx, t, c)
-
-		testutil.CleanupTasks(ctx, t, c)
-
-		require.NoError(t, c.Close(ctx))
-	}()
-
 	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(*registerIn, *registerOut) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, time.Second)
 			defer tcancel()
+
+			cleanupECSAndSecretsManagerCache()
 
 			tCase(tctx, t, c)
 		})

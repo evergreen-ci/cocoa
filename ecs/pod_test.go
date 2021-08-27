@@ -91,7 +91,6 @@ func TestECSPod(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
-
 		testutil.CleanupTasks(ctx, t, c)
 
 		assert.NoError(t, c.Close(ctx))

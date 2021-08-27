@@ -39,8 +39,8 @@ func CleanupSecrets(ctx context.Context, t *testing.T, c cocoa.SecretsManagerCli
 	}
 }
 
-// cleanupSecretsWithToken cleans up all existing secrets used in Cocoa tests
-// based on the results from the pagination token.
+// cleanupSecretsWithToken cleans up existing secrets used in Cocoa tests based
+// on the results from the pagination token.
 func cleanupSecretsWithToken(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient, token *string) (nextToken *string) {
 	out, err := c.ListSecrets(ctx, &secretsmanager.ListSecretsInput{
 		NextToken: token,

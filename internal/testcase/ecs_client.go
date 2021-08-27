@@ -153,8 +153,8 @@ func ECSClientRegisteredTaskDefinitionTests(registerIn ecs.RegisterTaskDefinitio
 				Cluster: aws.String(testutil.ECSClusterName()),
 				Tasks:   []*string{aws.String(utility.RandomString())},
 			})
-			assert.NoError(t, err)
-			assert.NotZero(t, out)
+			require.NoError(t, err)
+			require.NotZero(t, out)
 			assert.NotZero(t, out.Failures)
 			assert.Empty(t, out.Tasks)
 		},

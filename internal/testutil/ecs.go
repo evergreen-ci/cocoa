@@ -55,8 +55,8 @@ func CleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient
 	}
 }
 
-// cleanupTaskDefinitionsWithToken cleans up all existing task definitions used
-// in Cocoa tests based on the results from the pagination token.
+// cleanupTaskDefinitionsWithToken cleans up active task definitions used in
+// Cocoa tests based on the results from the pagination token.
 func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient, token *string) (nextToken *string) {
 	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
 		Status:    aws.String(ecs.TaskDefinitionStatusActive),
@@ -103,7 +103,7 @@ func CleanupTasks(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 	}
 }
 
-// cleanupTasksWithToken cleans up all existing tasks used in Cocoa tests based
+// cleanupTasksWithToken cleans up running tasks used in the Cocoa cluster based
 // on the results from the pagination token.
 func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient, token *string) (nextToken *string) {
 	out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
@@ -122,11 +122,6 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 		}
 
 		taskARN := *arn
-
-		name := taskDefinitionFamily(t)
-		if !strings.Contains(taskARN, name) {
-			continue
-		}
 
 		_, err := c.StopTask(ctx, &ecs.StopTaskInput{
 			Cluster: aws.String(ECSClusterName()),
