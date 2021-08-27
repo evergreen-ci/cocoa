@@ -30,7 +30,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
@@ -60,7 +60,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName("name")).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
@@ -70,7 +70,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
@@ -88,7 +88,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetUsername("username").
 				SetPassword("password")
 			creds := cocoa.NewRepositoryCredentials().
-				SetName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*storedCreds)
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
@@ -98,7 +98,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
@@ -120,7 +120,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 		"CreatePodFailsWithSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			envVar := cocoa.NewEnvironmentVariable().SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName("name")).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue("value"))
 			containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
 				AddEnvironmentVariables(*envVar).
@@ -137,7 +137,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCPU(128).
 				SetTaskRole(testutil.ECSTaskRole()).
 				SetExecutionOptions(*execOpts).
-				SetName(testutil.NewTaskDefinitionFamily(t.Name()))
+				SetName(testutil.NewTaskDefinitionFamily(t))
 			assert.Error(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -148,7 +148,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("envVar").
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName("name")).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue("value").
 					SetOwned(true))
 
@@ -163,7 +163,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
@@ -187,7 +187,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetUsername("username").
 				SetPassword("password")
 			creds := cocoa.NewRepositoryCredentials().
-				SetName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*storedCreds).
 				SetOwned(true)
 
@@ -202,7 +202,7 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCluster(testutil.ECSClusterName())
 
 			opts := cocoa.NewECSPodCreationOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).

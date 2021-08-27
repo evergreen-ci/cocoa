@@ -18,8 +18,12 @@ import (
 
 // NewTaskDefinitionFamily makes a new test family for a task definition with a
 // common prefix, the given name, and a random string.
-func NewTaskDefinitionFamily(name string) string {
-	return strings.Join([]string{strings.TrimSuffix(TaskDefinitionPrefix(), "-"), projectName, strings.ReplaceAll(name, "/", "-"), utility.RandomString()}, "-")
+func NewTaskDefinitionFamily(t *testing.T) string {
+	return strings.Join([]string{taskDefinitionFamily(t), utility.RandomString()}, "-")
+}
+
+func taskDefinitionFamily(t *testing.T) string {
+	return strings.Join([]string{strings.TrimSuffix(TaskDefinitionPrefix(), "-"), projectName, runtimeNamespace, strings.ReplaceAll(t.Name(), "/", "-")}, "-")
 }
 
 // TaskDefinitionPrefix returns the prefix name for task definitions from the
@@ -44,8 +48,8 @@ func ECSExecutionRole() string {
 	return os.Getenv("AWS_ECS_EXECUTION_ROLE")
 }
 
-// CleanupTaskDefinitions cleans up all existing task definitions used in Cocoa
-// tests.
+// CleanupTaskDefinitions cleans up all existing task definitions used in a
+// test.
 func CleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 	for token := cleanupTaskDefinitionsWithToken(ctx, t, c, nil); token != nil; cleanupTaskDefinitionsWithToken(ctx, t, c, token) {
 	}
@@ -72,8 +76,8 @@ func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.
 
 		taskDefARN := *arn
 
-		// Ignore task definitions that were not generated within Cocoa.
-		name := strings.Join([]string{strings.TrimSuffix(TaskDefinitionPrefix(), "-"), "cocoa"}, "-")
+		// Ignore task definitions that were not generated within this test.
+		name := taskDefinitionFamily(t)
 		if !strings.Contains(taskDefARN, name) {
 			continue
 		}
@@ -93,7 +97,7 @@ func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.
 	return out.NextToken
 }
 
-// CleanupTasks cleans up all tasks used in Cocoa tests.
+// CleanupTasks cleans up all tasks used in the Cocoa cluster.
 func CleanupTasks(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 	for token := cleanupTasksWithToken(ctx, t, c, nil); token != nil; token = cleanupTasksWithToken(ctx, t, c, token) {
 	}
@@ -117,6 +121,13 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 			continue
 		}
 
+		taskARN := *arn
+
+		name := taskDefinitionFamily(t)
+		if !strings.Contains(taskARN, name) {
+			continue
+		}
+
 		_, err := c.StopTask(ctx, &ecs.StopTaskInput{
 			Cluster: aws.String(ECSClusterName()),
 			Reason:  aws.String(fmt.Sprintf("cocoa test teardown for test '%s'", t.Name())),
@@ -125,7 +136,7 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 		if assert.NoError(t, err) {
 			grip.Info(message.Fields{
 				"message": "cleaned up leftover task",
-				"arn":     *arn,
+				"arn":     taskARN,
 				"test":    t.Name(),
 			})
 		}

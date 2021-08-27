@@ -69,7 +69,7 @@ func TestECSClient(t *testing.T) {
 		},
 		Cpu:    aws.String("128"),
 		Memory: aws.String("4"),
-		Family: aws.String(testutil.NewTaskDefinitionFamily(t.Name())),
+		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
 	}
 
 	registerOut, err := c.RegisterTaskDefinition(ctx, registerIn)

@@ -98,7 +98,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 	makePodCreationOpts := func(t *testing.T) *cocoa.ECSPodCreationOptions {
 		return cocoa.NewECSPodCreationOptions().
-			SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+			SetName(testutil.NewTaskDefinitionFamily(t)).
 			SetMemoryMB(128).
 			SetCPU(128).
 			SetTaskRole(testutil.ECSTaskRole()).

@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -19,9 +18,13 @@ import (
 const projectName = "cocoa"
 
 // NewSecretName creates a new test secret name with a common prefix, the given
-// name, and a random string.
-func NewSecretName(name string) string {
-	return fmt.Sprint(path.Join(strings.TrimSuffix(SecretPrefix(), "/"), projectName, name, utility.RandomString()))
+// test's name, and a random string.
+func NewSecretName(t *testing.T) string {
+	return path.Join(secretName(t), utility.RandomString())
+}
+
+func secretName(t *testing.T) string {
+	return path.Join(strings.TrimSuffix(SecretPrefix(), "/"), projectName, runtimeNamespace, t.Name())
 }
 
 // SecretPrefix returns the prefix name for secrets from the environment
@@ -30,7 +33,7 @@ func SecretPrefix() string {
 	return os.Getenv("AWS_SECRET_PREFIX")
 }
 
-// CleanupSecrets cleans up all existing secrets used in Cocoa tests.
+// CleanupSecrets cleans up all existing secrets used in a test.
 func CleanupSecrets(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
 	for token := cleanupSecretsWithToken(ctx, t, c, nil); token != nil; token = cleanupSecretsWithToken(ctx, t, c, token) {
 	}
@@ -59,8 +62,8 @@ func cleanupSecretsWithToken(ctx context.Context, t *testing.T, c cocoa.SecretsM
 
 		arn := *secret.ARN
 
-		// Ignore secrets that were not generated within Cocoa.
-		name := path.Join(strings.TrimSuffix(SecretPrefix(), "/"), "cocoa")
+		// Ignore secrets that were not generated within this test.
+		name := secretName(t)
 		if !strings.Contains(arn, name) {
 			continue
 		}
