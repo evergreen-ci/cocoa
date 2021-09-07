@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/awsutil"
@@ -96,15 +95,7 @@ func TestECSPod(t *testing.T) {
 		assert.NoError(t, c.Close(ctx))
 	}()
 
-	smc, err := secret.NewBasicSecretsManagerClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(testutil.AWSRegion()),
-		Role:   aws.String(testutil.AWSRole()),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
-		},
-		HTTPClient: hc,
-	})
+	smc, err := secret.NewBasicSecretsManagerClient(*awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)

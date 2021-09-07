@@ -51,7 +51,7 @@ func ECSExecutionRole() string {
 // CleanupTaskDefinitions cleans up all existing task definitions used in a
 // test.
 func CleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-	for token := cleanupTaskDefinitionsWithToken(ctx, t, c, nil); token != nil; cleanupTaskDefinitionsWithToken(ctx, t, c, token) {
+	for token := cleanupTaskDefinitionsWithToken(ctx, t, c, nil); token != nil; token = cleanupTaskDefinitionsWithToken(ctx, t, c, token) {
 	}
 }
 
