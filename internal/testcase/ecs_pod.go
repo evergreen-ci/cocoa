@@ -34,7 +34,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		return cocoa.NewEnvironmentVariable().
 			SetName(t.Name()).
 			SetSecretOptions(*cocoa.NewSecretOptions().
-				SetName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t)).
 				SetNewValue(utility.RandomString()).
 				SetOwned(true))
 	}
@@ -49,11 +49,11 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 	makePodCreationOpts := func(t *testing.T) *cocoa.ECSPodCreationOptions {
 		return cocoa.NewECSPodCreationOptions().
-			SetName(testutil.NewTaskDefinitionFamily(t.Name())).
+			SetName(testutil.NewTaskDefinitionFamily(t)).
 			SetMemoryMB(128).
 			SetCPU(128).
-			SetTaskRole(testutil.TaskRole()).
-			SetExecutionRole(testutil.ExecutionRole()).
+			SetTaskRole(testutil.ECSTaskRole()).
+			SetExecutionRole(testutil.ECSExecutionRole()).
 			SetExecutionOptions(*cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()))
 	}
@@ -120,7 +120,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		},
 		"StopSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			creds := cocoa.NewRepositoryCredentials().
-				SetName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
@@ -153,7 +153,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			secret := cocoa.NewEnvironmentVariable().
 				SetName("secret").
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName(t.Name())).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue(utility.RandomString()))
 			ownedSecret := makeSecretEnvVar(t)
 
@@ -232,7 +232,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		},
 		"DeleteSucceedsWithRepoCreds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			creds := cocoa.NewRepositoryCredentials().
-				SetName(testutil.NewSecretName(t.Name())).
+				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
@@ -263,11 +263,11 @@ func ECSPodTests() map[string]ECSPodTestCase {
 		"DeleteSucceedsWithSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := cocoa.NewEnvironmentVariable().SetName(t.Name()).
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName(t.Name())).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue("value1"))
 			ownedSecret := cocoa.NewEnvironmentVariable().SetName(t.Name() + "-owned").
 				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName(t.Name())).
+					SetName(testutil.NewSecretName(t)).
 					SetNewValue("value2").
 					SetOwned(true))
 
