@@ -426,6 +426,9 @@ func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecut
 		SetPlacementStrategy(pc.exportStrategy(opts.PlacementOpts)).
 		SetPlacementConstraints(pc.exportPlacementConstraints(opts.PlacementOpts)).
 		SetNetworkConfiguration(pc.exportAWSVPCOptions(opts.AWSVPCOpts))
+	if opts.PlacementOpts != nil && opts.PlacementOpts.Group != nil {
+		runTask.SetGroup(utility.FromStringPtr(opts.PlacementOpts.Group))
+	}
 	return &runTask
 }
 

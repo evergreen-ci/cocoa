@@ -125,6 +125,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetCPU(256).
 				AddEnvironmentVariables(*envVar)
 			placementOpts := cocoa.NewECSPodPlacementOptions().
+				SetGroup("group").
 				SetStrategy(cocoa.StrategyBinpack).
 				SetStrategyParameter(cocoa.StrategyParamBinpackMemory).
 				AddInstanceFilters("runningTaskCount == 0")
@@ -176,6 +177,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			require.NotZero(t, c.RunTaskInput)
 			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
+			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
