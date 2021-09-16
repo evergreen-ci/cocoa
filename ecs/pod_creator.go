@@ -210,7 +210,11 @@ func (pc *BasicECSPodCreator) exportPlacementConstraints(opts *cocoa.ECSPodPlace
 
 	for _, filter := range opts.InstanceFilters {
 		var constraint ecs.PlacementConstraint
-		constraint.SetType("memberOf").SetExpression(filter)
+		if filter == cocoa.ConstraintDistinctInstance {
+			constraint.SetType(filter)
+		} else {
+			constraint.SetType("memberOf").SetExpression(filter)
+		}
 		constraints = append(constraints, &constraint)
 	}
 

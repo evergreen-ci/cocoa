@@ -815,8 +815,12 @@ type ECSPodPlacementOptions struct {
 
 	// InstanceFilter is a set of query expressions that restrict the placement
 	// of the pod to a set of container instances in the cluster that match the
-	// query filter.
-	// Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-query-language.html
+	// query filter. As a special case, if ConstraintDistinctInstance is the
+	// specified filter, it will place each pod in the pod's group on a
+	// different instance. Otherwise, all filters are assumed to use the ECS
+	// cluster query language to filter the candidate set of instances for a
+	// pod. Docs:
+	// https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-query-language.html
 	InstanceFilters []string
 }
 
@@ -927,6 +931,13 @@ const (
 	// StrategyParamSpreadHost indicates the ECS should spread pods evenly
 	// across all container instances (i.e. hosts).
 	StrategyParamSpreadHost ECSStrategyParameter = "host"
+)
+
+const (
+	// ConstraintDistinctInstance is a container instance filter indicating that
+	// ECS should place all pods in the same group on different container
+	// instances.
+	ConstraintDistinctInstance = "distinctInstance"
 )
 
 // AWSVPCOptions represent options to configure networking when the network mode
