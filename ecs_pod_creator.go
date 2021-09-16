@@ -801,6 +801,10 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 // ECSPodPlacementOptions represent options to control how an ECS pod is
 // assigned to a container instance.
 type ECSPodPlacementOptions struct {
+	// Group is the name of a logical collection of ECS pods. Pods within the
+	// same group can support additional placement configuration.
+	Group *string
+
 	// Strategy is the overall placement strategy. By default, it uses the
 	// binpack strategy.
 	Strategy *ECSPlacementStrategy
@@ -824,6 +828,12 @@ type ECSPodPlacementOptions struct {
 // should be assigned to a container instance.
 func NewECSPodPlacementOptions() *ECSPodPlacementOptions {
 	return &ECSPodPlacementOptions{}
+}
+
+// SetGroup sets the name of the group that the pod belongs to.
+func (o *ECSPodPlacementOptions) SetGroup(group string) *ECSPodPlacementOptions {
+	o.Group = &group
+	return o
 }
 
 // SetStrategy sets the strategy for placing the pod on a container instance.
@@ -857,12 +867,16 @@ func (o *ECSPodPlacementOptions) AddInstanceFilters(filters ...string) *ECSPodPl
 // valid combination.
 func (o *ECSPodPlacementOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
+
+	catcher.ErrorfWhen(o.Group != nil && *o.Group == "", "cannot specify an empty group name")
+
 	if o.Strategy != nil {
 		catcher.Add(o.Strategy.Validate())
-	}
-	if o.Strategy != nil && o.StrategyParameter != nil {
-		catcher.ErrorfWhen(*o.Strategy == StrategyBinpack && *o.StrategyParameter != StrategyParamBinpackMemory && *o.StrategyParameter != StrategyParamBinpackCPU, "strategy parameter cannot be '%s' when the strategy is '%s'", *o.StrategyParameter, *o.Strategy)
-		catcher.ErrorfWhen(*o.Strategy != StrategySpread && *o.StrategyParameter == StrategyParamSpreadHost, "strategy parameter cannot be '%s' when the strategy is not '%s'", *o.StrategyParameter, StrategySpread)
+
+		if o.StrategyParameter != nil {
+			catcher.ErrorfWhen(*o.Strategy == StrategyBinpack && *o.StrategyParameter != StrategyParamBinpackMemory && *o.StrategyParameter != StrategyParamBinpackCPU, "strategy parameter cannot be '%s' when the strategy is '%s'", *o.StrategyParameter, *o.Strategy)
+			catcher.ErrorfWhen(*o.Strategy != StrategySpread && *o.StrategyParameter == StrategyParamSpreadHost, "strategy parameter cannot be '%s' when the strategy is not '%s'", *o.StrategyParameter, StrategySpread)
+		}
 	}
 
 	if catcher.HasErrors() {

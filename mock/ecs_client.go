@@ -126,6 +126,7 @@ type ECSTask struct {
 	TaskDef     ECSTaskDefinition
 	Cluster     *string
 	Containers  []ECSContainer
+	Group       *string
 	ExecEnabled *bool
 	Status      *string
 	GoalStatus  *string
@@ -147,6 +148,7 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		ARN:         utility.ToStringPtr(id.String()),
 		Cluster:     in.Cluster,
 		ExecEnabled: in.EnableExecuteCommand,
+		Group:       in.Group,
 		Status:      utility.ToStringPtr(ecs.DesiredStatusPending),
 		GoalStatus:  utility.ToStringPtr(ecs.DesiredStatusRunning),
 		Created:     utility.ToTimePtr(time.Now()),
@@ -166,6 +168,7 @@ func (t *ECSTask) export() *ecs.Task {
 		TaskArn:              t.ARN,
 		ClusterArn:           t.Cluster,
 		EnableExecuteCommand: t.ExecEnabled,
+		Group:                t.Group,
 		Tags:                 exportTags(t.Tags),
 		TaskDefinitionArn:    t.TaskDef.ARN,
 		Cpu:                  t.TaskDef.CPU,
