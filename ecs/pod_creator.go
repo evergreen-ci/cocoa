@@ -92,7 +92,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 	podOpts := NewBasicECSPodOptions().
 		SetClient(pc.client).
 		SetVault(pc.vault).
-		SetStatusInfo(pc.translatePodStatusInfo(runOut.Tasks[0])).
+		SetStatusInfo(translatePodStatusInfo(runOut.Tasks[0])).
 		SetResources(*resources)
 
 	p, err := NewBasicECSPod(podOpts)
@@ -313,13 +313,17 @@ func (pc *BasicECSPodCreator) translateContainerSecrets(defs []cocoa.ECSContaine
 	return translated
 }
 
-func (pc *BasicECSPodCreator) translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
+// translatePodStatusInfo translates an ECS task to its equivalent cocoa
+// status information.
+func translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
 	return *cocoa.NewECSPodStatusInfo().
-		SetStatus(pc.translateECSStatus(task.LastStatus)).
-		SetContainers(pc.translateContainerStatusInfo(task.Containers))
+		SetStatus(translateECSStatus(task.LastStatus)).
+		SetContainers(translateContainerStatusInfo(task.Containers))
 }
 
-func (pc *BasicECSPodCreator) translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContainerStatusInfo {
+// translateContainerStatusInfo translates an ECS container to its equivalent
+// cocoa container status information.
+func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContainerStatusInfo {
 	var statuses []cocoa.ECSContainerStatusInfo
 
 	for _, container := range containers {
@@ -329,7 +333,7 @@ func (pc *BasicECSPodCreator) translateContainerStatusInfo(containers []*ecs.Con
 		status := cocoa.NewECSContainerStatusInfo().
 			SetContainerID(utility.FromStringPtr(container.ContainerArn)).
 			SetName(utility.FromStringPtr(container.Name)).
-			SetStatus(pc.translateECSStatus(container.LastStatus))
+			SetStatus(translateECSStatus(container.LastStatus))
 		statuses = append(statuses, *status)
 	}
 
@@ -338,7 +342,7 @@ func (pc *BasicECSPodCreator) translateContainerStatusInfo(containers []*ecs.Con
 
 // translateECSStatus translate the ECS status into its equivalent cocoa
 // status.
-func (pc *BasicECSPodCreator) translateECSStatus(status *string) cocoa.ECSStatus {
+func translateECSStatus(status *string) cocoa.ECSStatus {
 	if status == nil {
 		return cocoa.StatusUnknown
 	}

@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// defaultTestTimeout is the standard timeout for integration tests against
+// Secrets Manager.
+const defaultTestTimeout = time.Minute
+
 func TestSecretsManagerClient(t *testing.T) {
 	assert.Implements(t, (*cocoa.SecretsManagerClient)(nil), &BasicSecretsManagerClient{})
 
@@ -40,7 +44,7 @@ func TestSecretsManagerClient(t *testing.T) {
 
 	for tName, tCase := range testcase.SecretsManagerClientTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			tCase(tctx, t, c)

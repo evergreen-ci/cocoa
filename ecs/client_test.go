@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const defaultTestTimeout = time.Minute
+
 func TestECSClient(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
 
@@ -49,7 +51,7 @@ func TestECSClient(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSClientTaskDefinitionTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			defer c.Close(tctx)
@@ -84,7 +86,7 @@ func TestECSClient(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(*registerIn, *registerOut) {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			tCase(tctx, t, c)

@@ -3,7 +3,6 @@ package ecs
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/evergreen-ci/cocoa"
@@ -47,7 +46,7 @@ func TestBasicECSPodCreator(t *testing.T) {
 		},
 	} {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			hc := utility.GetHTTPClient()
@@ -106,7 +105,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSPodCreatorTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			pc, err := NewBasicECSPodCreator(c, nil)
@@ -126,7 +125,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSPodCreatorWithVaultTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, 30*time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			m := secret.NewBasicSecretsManager(smc)

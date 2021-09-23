@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
@@ -32,7 +31,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range ecsPodCreatorTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			cleanupECSAndSecretsManagerCache()
@@ -60,7 +59,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSPodCreatorTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			cleanupECSAndSecretsManagerCache()
@@ -81,7 +80,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range testcase.ECSPodCreatorWithVaultTests() {
 		t.Run(tName, func(t *testing.T) {
-			tctx, tcancel := context.WithTimeout(ctx, time.Second)
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
 			cleanupECSAndSecretsManagerCache()
