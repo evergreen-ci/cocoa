@@ -31,7 +31,7 @@ functions:
       working_dir: gopath/src/github.com/evergreen-ci/cocoa
       binary: make
       args: ["${target}"]
-      include_expansions_in_env: ["DISABLE_COVERAGE", "GO_BIN_PATH", "GOROOT", "RACE_DETECTOR"]
+      include_expansions_in_env: ["DISABLE_COVERAGE", "GOROOT", "RACE_DETECTOR"]
       env:
         AWS_ACCESS_KEY: ${aws_access_key}
         AWS_SECRET_ACCESS_KEY: ${aws_secret_access_key}
@@ -136,7 +136,6 @@ buildvariants:
     expansions:
       DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
-      GO_BIN_PATH: /opt/golang/go1.16/bin/go
       RACE_DETECTOR: true
     run_on:
       - archlinux-new-small
@@ -149,7 +148,6 @@ buildvariants:
     expansions:
       DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
-      GO_BIN_PATH: /opt/golang/go1.16/bin/go
     run_on:
       - archlinux-new-small
       - archlinux-new-large
@@ -161,7 +159,6 @@ buildvariants:
     expansions:
       DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
-      GO_BIN_PATH: /opt/golang/go1.16/bin/go
     run_on:
       - ubuntu1804-small
       - ubuntu1804-large
