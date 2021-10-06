@@ -6,56 +6,26 @@ allPackages := $(testPackages) internal-testcase internal-testutil
 lintPackages := $(allPackages)
 
 # start environment setup
-gobin := $(GO_BIN_PATH)
-ifeq ($(gobin),)
 gobin := go
+ifneq (,$(GOROOT))
+gobin := $(GOROOT)/bin/go
 endif
 
-gopath := $(GOPATH)
-gocache := $(abspath $(buildDir)/.cache)
-goroot := $(GOROOT)
 ifeq ($(OS),Windows_NT)
-gocache := $(shell cygpath -m $(gocache))
-gopath := $(shell cygpath -m $(gopath))
-goroot := $(shell cygpath -m $(goroot))
+gobin := $(shell cygpath $(gobin))
+export GOCACHE := $(shell cygpath -m $(abspath $(buildDir)/.cache))
+export GOLANGCI_LINT_CACHE := $(shell cygpath -m $(abspath $(buildDir)/.lint-cache))
+export GOPATH := $(shell cygpath -m $(GOPATH))
+export GOROOT := $(shell cygpath -m $(GOROOT))
 endif
 
-export GOPATH := $(gopath)
-export GOCACHE := $(gocache)
-export GOROOT := $(goroot)
 export GO111MODULE := off
 # end environment setup
 
 # Ensure the build directory exists, since most targets require it.
 $(shell mkdir -p $(buildDir))
 
-# start testing convenience targets
-testOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).test)
-lintOutput := $(foreach target,$(lintPackages),$(buildDir)/output.$(target).lint)
-coverageOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).coverage)
-coverageHtmlOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).coverage.html)
-.PRECIOUS: $(coverageOutput) $(coverageHtmlOutput) $(lintOutput) $(testOutput)
-
 .DEFAULT_GOAL := compile
-
-compile:
-	$(gobin) build $(subst $(name),,$(subst -,/,$(foreach target,$(allPackages),./$(target))))
-test: $(testOutput)
-lint: $(lintOutput)
-coverage: $(coverageOutput)
-coverage-html: $(coverageHtmlOutput)
-phony += lint test coverage coverage-html
-
-test-%: $(buildDir)/output.%.test
-	
-coverage-%: $(buildDir)/output.%.coverage
-	
-coverage-html-%: $(buildDir)/output.%.coverage.html
-	
-lint-%: $(buildDir)/output.%.lint
-	
-# end testing convenience targets
-
 
 # start lint setup targets
 lintDeps := $(buildDir)/run-linter $(buildDir)/golangci-lint
@@ -65,7 +35,37 @@ $(buildDir)/run-linter: cmd/run-linter/run-linter.go $(buildDir)/golangci-lint
 	@$(gobin) build -o $@ $<
 # end lint setup targets
 
-# start lint, test, and coverage artifacts
+# start output files
+testOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).test)
+lintOutput := $(foreach target,$(lintPackages),$(buildDir)/output.$(target).lint)
+coverageOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).coverage)
+coverageHtmlOutput := $(foreach target,$(testPackages),$(buildDir)/output.$(target).coverage.html)
+.PRECIOUS: $(coverageOutput) $(coverageHtmlOutput) $(lintOutput) $(testOutput)
+# end output files
+
+# start basic development targets
+compile:
+	$(gobin) build $(subst $(name),,$(subst -,/,$(foreach target,$(allPackages),./$(target))))
+test: $(testOutput)
+lint: $(lintOutput)
+coverage: $(coverageOutput)
+coverage-html: $(coverageHtmlOutput)
+phony += compile lint test coverage coverage-html
+
+# start convenience targets for running tests and coverage tasks on a
+# specific package.
+test-%: $(buildDir)/output.%.test
+	
+coverage-%: $(buildDir)/output.%.coverage
+	
+coverage-html-%: $(buildDir)/output.%.coverage.html
+	
+lint-%: $(buildDir)/output.%.lint
+	
+# end convenience targets
+# end basic development targets
+
+# start test and coverage artifacts
 testArgs := -v
 ifneq (,$(RUN_TEST))
 testArgs += -run='$(RUN_TEST)'
@@ -91,11 +91,17 @@ $(buildDir)/output.%.coverage: .FORCE
 	@[ -f $@ ] && $(gobin) tool cover -func=$@ | sed 's%$(projectPath)/%%' | column -t
 $(buildDir)/output.%.coverage.html: $(buildDir)/output.%.coverage .FORCE
 	$(gobin) tool cover -html=$< -o $@
-# We have to handle the PATH specially for CI, because if the PATH has a different version of Go in it, it'll break.
-$(buildDir)/output.%.lint: $(buildDir)/run-linter .FORCE
-	@$(if $(GO_BIN_PATH), PATH="$(shell dirname $(GO_BIN_PATH)):$(PATH)") ./$< --output=$@ --lintBin=$(buildDir)/golangci-lint --packages='$*'
-# end lint, test, and coverage artifacts
 
+ifneq (go,$(gobin))
+# We have to handle the PATH specially for linting in CI, because if the PATH has a different version of the Go
+# binary in it, the linter won't work properly.
+lintEnvVars := PATH="$(shell dirname $(gobin)):$(PATH)"
+endif
+$(buildDir)/output.%.lint: $(buildDir)/run-linter .FORCE
+	@$(lintEnvVars) ./$< --output=$@ --lintBin=$(buildDir)/golangci-lint --packages='$*'
+# end test and coverage artifacts
+
+# start vendoring configuration
 vendor-clean:
 	rm -rf vendor/github.com/evergreen-ci/gimlet/vendor/github.com/mongodb/grip/
 	rm -rf vendor/github.com/evergreen-ci/utility/gitignore.go
@@ -107,13 +113,15 @@ vendor-clean:
 	find vendor/ -name "*.gif" -o -name "*.gz" -o -name "*.png" -o -name "*.ico" -o -name "*testdata*" | xargs rm -rf
 	find vendor/ -type d -empty | xargs rm -rf
 	find vendor/ -type d -name '.git' | xargs rm -rf
+# end vendoring configuration
 
+# start cleanup targets
 clean:
 	rm -rf $(buildDir)
-
 clean-results:
 	rm -rf $(buildDir)/output.*
+# end cleanup targets
 
 .FORCE:
-
+	
 .PHONY: $(phony) .FORCE
