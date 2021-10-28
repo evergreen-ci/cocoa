@@ -19,16 +19,23 @@ variables:
 #              Functions              #
 #######################################
 functions:
-  get-project:
-    command: git.get_project # git clone github.com/evergreen-ci/cocoa
-    type: system
-    params:
-      directory: gopath/src/github.com/evergreen-ci/cocoa
+  get-project-and-modules:
+    - command: git.get_project
+      type: system
+      params:
+        directory: cocoa
+    - command: subprocess.exec
+      type: setup
+      params:
+        working_dir: cocoa
+        binary: make
+        args: ["mod-tidy"]
+        include_expansions_in_env: ["GOROOT"]
   run-make:
     command: subprocess.exec
     type: test
     params:
-      working_dir: gopath/src/github.com/evergreen-ci/cocoa
+      working_dir: cocoa
       binary: make
       args: ["${target}"]
       include_expansions_in_env: ["DISABLE_COVERAGE", "GOROOT", "RACE_DETECTOR"]
@@ -42,13 +49,12 @@ functions:
         AWS_ECS_TASK_DEFINITION_PREFIX: ${aws_ecs_task_definition_prefix}
         AWS_ECS_TASK_ROLE: ${aws_ecs_task_role}
         AWS_ECS_EXECUTION_ROLE: ${aws_ecs_execution_role}
-        GOPATH: ${workdir}/gopath
   parse-results:
     command: gotest.parse_files
     type: setup
     params:
       files:
-        - "gopath/src/github.com/evergreen-ci/cocoa/build/output.*"
+        - "cocoa/build/output.*"
 
 #######################################
 #                Tasks                #
@@ -109,7 +115,7 @@ task_groups:
     tasks: [".lint"]
     max_hosts: 4
     setup_group:
-      - func: get-project
+      - func: get-project-and-modules
     teardown_task:
       - func: parse-results
       - func: run-make
@@ -119,13 +125,12 @@ task_groups:
     tasks: [".test"]
     max_hosts: 4
     setup_group:
-      - func: get-project
+      - func: get-project-and-modules
     teardown_task:
       - func: parse-results
       - func: run-make
         vars:
           target: clean-results
-
 
 #######################################
 #           Buildvariants             #
