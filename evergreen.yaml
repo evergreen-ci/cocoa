@@ -110,6 +110,16 @@ tasks:
     name: lint-secret
     must_have_test_results: true
 
+  - name: verify-mod-tidy
+    tags: ["report"]
+    commands:
+      - command: git.get_project
+        type: system
+        params:
+          directory: cocoa
+      - func: run-make
+        vars: { target: "${task_name}" }
+
 task_groups:
   - name: lint_group
     tasks: [".lint"]
