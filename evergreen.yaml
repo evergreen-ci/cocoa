@@ -111,7 +111,6 @@ tasks:
     must_have_test_results: true
 
   - name: verify-mod-tidy
-    tags: ["lint"]
     commands:
       - command: git.get_project
         type: system
@@ -168,6 +167,7 @@ buildvariants:
       - archlinux-new-large
     tasks:
       - name: lint_group
+      - name: verify-mod-tidy
 
   - name: ubuntu
     display_name: Ubuntu 18.04
