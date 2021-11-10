@@ -111,7 +111,7 @@ tasks:
     must_have_test_results: true
 
   - name: verify-mod-tidy
-    tags: ["report"]
+    tags: ["lint"]
     commands:
       - command: git.get_project
         type: system
