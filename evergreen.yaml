@@ -38,7 +38,7 @@ functions:
       working_dir: cocoa
       binary: make
       args: ["${target}"]
-      include_expansions_in_env: ["DISABLE_COVERAGE", "GOROOT", "RACE_DETECTOR"]
+      include_expansions_in_env: ["GOROOT", "RACE_DETECTOR"]
       env:
         AWS_ACCESS_KEY: ${aws_access_key}
         AWS_SECRET_ACCESS_KEY: ${aws_secret_access_key}
@@ -148,7 +148,6 @@ buildvariants:
   - name: race-detector
     display_name: Race Detector (Arch Linux)
     expansions:
-      DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
       RACE_DETECTOR: true
     run_on:
@@ -160,7 +159,6 @@ buildvariants:
   - name: lint
     display_name: Lint (Arch Linux)
     expansions:
-      DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
     run_on:
       - archlinux-new-small
@@ -172,7 +170,6 @@ buildvariants:
   - name: ubuntu
     display_name: Ubuntu 18.04
     expansions:
-      DISABLE_COVERAGE: true
       GOROOT: /opt/golang/go1.16
     run_on:
       - ubuntu1804-small
