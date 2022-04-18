@@ -84,9 +84,9 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 
 	var out *ecs.RegisterTaskDefinitionOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
 			out, err = c.ecs.RegisterTaskDefinitionWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -110,9 +110,9 @@ func (c *BasicECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Des
 
 	var out *ecs.DescribeTaskDefinitionOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("DescribeTaskDefinition", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("DescribeTaskDefinition", in)
 			out, err = c.ecs.DescribeTaskDefinitionWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -136,9 +136,9 @@ func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTa
 
 	var out *ecs.ListTaskDefinitionsOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
 			out, err = c.ecs.ListTaskDefinitionsWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -161,9 +161,9 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 
 	var out *ecs.DeregisterTaskDefinitionOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("DeregisterTaskDefinition", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("DeregisterTaskDefinition", in)
 			out, err = c.ecs.DeregisterTaskDefinitionWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -187,9 +187,9 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 
 	var out *ecs.RunTaskOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("RunTask", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("RunTask", in)
 			out, err = c.ecs.RunTaskWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -212,9 +212,9 @@ func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTask
 
 	var out *ecs.DescribeTasksOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("DescribeTasks", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("DescribeTasks", in)
 			out, err = c.ecs.DescribeTasksWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -237,9 +237,9 @@ func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) 
 
 	var out *ecs.ListTasksOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("ListTasks", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("ListTasks", in)
 			out, err = c.ecs.ListTasksWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
@@ -262,9 +262,9 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 
 	var out *ecs.StopTaskOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("StopTask", in)
 	if err := utility.Retry(ctx,
 		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("StopTask", in)
 			out, err = c.ecs.StopTaskWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
