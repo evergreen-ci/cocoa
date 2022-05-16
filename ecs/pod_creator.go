@@ -317,7 +317,7 @@ func (pc *BasicECSPodCreator) translateContainerSecrets(defs []cocoa.ECSContaine
 // status information.
 func translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
 	return *cocoa.NewECSPodStatusInfo().
-		SetStatus(translateECSStatus(task.LastStatus)).
+		SetStatus(TranslateECSStatus(task.LastStatus)).
 		SetContainers(translateContainerStatusInfo(task.Containers))
 }
 
@@ -333,29 +333,11 @@ func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContai
 		status := cocoa.NewECSContainerStatusInfo().
 			SetContainerID(utility.FromStringPtr(container.ContainerArn)).
 			SetName(utility.FromStringPtr(container.Name)).
-			SetStatus(translateECSStatus(container.LastStatus))
+			SetStatus(TranslateECSStatus(container.LastStatus))
 		statuses = append(statuses, *status)
 	}
 
 	return statuses
-}
-
-// translateECSStatus translate the ECS status into its equivalent cocoa
-// status.
-func translateECSStatus(status *string) cocoa.ECSStatus {
-	if status == nil {
-		return cocoa.StatusUnknown
-	}
-	switch *status {
-	case TaskStatusProvisioning, TaskStatusPending, TaskStatusActivating:
-		return cocoa.StatusStarting
-	case TaskStatusRunning:
-		return cocoa.StatusRunning
-	case TaskStatusDeactivating, TaskStatusStopping, TaskStatusDeprovisioning, TaskStatusStopped:
-		return cocoa.StatusStopped
-	default:
-		return cocoa.StatusUnknown
-	}
 }
 
 // exportPodCreationOptions converts options to create a pod into its equivalent

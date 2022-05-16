@@ -1,5 +1,7 @@
 package ecs
 
+import "github.com/evergreen-ci/cocoa"
+
 // Constants represents ECS task states.
 const (
 	// TaskStatusProvisioning indicates that ECS is performing additional work
@@ -29,3 +31,23 @@ const (
 	// TaskStatusStopped indicates that the task is stopped.
 	TaskStatusStopped = "STOPPED"
 )
+
+// TranslateECSStatus translate the ECS status into its equivalent cocoa
+// status.
+func TranslateECSStatus(status *string) cocoa.ECSStatus {
+	if status == nil {
+		return cocoa.StatusUnknown
+	}
+	switch *status {
+	case TaskStatusProvisioning, TaskStatusPending, TaskStatusActivating:
+		return cocoa.StatusStarting
+	case TaskStatusRunning:
+		return cocoa.StatusRunning
+	case TaskStatusDeactivating, TaskStatusStopping, TaskStatusDeprovisioning:
+		return cocoa.StatusStopping
+	case TaskStatusStopped:
+		return cocoa.StatusStopped
+	default:
+		return cocoa.StatusUnknown
+	}
+}
