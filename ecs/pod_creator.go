@@ -316,8 +316,9 @@ func (pc *BasicECSPodCreator) translateContainerSecrets(defs []cocoa.ECSContaine
 // translatePodStatusInfo translates an ECS task to its equivalent cocoa
 // status information.
 func translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
+	lastStatus := TaskStatus(utility.FromStringPtr(task.LastStatus)).ToCocoaStatus()
 	return *cocoa.NewECSPodStatusInfo().
-		SetStatus(TranslateECSStatus(task.LastStatus)).
+		SetStatus(lastStatus).
 		SetContainers(translateContainerStatusInfo(task.Containers))
 }
 
@@ -330,10 +331,11 @@ func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContai
 		if container == nil {
 			continue
 		}
+		lastStatus := TaskStatus(utility.FromStringPtr(container.LastStatus)).ToCocoaStatus()
 		status := cocoa.NewECSContainerStatusInfo().
 			SetContainerID(utility.FromStringPtr(container.ContainerArn)).
 			SetName(utility.FromStringPtr(container.Name)).
-			SetStatus(TranslateECSStatus(container.LastStatus))
+			SetStatus(lastStatus)
 		statuses = append(statuses, *status)
 	}
 
