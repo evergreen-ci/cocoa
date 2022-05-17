@@ -25,8 +25,43 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
+		"DeregisteringExistingTaskDefinitionMultipleTimesIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			registerOut, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
+				ContainerDefinitions: []*ecs.ContainerDefinition{
+					{
+						Command: []*string{aws.String("echo"), aws.String("hello")},
+						Image:   aws.String("busybox"),
+						Name:    aws.String("hello_world"),
+					},
+				},
+				Cpu:    aws.String("128"),
+				Memory: aws.String("4"),
+				Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
+			})
+			require.NoError(t, err)
+			require.NotNil(t, registerOut)
+			require.NotNil(t, registerOut.TaskDefinition)
+			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
+
+			for i := 0; i < 3; i++ {
+				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				})
+				require.NoError(t, err)
+				require.NotZero(t, deregisterOut)
+				require.NotZero(t, deregisterOut.TaskDefinition)
+				require.Equal(t, registerOut.TaskDefinition.TaskDefinitionArn, deregisterOut.TaskDefinition.TaskDefinitionArn)
+			}
+		},
 		"DeregisterTaskDefinitionFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"DeregisterTaskDefinitionFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+				TaskDefinition: aws.String(testutil.NewTaskDefinitionFamily(t) + ":1"),
+			})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
@@ -200,7 +235,7 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			defer cleanupTaskDefinition(ctx, t, c, outDuplicate)
 
 			assert.Equal(t, utility.FromStringPtr(def.Family), utility.FromStringPtr(outDuplicate.TaskDefinition.Family))
-			assert.True(t, utility.FromInt64Ptr(outDuplicate.TaskDefinition.Revision) > utility.FromInt64Ptr(def.Revision))
+			assert.True(t, utility.FromInt64Ptr(outDuplicate.TaskDefinition.Revision) > utility.FromInt64Ptr(def.Revision), "registering a task definition in the same family as another task definition should create a new, separate revision")
 		},
 		"DescribeTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
 			out, err := c.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
