@@ -420,7 +420,8 @@ func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int,
 
 // ECSClient provides a mock implementation of a cocoa.ECSClient. This makes
 // it possible to introspect on inputs to the client and control the client's
-// output. It provides some default implementations where possible.
+// output. It provides some default implementations where possible. For unmocked
+// methods, it will issues the API calls to the fake GlobalECSService.
 type ECSClient struct {
 	RegisterTaskDefinitionInput  *ecs.RegisterTaskDefinitionInput
 	RegisterTaskDefinitionOutput *ecs.RegisterTaskDefinitionOutput
