@@ -25,7 +25,7 @@ func TestECSClient(t *testing.T) {
 
 	c := &ECSClient{}
 	defer func() {
-		cleanupECSAndSecretsManagerCache()
+		resetECSAndSecretsManagerCache()
 
 		assert.NoError(t, c.Close(ctx))
 	}()
@@ -35,7 +35,7 @@ func TestECSClient(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			tCase(tctx, t, c)
 		})
@@ -64,7 +64,7 @@ func TestECSClient(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSClustersAndSecretsManagerCache()
 
 			tCase(tctx, t, c)
 		})

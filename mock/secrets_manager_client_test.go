@@ -20,7 +20,7 @@ func TestSecretsManagerClient(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &SecretsManagerClient{}
 			defer func() {

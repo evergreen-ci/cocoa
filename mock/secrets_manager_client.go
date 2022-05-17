@@ -31,6 +31,12 @@ type StoredSecret struct {
 var GlobalSecretCache map[string]StoredSecret
 
 func init() {
+	ResetGlobalSecretCache()
+}
+
+// ResetGlobalSecretCache resets the global fake secret storage cache to an
+// initialized but clean state.
+func ResetGlobalSecretCache() {
 	GlobalSecretCache = map[string]StoredSecret{}
 }
 

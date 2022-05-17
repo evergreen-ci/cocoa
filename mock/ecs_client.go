@@ -322,6 +322,12 @@ type ECSService struct {
 var GlobalECSService ECSService
 
 func init() {
+	ResetGlobalECSService()
+}
+
+// ResetGlobalECSService resets the global fake ECS service back to an
+// initialized but clean state.
+func ResetGlobalECSService() {
 	GlobalECSService = ECSService{
 		Clusters: map[string]ECSCluster{},
 		TaskDefs: map[string][]ECSTaskDefinition{},
