@@ -49,55 +49,24 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 	if err := pc.createSecrets(ctx, &mergedPodCreationOpts); err != nil {
 		return nil, errors.Wrap(err, "creating new secrets")
 	}
-	taskDefinition := pc.exportPodCreationOptions(mergedPodCreationOpts)
 
-	registerOut, err := pc.client.RegisterTaskDefinition(ctx, taskDefinition)
+	taskDefinition, err := pc.registerTaskDefinition(ctx, mergedPodCreationOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "registering task definition")
 	}
 
-	if registerOut.TaskDefinition == nil || registerOut.TaskDefinition.TaskDefinitionArn == nil {
-		return nil, errors.New("expected a task definition from ECS, but none was returned")
-	}
-
 	taskDef := cocoa.NewECSTaskDefinition().
-		SetID(utility.FromStringPtr(registerOut.TaskDefinition.TaskDefinitionArn)).
+		SetID(utility.FromStringPtr(taskDefinition.TaskDefinitionArn)).
 		SetOwned(true)
 
-	runTask := pc.exportTaskExecutionOptions(mergedPodExecutionOpts, *taskDef)
-
-	runOut, err := pc.client.RunTask(ctx, runTask)
+	task, err := pc.runTask(ctx, mergedPodExecutionOpts, *taskDef)
 	if err != nil {
-		return nil, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(runTask.TaskDefinition), utility.FromStringPtr(runTask.Cluster))
+		return nil, errors.Wrap(err, "running task")
 	}
 
-	if len(runOut.Failures) > 0 {
-		catcher := grip.NewBasicCatcher()
-		for _, failure := range runOut.Failures {
-			catcher.Errorf("task '%s': %s: %s\n", utility.FromStringPtr(failure.Arn), utility.FromStringPtr(failure.Detail), utility.FromStringPtr(failure.Reason))
-		}
-		return nil, errors.Wrap(catcher.Resolve(), "running task")
-	}
-
-	if len(runOut.Tasks) == 0 || runOut.Tasks[0].TaskArn == nil {
-		return nil, errors.New("expected a task to be running in ECS, but none was returned")
-	}
-
-	resources := cocoa.NewECSPodResources().
-		SetCluster(utility.FromStringPtr(mergedPodExecutionOpts.Cluster)).
-		SetContainers(pc.translateContainerResources(runOut.Tasks[0].Containers, mergedPodCreationOpts.ContainerDefinitions)).
-		SetTaskDefinition(*taskDef).
-		SetTaskID(utility.FromStringPtr(runOut.Tasks[0].TaskArn))
-
-	podOpts := NewBasicECSPodOptions().
-		SetClient(pc.client).
-		SetVault(pc.vault).
-		SetStatusInfo(translatePodStatusInfo(runOut.Tasks[0])).
-		SetResources(*resources)
-
-	p, err := NewBasicECSPod(podOpts)
+	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, mergedPodCreationOpts.ContainerDefinitions)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating pod")
+		return nil, errors.Wrap(err, "creating pod after requesting task")
 	}
 
 	return p, nil
@@ -106,7 +75,120 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 // CreatePodFromExistingDefinition creates a new pod backed by AWS ECS from an
 // existing definition.
 func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
-	return nil, errors.New("TODO: implement")
+	if err := def.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid task definition")
+	}
+
+	mergedPodExecutionOpts := cocoa.MergeECSPodExecutionOptions(opts...)
+	if err := mergedPodExecutionOpts.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid pod execution options")
+	}
+
+	taskDef := cocoa.NewECSTaskDefinition().
+		SetID(utility.FromStringPtr(def.ID)).
+		SetOwned(utility.FromBoolPtr(def.Owned))
+
+	task, err := pc.runTask(ctx, mergedPodExecutionOpts, *taskDef)
+	if err != nil {
+		return nil, errors.Wrap(err, "running task")
+	}
+
+	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating pod after requesting task")
+	}
+
+	return p, nil
+}
+
+// createPod creates the basic ECS pod after its ECS task has been requested.
+func (pc *BasicECSPodCreator) createPod(cluster string, task ecs.Task, def cocoa.ECSTaskDefinition, containerDefs []cocoa.ECSContainerDefinition) (*BasicECSPod, error) {
+	resources := cocoa.NewECSPodResources().
+		SetCluster(cluster).
+		SetContainers(pc.translateContainerResources(task.Containers, containerDefs)).
+		SetTaskDefinition(def).
+		SetTaskID(utility.FromStringPtr(task.TaskArn))
+
+	podOpts := NewBasicECSPodOptions().
+		SetClient(pc.client).
+		SetVault(pc.vault).
+		SetStatusInfo(translatePodStatusInfo(task)).
+		SetResources(*resources)
+
+	p, err := NewBasicECSPod(podOpts)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating basic pod")
+	}
+
+	return p, nil
+}
+
+// registerTaskDefinition makes the request to register an ECS task definition
+// from the options checks that it returns a valid task definition.
+func (pc *BasicECSPodCreator) registerTaskDefinition(ctx context.Context, opts cocoa.ECSPodCreationOptions) (*ecs.TaskDefinition, error) {
+	in := pc.exportPodCreationOptions(opts)
+	out, err := pc.client.RegisterTaskDefinition(ctx, in)
+	if err != nil {
+		return nil, errors.Wrap(err, "registering task definition")
+	}
+
+	if err := pc.validateRegisterTaskDefinitionOutput(out); err != nil {
+		return nil, errors.Wrap(err, "validating response from registering task definition")
+	}
+
+	return out.TaskDefinition, nil
+}
+
+// validateRegisterTaskDefinitionOutput checks that the output from registering
+// a task definition is a valid task definition.
+func (pc *BasicECSPodCreator) validateRegisterTaskDefinitionOutput(out *ecs.RegisterTaskDefinitionOutput) error {
+	if out.TaskDefinition == nil {
+		return errors.New("expected a task definition from ECS, but none was returned")
+	}
+	if out.TaskDefinition.TaskDefinitionArn == nil {
+		return errors.New("received a task definition, but it is missing an ARN")
+	}
+	return nil
+}
+
+// runTask makes the request to run an ECS task from the execution options and
+// task definition and checks that it returns a valid task.
+func (pc *BasicECSPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExecutionOptions, def cocoa.ECSTaskDefinition) (*ecs.Task, error) {
+	in := pc.exportTaskExecutionOptions(opts, def)
+	out, err := pc.client.RunTask(ctx, in)
+	if err != nil {
+		return nil, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(in.TaskDefinition), utility.FromStringPtr(in.Cluster))
+	}
+
+	if err := pc.validateRunTaskOutput(out); err != nil {
+		return nil, errors.Wrap(err, "validating response from running task")
+	}
+
+	return out.Tasks[0], nil
+}
+
+// validateRunTaskOutput checks that the output from running a task contains no
+// errors and includes the necessary information for the expected tasks.
+func (pc *BasicECSPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) error {
+	if len(out.Failures) > 0 {
+		catcher := grip.NewBasicCatcher()
+		for _, failure := range out.Failures {
+			catcher.Errorf("task '%s': %s: %s\n", utility.FromStringPtr(failure.Arn), utility.FromStringPtr(failure.Detail), utility.FromStringPtr(failure.Reason))
+		}
+		return errors.Wrap(catcher.Resolve(), "running task")
+	}
+
+	if len(out.Tasks) == 0 {
+		return errors.New("expected a task to be running in ECS, but none was returned")
+	}
+	if out.Tasks[0] == nil {
+		return errors.New("received a task, but it was nil")
+	}
+	if out.Tasks[0].TaskArn == nil {
+		return errors.New("received a task, but it is missing an ARN")
+	}
+
+	return nil
 }
 
 // createSecrets creates any necessary secrets from the secret environment
@@ -315,7 +397,7 @@ func (pc *BasicECSPodCreator) translateContainerSecrets(defs []cocoa.ECSContaine
 
 // translatePodStatusInfo translates an ECS task to its equivalent cocoa
 // status information.
-func translatePodStatusInfo(task *ecs.Task) cocoa.ECSPodStatusInfo {
+func translatePodStatusInfo(task ecs.Task) cocoa.ECSPodStatusInfo {
 	return *cocoa.NewECSPodStatusInfo().
 		SetStatus(translateECSStatus(task.LastStatus)).
 		SetContainers(translateContainerStatusInfo(task.Containers))

@@ -149,7 +149,7 @@ func (p *BasicECSPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatus
 		return nil, errors.New("expected a task to exist in ECS, but none was returned")
 	}
 
-	p.statusInfo = translatePodStatusInfo(out.Tasks[0])
+	p.statusInfo = translatePodStatusInfo(*out.Tasks[0])
 
 	return &p.statusInfo, nil
 }

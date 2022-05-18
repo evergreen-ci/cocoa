@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
@@ -79,6 +81,21 @@ func TestBasicECSPodCreator(t *testing.T) {
 	}
 }
 
+func validRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
+	return ecs.RegisterTaskDefinitionInput{
+		ContainerDefinitions: []*ecs.ContainerDefinition{
+			{
+				Command: []*string{aws.String("echo"), aws.String("foo")},
+				Image:   aws.String("busybox"),
+				Name:    aws.String("print_foo"),
+			},
+		},
+		Cpu:    aws.String("128"),
+		Memory: aws.String("256"),
+		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
+	}
+}
+
 func TestECSPodCreator(t *testing.T) {
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
@@ -132,6 +149,30 @@ func TestECSPodCreator(t *testing.T) {
 			require.NotNil(t, m)
 
 			pc, err := NewBasicECSPodCreator(c, m)
+			require.NoError(t, err)
+
+			tCase(tctx, t, pc)
+		})
+	}
+
+	registerIn := validRegisterTaskDefinitionInput(t)
+	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
+	require.NoError(t, err)
+	require.NotZero(t, registerOut)
+	require.NotZero(t, registerOut.TaskDefinition)
+	defer func() {
+		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+		})
+		assert.NoError(t, err)
+	}()
+
+	for tName, tCase := range testcase.ECSPodCreatorRegisteredTaskDefinitionTests(*registerOut.TaskDefinition) {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
+			defer tcancel()
+
+			pc, err := NewBasicECSPodCreator(c, nil)
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)

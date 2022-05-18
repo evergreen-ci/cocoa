@@ -60,20 +60,8 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 
-	registerIn := &ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
-			{
-				Command: []*string{aws.String("echo"), aws.String("foo")},
-				Image:   aws.String("busybox"),
-				Name:    aws.String("print_foo"),
-			},
-		},
-		Cpu:    aws.String("128"),
-		Memory: aws.String("4"),
-		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-	}
-
-	registerOut, err := c.RegisterTaskDefinition(ctx, registerIn)
+	registerIn := validRegisterTaskDefinitionInput(t)
+	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)
 	require.NotZero(t, registerOut.TaskDefinition)
@@ -84,7 +72,7 @@ func TestECSClient(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(*registerIn, *registerOut) {
+	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(registerIn, *registerOut) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
