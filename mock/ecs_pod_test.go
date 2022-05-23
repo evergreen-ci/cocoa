@@ -77,8 +77,9 @@ func TestECSPod(t *testing.T) {
 	}
 }
 
-// ecsPodTests are mock-specific tests for ECS and Secrets Manager with ECS
-// pods.
+// ecsPodTests are mock-specific tests for ECS and Secrets Manager with ECS pods
+// created via a cocoa.ECSPodCreator. This is typically for scenarios that
+// cannot be easily simulated in ECS.
 func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 	makeSecretEnvVar := func(t *testing.T) *cocoa.EnvironmentVariable {
 		return cocoa.NewEnvironmentVariable().
@@ -108,18 +109,28 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 				SetCluster(testutil.ECSClusterName()))
 	}
 
+	makePod := func(opts *ecs.BasicECSPodOptions) (*ECSPod, error) {
+		p, err := ecs.NewBasicECSPod(opts)
+		if err != nil {
+			return nil, err
+		}
+		return NewECSPod(p), nil
+	}
+
 	checkPodDeleted := func(ctx context.Context, t *testing.T, p cocoa.ECSPod, c cocoa.ECSClient, smc cocoa.SecretsManagerClient, opts cocoa.ECSPodCreationOptions) {
 		ps := p.StatusInfo()
 		assert.Equal(t, cocoa.StatusDeleted, ps.Status)
 
 		res := p.Resources()
 
-		describeTaskDef, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
-			TaskDefinition: res.TaskDefinition.ID,
-		})
-		require.NoError(t, err)
-		require.NotZero(t, describeTaskDef.TaskDefinition)
-		assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(describeTaskDef.TaskDefinition.Family))
+		if res.TaskDefinition != nil {
+			describeTaskDef, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
+				TaskDefinition: res.TaskDefinition.ID,
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeTaskDef.TaskDefinition)
+			assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(describeTaskDef.TaskDefinition.Family))
+		}
 
 		describeTasks, err := c.DescribeTasks(ctx, &awsECS.DescribeTasksInput{
 			Cluster: res.Cluster,
@@ -145,6 +156,26 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 	}
 
 	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient){
+		"StopSucceedsWithoutContainers": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			res := p.Resources()
+			res.Containers = nil
+			ps := p.StatusInfo()
+			ps.Containers = nil
+			podOpts := ecs.NewBasicECSPodOptions().
+				SetClient(c).
+				SetResources(res).
+				SetStatusInfo(ps)
+
+			noContainers, err := makePod(podOpts)
+			require.NoError(t, err)
+
+			assert.NoError(t, noContainers.Stop(ctx), "should successfully stop pod even without its containers")
+			assert.Equal(t, cocoa.StatusStopped, noContainers.StatusInfo().Status)
+		},
 		"StopIsIdempotentWhenItFails": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
 			p, err := pc.CreatePod(ctx, *opts)
@@ -160,8 +191,25 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			c.StopTaskError = nil
 
 			require.NoError(t, p.Stop(ctx))
-			ps = p.StatusInfo()
-			assert.Equal(t, cocoa.StatusStopped, ps.Status)
+			assert.Equal(t, cocoa.StatusStopped, p.StatusInfo().Status)
+		},
+		"DeleteSucceedsWithoutTaskDefinition": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			res := p.Resources()
+			res.TaskDefinition = nil
+			podOpts := ecs.NewBasicECSPodOptions().
+				SetClient(c).
+				SetResources(res).
+				SetStatusInfo(p.StatusInfo())
+
+			noTaskDef, err := makePod(podOpts)
+			require.NoError(t, err)
+
+			assert.NoError(t, noTaskDef.Delete(ctx), "should successfully clean up even without a task definition")
+			checkPodDeleted(ctx, t, noTaskDef, c, smc, *opts)
 		},
 		"DeleteIsIdempotentWhenStoppingTaskFails": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(
@@ -230,6 +278,55 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			require.NoError(t, p.Delete(ctx))
 
 			checkPodDeleted(ctx, t, p, c, smc, *opts)
+		},
+		"DeleteFailsWithSecretsButNoVault": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(
+				*makeContainerDef(t).AddEnvironmentVariables(
+					*makeSecretEnvVar(t),
+				),
+			)
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			podOpts := ecs.NewBasicECSPodOptions().
+				SetClient(c).
+				SetResources(p.Resources()).
+				SetStatusInfo(p.StatusInfo())
+
+			noVault, err := makePod(podOpts)
+			require.NoError(t, err)
+
+			assert.Error(t, noVault.Delete(ctx), "should fail when deleting the pod secrets")
+			assert.Equal(t, cocoa.StatusStopped, noVault.StatusInfo().Status)
+
+			podOpts.SetVault(NewVault(secret.NewBasicSecretsManager(smc)))
+			withVault, err := makePod(podOpts)
+			require.NoError(t, err)
+
+			assert.NoError(t, withVault.Delete(ctx))
+			checkPodDeleted(ctx, t, withVault, c, smc, *opts)
+		},
+		"LatestStatusInfoSucceedsWithoutContainers": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			res := p.Resources()
+			res.Containers = nil
+			ps := p.StatusInfo()
+			ps.Containers = nil
+			podOpts := ecs.NewBasicECSPodOptions().
+				SetClient(c).
+				SetResources(res).
+				SetStatusInfo(ps)
+
+			noContainers, err := makePod(podOpts)
+			require.NoError(t, err)
+
+			status, err := noContainers.LatestStatusInfo(ctx)
+			require.NoError(t, err, "should successfully get latest status info even without containers")
+			require.NotZero(t, status)
+			assert.Len(t, status.Containers, 1, "should get container's latest status even if in-memory pod was missing its containers")
 		},
 		"LatestStatusInfoFailsWhenRequestErrors": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))

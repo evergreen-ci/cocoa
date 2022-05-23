@@ -68,7 +68,6 @@ func (i *ECSPodStatusInfo) AddContainers(containers ...ECSContainerStatusInfo) *
 func (i *ECSPodStatusInfo) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.Wrap(i.Status.Validate(), "invalid pod status")
-	catcher.NewWhen(len(i.Containers) == 0, "missing container statuses")
 	for _, c := range i.Containers {
 		catcher.Wrapf(c.Validate(), "container '%s'", utility.FromStringPtr(c.Name))
 	}
