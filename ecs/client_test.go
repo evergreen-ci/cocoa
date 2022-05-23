@@ -19,6 +19,21 @@ import (
 
 const defaultTestTimeout = time.Minute
 
+func validRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
+	return ecs.RegisterTaskDefinitionInput{
+		ContainerDefinitions: []*ecs.ContainerDefinition{
+			{
+				Command: []*string{aws.String("echo"), aws.String("foo")},
+				Image:   aws.String("busybox"),
+				Name:    aws.String("print_foo"),
+			},
+		},
+		Cpu:    aws.String("128"),
+		Memory: aws.String("256"),
+		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
+	}
+}
+
 func TestECSClient(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
 
@@ -60,20 +75,9 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 
-	registerIn := &ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
-			{
-				Command: []*string{aws.String("echo"), aws.String("foo")},
-				Image:   aws.String("busybox"),
-				Name:    aws.String("print_foo"),
-			},
-		},
-		Cpu:    aws.String("128"),
-		Memory: aws.String("4"),
-		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-	}
+	registerIn := validRegisterTaskDefinitionInput(t)
 
-	registerOut, err := c.RegisterTaskDefinition(ctx, registerIn)
+	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)
 	require.NotZero(t, registerOut.TaskDefinition)
@@ -84,12 +88,12 @@ func TestECSClient(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(*registerIn, *registerOut) {
+	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			tCase(tctx, t, c)
+			tCase(tctx, t, c, *registerOut.TaskDefinition)
 		})
 	}
 }

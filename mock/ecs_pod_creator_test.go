@@ -24,12 +24,6 @@ func resetECSAndSecretsManagerCache() {
 	ResetGlobalSecretCache()
 }
 
-func resetECSClustersAndSecretsManagerCache() {
-	GlobalECSService.Clusters = map[string]ECSCluster{}
-	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
-	ResetGlobalSecretCache()
-}
-
 func TestECSPodCreator(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &ECSPodCreator{})
 
