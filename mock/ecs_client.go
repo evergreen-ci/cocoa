@@ -322,6 +322,12 @@ type ECSService struct {
 var GlobalECSService ECSService
 
 func init() {
+	ResetGlobalECSService()
+}
+
+// ResetGlobalECSService resets the global fake ECS service back to an
+// initialized but clean state.
+func ResetGlobalECSService() {
 	GlobalECSService = ECSService{
 		Clusters: map[string]ECSCluster{},
 		TaskDefs: map[string][]ECSTaskDefinition{},
@@ -414,7 +420,8 @@ func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int,
 
 // ECSClient provides a mock implementation of a cocoa.ECSClient. This makes
 // it possible to introspect on inputs to the client and control the client's
-// output. It provides some default implementations where possible.
+// output. It provides some default implementations where possible. For unmocked
+// methods, it will issue the API calls to the fake GlobalECSService.
 type ECSClient struct {
 	RegisterTaskDefinitionInput  *ecs.RegisterTaskDefinitionInput
 	RegisterTaskDefinitionOutput *ecs.RegisterTaskDefinitionOutput

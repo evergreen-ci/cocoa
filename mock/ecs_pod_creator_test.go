@@ -18,9 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func cleanupECSAndSecretsManagerCache() {
+func resetECSAndSecretsManagerCache() {
+	ResetGlobalECSService()
 	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
-	GlobalSecretCache = map[string]StoredSecret{}
+	ResetGlobalSecretCache()
 }
 
 func TestECSPodCreator(t *testing.T) {
@@ -34,7 +35,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -62,7 +63,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -83,7 +84,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
