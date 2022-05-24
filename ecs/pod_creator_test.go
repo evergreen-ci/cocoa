@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
@@ -135,6 +136,30 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
+		})
+	}
+
+	registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
+	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
+	require.NoError(t, err)
+	require.NotZero(t, registerOut)
+	require.NotZero(t, registerOut.TaskDefinition)
+	defer func() {
+		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+		})
+		assert.NoError(t, err)
+	}()
+
+	for tName, tCase := range testcase.ECSPodCreatorRegisteredTaskDefinitionTests() {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
+			defer tcancel()
+
+			pc, err := NewBasicECSPodCreator(c, nil)
+			require.NoError(t, err)
+
+			tCase(tctx, t, pc, *registerOut.TaskDefinition)
 		})
 	}
 }

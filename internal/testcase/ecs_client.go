@@ -13,21 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func validRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
-	return ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
-			{
-				Command: []*string{aws.String("echo"), aws.String("foo")},
-				Image:   aws.String("busybox"),
-				Name:    aws.String("print_foo"),
-			},
-		},
-		Cpu:    aws.String("128"),
-		Memory: aws.String("256"),
-		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-	}
-}
-
 // ECSClientTestCase represents a test case for a cocoa.ECSClient.
 type ECSClientTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient)
 
@@ -129,11 +114,13 @@ func ECSClientTaskDefinitionTests() map[string]ECSClientTestCase {
 	}
 }
 
-// ECSClientRegisteredTaskDefinitionTestCase represents a test case for a cocoa.ECSClient with a task definition already registered.
+// ECSClientRegisteredTaskDefinitionTestCase represents a test case for a
+// cocoa.ECSClient with a task definition already registered.
 type ECSClientRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition)
 
 // ECSClientRegisteredTaskDefinitionTests returns common test cases that a
-// cocoa.ECSClient should support that rely on a registered task definition.
+// cocoa.ECSClient should support that rely on an already-registered task
+// definition.
 func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTaskDefinitionTestCase {
 	return map[string]ECSClientRegisteredTaskDefinitionTestCase{
 		"RunAndStopTaskSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
@@ -188,7 +175,7 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			assert.Equal(t, out.Tasks[0].TaskArn, runOut.Tasks[0].TaskArn)
 		},
 		"RegisterSucceedsWithDuplicateTaskDefinitionFamily": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
-			duplicateTaskDef := validRegisterTaskDefinitionInput(t)
+			duplicateTaskDef := testutil.ValidRegisterTaskDefinitionInput(t)
 			duplicateTaskDef.Family = def.Family
 
 			outDuplicate, err := c.RegisterTaskDefinition(ctx, &duplicateTaskDef)

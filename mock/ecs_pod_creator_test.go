@@ -106,13 +106,44 @@ func TestECSPodCreator(t *testing.T) {
 			tCase(tctx, t, mpc)
 		})
 	}
+
+	for tName, tCase := range testcase.ECSPodCreatorRegisteredTaskDefinitionTests() {
+		t.Run(tName, func(t *testing.T) {
+			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
+			defer tcancel()
+
+			resetECSAndSecretsManagerCache()
+
+			c := &ECSClient{}
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
+			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
+			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
+			require.NoError(t, err)
+			require.NotZero(t, registerOut)
+			require.NotZero(t, registerOut.TaskDefinition)
+
+			sm := &SecretsManagerClient{}
+			defer func() {
+				assert.NoError(t, sm.Close(tctx))
+			}()
+
+			pc, err := ecs.NewBasicECSPodCreator(c, nil)
+			require.NoError(t, err)
+
+			mpc := NewECSPodCreator(pc)
+
+			tCase(tctx, t, mpc, *registerOut.TaskDefinition)
+		})
+	}
 }
 
 // ecsPodCreatorTests are mock-specific tests for ECS and Secrets Manager with
 // the ECS pod creator.
 func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient){
-		"RegistersTaskDefinitionAndRunsTaskWithAllFieldsSet": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithAllFieldsSet": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetValue("env_var_value")
@@ -195,7 +226,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
 			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
 		},
-		"RegistersTaskDefinitionAndRunsTaskWithCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
 				SetNewValue("secret_value")
@@ -237,7 +268,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
-		"RegistersTaskDefinitionAndRunsTaskWithCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			repoCreds := cocoa.NewRepositoryCredentials().
 				SetName("repo_creds_secret_name").
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().
@@ -330,6 +361,52 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.NoError(t, err)
 			require.NotZero(t, getSecretOut)
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
+		},
+		"CreatePodFromExistingDefinitionRunsTaskWithExpectedTaskDefinitionAndExecutionOptions": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
+			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
+			require.NoError(t, err)
+			require.NotZero(t, registerOut)
+			require.NotZero(t, registerOut.TaskDefinition)
+
+			placementOpts := cocoa.NewECSPodPlacementOptions().
+				SetGroup("group").
+				SetStrategy(cocoa.StrategyBinpack).
+				SetStrategyParameter(cocoa.StrategyParamBinpackMemory).
+				AddInstanceFilters("runningTaskCount == 0", cocoa.ConstraintDistinctInstance)
+			awsvpcOpts := cocoa.NewAWSVPCOptions().
+				AddSubnets("subnet-12345").
+				AddSecurityGroups("sg-12345")
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName()).
+				SetPlacementOptions(*placementOpts).
+				SetAWSVPCOptions(*awsvpcOpts).
+				SetTags(map[string]string{"execution_tag": "execution_val"}).
+				SetSupportsDebugMode(true)
+
+			def := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(registerOut.TaskDefinition.TaskDefinitionArn))
+			_, err = pc.CreatePodFromExistingDefinition(ctx, *def, *execOpts)
+			require.NoError(t, err)
+
+			require.NotZero(t, c.RunTaskInput)
+			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
+			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
+			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
+			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
+			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
+			require.Len(t, c.RunTaskInput.PlacementConstraints, 2)
+			assert.Equal(t, "memberOf", utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Type))
+			assert.Equal(t, placementOpts.InstanceFilters[0], utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Expression))
+			assert.Equal(t, cocoa.ConstraintDistinctInstance, utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[1].Type))
+			assert.Zero(t, c.RunTaskInput.PlacementConstraints[1].Expression)
+			require.NotZero(t, c.RunTaskInput.NetworkConfiguration)
+			require.NotZero(t, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration)
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets))
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups))
+			require.Len(t, c.RunTaskInput.Tags, 1)
+			assert.Equal(t, "execution_tag", utility.FromStringPtr(c.RunTaskInput.Tags[0].Key))
+			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
+			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
 		},
 	}
 }

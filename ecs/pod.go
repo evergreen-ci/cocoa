@@ -149,7 +149,7 @@ func (p *BasicECSPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatus
 		return nil, errors.New("expected a task to exist in ECS, but none was returned")
 	}
 
-	p.statusInfo = translatePodStatusInfo(out.Tasks[0])
+	p.statusInfo = translatePodStatusInfo(*out.Tasks[0])
 
 	return &p.statusInfo, nil
 }
@@ -183,7 +183,7 @@ func (p *BasicECSPod) Delete(ctx context.Context) error {
 
 	catcher.Wrap(p.Stop(ctx), "stopping pod")
 
-	if utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
+	if p.resources.TaskDefinition != nil && utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
 		var deregisterDef ecs.DeregisterTaskDefinitionInput
 		deregisterDef.SetTaskDefinition(utility.FromStringPtr(p.resources.TaskDefinition.ID))
 
@@ -199,6 +199,12 @@ func (p *BasicECSPod) Delete(ctx context.Context) error {
 			}
 
 			id := utility.FromStringPtr(s.ID)
+
+			if p.vault == nil {
+				catcher.Errorf("cannot delete secret '%s' for container '%s' without a vault", id, utility.FromStringPtr(c.Name))
+				continue
+			}
+
 			catcher.Wrapf(p.vault.DeleteSecret(ctx, id), "deleting secret '%s' for container '%s'", id, utility.FromStringPtr(c.Name))
 		}
 	}

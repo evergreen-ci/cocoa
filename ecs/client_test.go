@@ -19,21 +19,6 @@ import (
 
 const defaultTestTimeout = time.Minute
 
-func validRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
-	return ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
-			{
-				Command: []*string{aws.String("echo"), aws.String("foo")},
-				Image:   aws.String("busybox"),
-				Name:    aws.String("print_foo"),
-			},
-		},
-		Cpu:    aws.String("128"),
-		Memory: aws.String("256"),
-		Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-	}
-}
-
 func TestECSClient(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
 
@@ -75,8 +60,7 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 
-	registerIn := validRegisterTaskDefinitionInput(t)
-
+	registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
 	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)

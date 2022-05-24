@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
+	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,10 +15,11 @@ import (
 // ECSPodCreatorTestCase represents a test case for a cocoa.ECSPodCreator.
 type ECSPodCreatorTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator)
 
-// ECSPodCreatorTests returns common test cases that a cocoa.ECSPodCreator should support.
+// ECSPodCreatorTests returns common test cases that a cocoa.ECSPodCreator
+// should support.
 func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
-		"CreatePodSucceedsWithNonSecretSettings": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodSucceedsWithoutSecretSettings": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			envVar := cocoa.NewEnvironmentVariable().SetName("name").SetValue("value")
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetImage("image").
@@ -49,7 +52,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			ps := p.StatusInfo()
 			assert.Equal(t, cocoa.StatusStarting, ps.Status)
 		},
-		"CreatePodFailsWithInvalidCreationOpts": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodFailsWithInvalidCreationOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
 			opts := cocoa.NewECSPodCreationOptions()
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -111,10 +114,18 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
+		"CreatePodFromExistingDefinitionFailsWithInvalidTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+			def := cocoa.NewECSTaskDefinition()
+			require.Error(t, def.Validate())
+			p, err := c.CreatePodFromExistingDefinition(ctx, *def)
+			require.Error(t, err)
+			require.Zero(t, p)
+		},
 	}
 }
 
-// ECSPodCreatorWithVaultTests returns common test cases that a cocoa.ECSPodCreator should support with a Vault.
+// ECSPodCreatorWithVaultTests returns common test cases that a
+// cocoa.ECSPodCreator should support with a Vault.
 func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 	return map[string]ECSPodCreatorTestCase{
 		"CreatePodFailsWithSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
@@ -220,6 +231,67 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			}()
 
 			checkPodStatus(t, p, cocoa.StatusStarting)
+		},
+	}
+}
+
+// ECSPodCreatorRegisteredTaskDefinitionTestCase represents a test case for a
+// cocoa.ECSPodCreator with a task definition already registered.
+type ECSPodCreatorRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator)
+
+// ECSPodCreatorRegisteredTaskDefinitionTests returns common test cases that a
+// cocoa.ECSPodCreator should support that rely on an already-registered task
+// definition.
+func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+	return map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition){
+		"CreatePodFromExistingDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
+			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
+
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			require.NoError(t, err)
+			require.NotZero(t, p)
+
+			defer func() {
+				assert.NoError(t, p.Delete(ctx))
+			}()
+
+			require.NotZero(t, p.Resources().TaskDefinition)
+			assert.Equal(t, utility.FromStringPtr(p.Resources().TaskDefinition.ID), utility.FromStringPtr(def.TaskDefinitionArn))
+			assert.False(t, utility.FromBoolPtr(p.Resources().TaskDefinition.Owned), def.TaskDefinitionArn)
+			assert.Equal(t, testutil.ECSClusterName(), utility.FromStringPtr(p.Resources().Cluster))
+			assert.Len(t, p.Resources().Containers, len(def.ContainerDefinitions))
+			assert.Len(t, p.StatusInfo().Containers, len(def.ContainerDefinitions))
+			checkPodStatus(t, p, cocoa.StatusStarting)
+		},
+		"CreatePodFromExistingDefinitionFailsWithNonexistentCluster": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
+			opts := cocoa.NewECSPodExecutionOptions().SetCluster("foo")
+
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			require.Error(t, err)
+			require.Zero(t, p)
+		},
+		"CreatePodFromExistingDefinitionFailsWithNonexistentTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+			taskDef := cocoa.NewECSTaskDefinition().SetID(testutil.NewTaskDefinitionFamily(t) + ":1")
+			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
+
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			require.Error(t, err)
+			require.Zero(t, p)
+		},
+		"CreatePodFromExistingDefinitionFailsWithInvalidExecutionOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
+			require.NoError(t, taskDef.Validate())
+			placementOpts := cocoa.NewECSPodPlacementOptions().SetStrategy("foo")
+			require.Error(t, placementOpts.Validate())
+			opts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName()).
+				SetPlacementOptions(*placementOpts)
+
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			require.Error(t, err)
+			require.Zero(t, p)
 		},
 	}
 }

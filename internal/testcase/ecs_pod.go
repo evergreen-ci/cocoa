@@ -409,8 +409,21 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 	for _, containerRes := range res.Containers {
 		for _, s := range containerRes.Secrets {
 			if utility.FromBoolPtr(s.Owned) {
-				_, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
-				require.Error(t, err)
+				// Secrets that are owned should be deleted, but Secrets Manager
+				// is eventually consistent, so it may take time for the
+				// deletion to propagate. Therefore, poll until the secret is
+				// deleted.
+				var isDeleted bool
+				assert.NoError(t, utility.Retry(ctx, func() (bool, error) {
+					_, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
+					if err != nil {
+						isDeleted = true
+						return false, nil
+					}
+					return true, nil
+				}, utility.RetryOptions{MaxAttempts: 5}))
+
+				assert.True(t, isDeleted)
 			} else {
 				val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 				require.NoError(t, err)
