@@ -413,19 +413,17 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 				// is eventually consistent, so it may take time for the
 				// deletion to propagate. Therefore, poll until the secret is
 				// deleted.
-				ctxDeadline, ok := ctx.Deadline()
-				var timeout time.Duration
-				if ok {
-					timeout = time.Until(ctxDeadline)
-				} else {
-					timeout = 10 * time.Second
-				}
-				const checkPeriod = time.Second
-				valueNoLongerExists := func() bool {
+				var isDeleted bool
+				assert.NoError(t, utility.Retry(ctx, func() (bool, error) {
 					_, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
-					return err != nil
-				}
-				assert.Eventually(t, valueNoLongerExists, timeout, checkPeriod)
+					if err != nil {
+						isDeleted = true
+						return false, nil
+					}
+					return true, nil
+				}, utility.RetryOptions{MaxAttempts: 5}))
+
+				assert.True(t, isDeleted)
 			} else {
 				val, err := v.GetValue(ctx, utility.FromStringPtr(s.ID))
 				require.NoError(t, err)
