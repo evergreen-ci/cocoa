@@ -60,7 +60,7 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 
-	registerIn := validRegisterTaskDefinitionInput(t)
+	registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
 	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 	require.NoError(t, err)
 	require.NotZero(t, registerOut)
@@ -72,12 +72,12 @@ func TestECSClient(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests(registerIn, *registerOut) {
+	for tName, tCase := range testcase.ECSClientRegisteredTaskDefinitionTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			tCase(tctx, t, c)
+			tCase(tctx, t, c, *registerOut.TaskDefinition)
 		})
 	}
 }

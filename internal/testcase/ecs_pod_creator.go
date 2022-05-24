@@ -235,11 +235,16 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 	}
 }
 
+// ECSPodCreatorRegisteredTaskDefinitionTestCase represents a test case for a
+// cocoa.ECSPodCreator with a task definition already registered.
+type ECSPodCreatorRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator)
+
 // ECSPodCreatorRegisteredTaskDefinitionTests returns common test cases that a
-// cocoa.ECSPodCreator should support with a pre-created task definition.
-func ECSPodCreatorRegisteredTaskDefinitionTests(def ecs.TaskDefinition) map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
-	return map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator){
-		"CreatePodFromExistingDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+// cocoa.ECSPodCreator should support that rely on an already-registered task
+// definition.
+func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
+	return map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition){
+		"CreatePodFromExistingDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
 			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
@@ -259,7 +264,7 @@ func ECSPodCreatorRegisteredTaskDefinitionTests(def ecs.TaskDefinition) map[stri
 			assert.Len(t, p.StatusInfo().Containers, len(def.ContainerDefinitions))
 			checkPodStatus(t, p, cocoa.StatusStarting)
 		},
-		"CreatePodFromExistingDefinitionFailsWithNonexistentCluster": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodFromExistingDefinitionFailsWithNonexistentCluster": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
 			opts := cocoa.NewECSPodExecutionOptions().SetCluster("foo")
 
@@ -267,7 +272,7 @@ func ECSPodCreatorRegisteredTaskDefinitionTests(def ecs.TaskDefinition) map[stri
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
-		"CreatePodFromExistingDefinitionFailsWithNonexistentTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodFromExistingDefinitionFailsWithNonexistentTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(testutil.NewTaskDefinitionFamily(t) + ":1")
 			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
@@ -275,7 +280,7 @@ func ECSPodCreatorRegisteredTaskDefinitionTests(def ecs.TaskDefinition) map[stri
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
-		"CreatePodFromExistingDefinitionFailsWithInvalidExecutionOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
+		"CreatePodFromExistingDefinitionFailsWithInvalidExecutionOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
 			require.NoError(t, taskDef.Validate())
 			placementOpts := cocoa.NewECSPodPlacementOptions().SetStrategy("foo")

@@ -18,9 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func cleanupECSAndSecretsManagerCache() {
+func resetECSAndSecretsManagerCache() {
+	ResetGlobalECSService()
 	GlobalECSService.Clusters[testutil.ECSClusterName()] = ECSCluster{}
-	GlobalSecretCache = map[string]StoredSecret{}
+	ResetGlobalSecretCache()
 }
 
 func TestECSPodCreator(t *testing.T) {
@@ -34,7 +35,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -62,7 +63,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -83,7 +84,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
 			defer func() {
@@ -106,22 +107,22 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	c := &ECSClient{}
-	defer func() {
-		assert.NoError(t, c.Close(ctx))
-	}()
-	registerIn := validRegisterTaskDefinitionInput(t)
-	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
-	require.NoError(t, err)
-	require.NotZero(t, registerOut)
-	require.NotZero(t, registerOut.TaskDefinition)
-
-	for tName, tCase := range testcase.ECSPodCreatorRegisteredTaskDefinitionTests(*registerOut.TaskDefinition) {
+	for tName, tCase := range testcase.ECSPodCreatorRegisteredTaskDefinitionTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
+
+			c := &ECSClient{}
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
+			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
+			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
+			require.NoError(t, err)
+			require.NotZero(t, registerOut)
+			require.NotZero(t, registerOut.TaskDefinition)
 
 			sm := &SecretsManagerClient{}
 			defer func() {
@@ -133,7 +134,7 @@ func TestECSPodCreator(t *testing.T) {
 
 			mpc := NewECSPodCreator(pc)
 
-			tCase(tctx, t, mpc)
+			tCase(tctx, t, mpc, *registerOut.TaskDefinition)
 		})
 	}
 }
@@ -362,7 +363,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
 		},
 		"CreatePodFromExistingDefinitionRunsTaskWithExpectedTaskDefinitionAndExecutionOptions": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
-			registerIn := validRegisterTaskDefinitionInput(t)
+			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
 			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 			require.NoError(t, err)
 			require.NotZero(t, registerOut)

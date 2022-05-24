@@ -23,12 +23,14 @@ func TestVaultWithSecretsManager(t *testing.T) {
 		}
 	}
 
+	defer resetECSAndSecretsManagerCache()
+
 	for tName, tCase := range testcase.VaultTests(cleanupSecret) {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			cleanupECSAndSecretsManagerCache()
+			resetECSAndSecretsManagerCache()
 
 			c := &SecretsManagerClient{}
 			defer func() {

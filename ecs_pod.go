@@ -295,7 +295,10 @@ const (
 	// StatusRunning indicates that the ECS pod or container is actively
 	// running.
 	StatusRunning ECSStatus = "running"
-	// StatusStopped indicates the that ECS pod or container is stopped. For a
+	// StatusStopping indicates that the ECS pod or container is in the process
+	// of stopping but is not stopped yet.
+	StatusStopping ECSStatus = "stopping"
+	// StatusStopped indicates that the ECS pod or container is stopped. For a
 	// pod, all of its resources are still available even if it's stopped.
 	StatusStopped ECSStatus = "stopped"
 	// StatusDeleted indicates that the ECS pod or container has been cleaned up

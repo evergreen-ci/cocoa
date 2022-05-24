@@ -166,3 +166,20 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 
 	return out.NextToken
 }
+
+// ValidRegisterTaskDefinitionInput returns a valid set of options for
+// registering an ECS task definition.
+func ValidRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
+	return ecs.RegisterTaskDefinitionInput{
+		ContainerDefinitions: []*ecs.ContainerDefinition{
+			{
+				Command: []*string{aws.String("echo"), aws.String("foo")},
+				Image:   aws.String("busybox"),
+				Name:    aws.String("print_foo"),
+			},
+		},
+		Cpu:    aws.String("128"),
+		Memory: aws.String("256"),
+		Family: aws.String(NewTaskDefinitionFamily(t)),
+	}
+}
