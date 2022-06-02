@@ -8,7 +8,7 @@ import (
 // container.
 type TaskStatus string
 
-// Constants represents ECS task or container states.
+// Constants representing ECS task or container states.
 const (
 	// TaskStatusProvisioning indicates that ECS is performing additional work
 	// before launching the task (e.g. provisioning a network interface for
@@ -94,3 +94,33 @@ func (s TaskStatus) ordinal() int {
 		return -1
 	}
 }
+
+// ContainerInstanceStatus represents a status from the ECS API for a container
+// instance running tasks.
+type ContainerInstanceStatus string
+
+// Constants representing ECS container instance states.
+const (
+	// ContainerInstanceStatusRegistering indicates that the container instance
+	// is registering with the cluster. For container instances using AWSVPC
+	// trunking, this includes provisioning the trunk elastic network interface.
+	ContainerInstanceStatusRegistering ContainerInstanceStatus = "REGISTERING"
+	// ContainerInstanceStatusRegistrationFailed indicates that the container
+	// instance attempted to register but failed.
+	ContainerInstanceStatusRegistrationFailed ContainerInstanceStatus = "REGISTRATION_FAILED"
+	// ContainerInstanceStatusActive indicates that the container instance is
+	// ready to run tasks. When the container instance is active, ECS can
+	// schedule tasks for placement on it.
+	ContainerInstanceStatusActive ContainerInstanceStatus = "ACTIVE"
+	// ContainerInstanceStatusDeregistering indicates that the container
+	// instance is deregistering from the cluster. For container instances using
+	// AWSVPC trunking, this includes deprovisioning the trunk elastic network
+	// interface.
+	ContainerInstanceStatusDeregistering ContainerInstanceStatus = "DEREGISTERING"
+	// ContainerInstanceStatusInactive indicates that the container instance has
+	// been terminated and deregistered from the cluster.
+	ContainerInstanceStatusInactive ContainerInstanceStatus = "INACTIVE"
+	// ContainerInstanceStatusDraining indicates that the container instance is
+	// running, but ECS will not schedule new tasks for placement on it.
+	ContainerInstanceStatusDraining ContainerInstanceStatus = "DRAINING"
+)

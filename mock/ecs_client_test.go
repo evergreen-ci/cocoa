@@ -28,7 +28,7 @@ func TestECSClient(t *testing.T) {
 		assert.NoError(t, c.Close(ctx))
 	}()
 
-	for tName, tCase := range testcase.ECSClientTaskDefinitionTests() {
+	for tName, tCase := range testcase.ECSClientTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()

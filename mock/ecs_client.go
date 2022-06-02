@@ -122,19 +122,20 @@ type ECSCluster map[string]ECSTask
 
 // ECSTask represents a mock running ECS task within a cluster.
 type ECSTask struct {
-	ARN         *string
-	TaskDef     ECSTaskDefinition
-	Cluster     *string
-	Containers  []ECSContainer
-	Group       *string
-	ExecEnabled *bool
-	Status      *string
-	GoalStatus  *string
-	Created     *time.Time
-	StopCode    *string
-	StopReason  *string
-	Stopped     *time.Time
-	Tags        map[string]string
+	ARN               *string
+	TaskDef           ECSTaskDefinition
+	Cluster           *string
+	ContainerInstance *string
+	Containers        []ECSContainer
+	Group             *string
+	ExecEnabled       *bool
+	Status            *string
+	GoalStatus        *string
+	Created           *time.Time
+	StopCode          *string
+	StopReason        *string
+	Stopped           *time.Time
+	Tags              map[string]string
 }
 
 func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
@@ -665,6 +666,10 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 	var arns []string
 	for arn, task := range cluster {
 		if in.DesiredStatus != nil && utility.FromStringPtr(task.GoalStatus) != *in.DesiredStatus {
+			continue
+		}
+
+		if in.ContainerInstance != nil && utility.FromStringPtr(task.ContainerInstance) != *in.ContainerInstance {
 			continue
 		}
 
