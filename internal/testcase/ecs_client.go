@@ -16,9 +16,9 @@ import (
 // ECSClientTestCase represents a test case for a cocoa.ECSClient.
 type ECSClientTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient)
 
-// ECSClientTaskDefinitionTests returns common test cases that a cocoa.ECSClient
-// should support.
-func ECSClientTaskDefinitionTests() map[string]ECSClientTestCase {
+// ECSClientTests returns common test cases that a cocoa.ECSClient should
+// support.
+func ECSClientTests() map[string]ECSClientTestCase {
 	return map[string]ECSClientTestCase{
 		"RegisterTaskDefinitionFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{})
@@ -111,6 +111,20 @@ func ECSClientTaskDefinitionTests() map[string]ECSClientTestCase {
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
+		"ListTasksFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"ListTasksSucceedsWithNoResultsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
+				Cluster: aws.String(testutil.ECSClusterName()),
+				Family:  aws.String(testutil.NewTaskDefinitionFamily(t)),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, out)
+			assert.Empty(t, out.TaskArns)
+		},
 	}
 }
 
@@ -196,6 +210,35 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			require.NotZero(t, out)
 			require.NotZero(t, out.TaskDefinition)
 			assert.Equal(t, def, *out.TaskDefinition)
+		},
+		"ListTasksSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
+			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
+				Cluster:        aws.String(testutil.ECSClusterName()),
+				TaskDefinition: def.TaskDefinitionArn,
+			})
+			require.NoError(t, err)
+			require.NotZero(t, runOut)
+			require.Empty(t, runOut.Failures)
+			require.NotEmpty(t, runOut.Tasks)
+			assert.Equal(t, runOut.Tasks[0].TaskDefinitionArn, def.TaskDefinitionArn)
+			taskARN := utility.FromStringPtr(runOut.Tasks[0].TaskArn)
+			assert.NotZero(t, taskARN)
+
+			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
+				Cluster:       aws.String(testutil.ECSClusterName()),
+				DesiredStatus: aws.String(ecs.DesiredStatusRunning),
+			})
+			require.NoError(t, err)
+			require.NotZero(t, out)
+			assert.NotEmpty(t, out.TaskArns)
+			var taskARNFound bool
+			for _, arn := range out.TaskArns {
+				if taskARN == utility.FromStringPtr(arn) {
+					taskARNFound = true
+					break
+				}
+			}
+			assert.True(t, taskARNFound, "task that was just requested to run should appear in results for tasks trying to run")
 		},
 	}
 }
