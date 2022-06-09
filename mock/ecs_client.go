@@ -125,6 +125,7 @@ type ECSTask struct {
 	ARN               *string
 	TaskDef           ECSTaskDefinition
 	Cluster           *string
+	CapacityProvider  *string
 	ContainerInstance *string
 	Containers        []ECSContainer
 	Group             *string
@@ -146,15 +147,16 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 	}
 
 	t := ECSTask{
-		ARN:         utility.ToStringPtr(id.String()),
-		Cluster:     in.Cluster,
-		ExecEnabled: in.EnableExecuteCommand,
-		Group:       in.Group,
-		Status:      utility.ToStringPtr(ecs.DesiredStatusPending),
-		GoalStatus:  utility.ToStringPtr(ecs.DesiredStatusRunning),
-		Created:     utility.ToTimePtr(time.Now()),
-		TaskDef:     taskDef,
-		Tags:        newTags(in.Tags),
+		ARN:              utility.ToStringPtr(id.String()),
+		Cluster:          in.Cluster,
+		CapacityProvider: newCapacityProvider(in.CapacityProviderStrategy),
+		ExecEnabled:      in.EnableExecuteCommand,
+		Group:            in.Group,
+		Status:           utility.ToStringPtr(ecs.DesiredStatusPending),
+		GoalStatus:       utility.ToStringPtr(ecs.DesiredStatusRunning),
+		Created:          utility.ToTimePtr(time.Now()),
+		TaskDef:          taskDef,
+		Tags:             newTags(in.Tags),
 	}
 
 	for _, containerDef := range taskDef.ContainerDefs {
@@ -168,6 +170,7 @@ func (t *ECSTask) export() *ecs.Task {
 	exported := ecs.Task{
 		TaskArn:              t.ARN,
 		ClusterArn:           t.Cluster,
+		CapacityProviderName: t.CapacityProvider,
 		EnableExecuteCommand: t.ExecEnabled,
 		Group:                t.Group,
 		Tags:                 exportTags(t.Tags),
@@ -263,6 +266,25 @@ func exportTags(tags map[string]string) []*ecs.Tag {
 		})
 	}
 	return exported
+}
+
+func newCapacityProvider(providers []*ecs.CapacityProviderStrategyItem) *string {
+	if len(providers) == 0 {
+		return nil
+	}
+	// This is just a fake ECS, so it's okay to arbitrarily choose the first
+	// capacity provider for convenience.
+	return providers[0].CapacityProvider
+}
+
+func exportCapacityProviders(providers []string) []*ecs.CapacityProviderStrategyItem {
+	var converted []*ecs.CapacityProviderStrategyItem
+	for _, p := range providers {
+		converted = append(converted, &ecs.CapacityProviderStrategyItem{
+			CapacityProvider: utility.ToStringPtr(p),
+		})
+	}
+	return converted
 }
 
 func newEnvVars(envVars []*ecs.KeyValuePair) map[string]string {

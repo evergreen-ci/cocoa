@@ -863,9 +863,14 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetCluster", func(t *testing.T) {
-		cluster := "cluster"
-		opts := NewECSPodExecutionOptions().SetCluster("cluster")
+		const cluster = "cluster"
+		opts := NewECSPodExecutionOptions().SetCluster(cluster)
 		assert.Equal(t, cluster, utility.FromStringPtr(opts.Cluster))
+	})
+	t.Run("SetCapacityProvider", func(t *testing.T) {
+		const provider = "capacity_provider"
+		opts := NewECSPodExecutionOptions().SetCapacityProvider(provider)
+		assert.Equal(t, provider, utility.FromStringPtr(opts.CapacityProvider))
 	})
 	t.Run("SetPlacementOptions", func(t *testing.T) {
 		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack)

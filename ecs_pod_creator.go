@@ -682,6 +682,10 @@ type ECSPodExecutionOptions struct {
 	// Cluster is the name of the cluster where the pod will run. If none is
 	// specified, this will run in the default cluster.
 	Cluster *string
+	// CapacityProvider is the name of the capacity provider that the pod will
+	// use, which in turn determines the infrastructure that the pod will run
+	// on. If none is specified, this will run in the default capacity provider.
+	CapacityProvider *string
 	// PlacementOptions specify options that determine how a pod is assigned to
 	// a container instance.
 	PlacementOpts *ECSPodPlacementOptions
@@ -705,6 +709,13 @@ func NewECSPodExecutionOptions() *ECSPodExecutionOptions {
 // SetCluster sets the name of the cluster where the pod will run.
 func (o *ECSPodExecutionOptions) SetCluster(cluster string) *ECSPodExecutionOptions {
 	o.Cluster = &cluster
+	return o
+}
+
+// SetCapacityProvider sets the name of the capacity provider that the pod will
+// use.
+func (o *ECSPodExecutionOptions) SetCapacityProvider(provider string) *ECSPodExecutionOptions {
+	o.CapacityProvider = &provider
 	return o
 }
 
@@ -776,6 +787,10 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 	for _, opt := range opts {
 		if opt.Cluster != nil {
 			merged.Cluster = opt.Cluster
+		}
+
+		if opt.CapacityProvider != nil {
+			merged.CapacityProvider = opt.CapacityProvider
 		}
 
 		if opt.PlacementOpts != nil {
