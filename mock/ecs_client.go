@@ -277,16 +277,6 @@ func newCapacityProvider(providers []*ecs.CapacityProviderStrategyItem) *string 
 	return providers[0].CapacityProvider
 }
 
-func exportCapacityProviders(providers []string) []*ecs.CapacityProviderStrategyItem {
-	var converted []*ecs.CapacityProviderStrategyItem
-	for _, p := range providers {
-		converted = append(converted, &ecs.CapacityProviderStrategyItem{
-			CapacityProvider: utility.ToStringPtr(p),
-		})
-	}
-	return converted
-}
-
 func newEnvVars(envVars []*ecs.KeyValuePair) map[string]string {
 	converted := map[string]string{}
 	for _, envVar := range envVars {
