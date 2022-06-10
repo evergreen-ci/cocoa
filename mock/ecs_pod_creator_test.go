@@ -165,6 +165,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddSecurityGroups("sg-12345")
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()).
+				SetCapacityProvider("capacity_provider").
 				SetPlacementOptions(*placementOpts).
 				SetAWSVPCOptions(*awsvpcOpts).
 				SetTags(map[string]string{"execution_tag": "execution_val"}).
@@ -208,6 +209,8 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			require.NotZero(t, c.RunTaskInput)
 			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
+			require.Len(t, c.RunTaskInput.CapacityProviderStrategy, 1)
+			assert.Equal(t, utility.FromStringPtr(execOpts.CapacityProvider), utility.FromStringPtr(c.RunTaskInput.CapacityProviderStrategy[0].CapacityProvider))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
@@ -379,6 +382,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				AddSecurityGroups("sg-12345")
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()).
+				SetCapacityProvider("capacity_provider").
 				SetPlacementOptions(*placementOpts).
 				SetAWSVPCOptions(*awsvpcOpts).
 				SetTags(map[string]string{"execution_tag": "execution_val"}).
@@ -390,6 +394,8 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			require.NotZero(t, c.RunTaskInput)
 			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
+			require.Len(t, c.RunTaskInput.CapacityProviderStrategy, 1)
+			assert.Equal(t, utility.FromStringPtr(execOpts.CapacityProvider), utility.FromStringPtr(c.RunTaskInput.CapacityProviderStrategy[0].CapacityProvider))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))

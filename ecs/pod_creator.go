@@ -494,6 +494,7 @@ func (pc *BasicECSPodCreator) exportRepoCreds(creds *cocoa.RepositoryCredentials
 func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
 	var runTask ecs.RunTaskInput
 	runTask.SetCluster(utility.FromStringPtr(opts.Cluster)).
+		SetCapacityProviderStrategy(pc.exportCapacityProvider(opts.CapacityProvider)).
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
 		SetTags(pc.exportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
@@ -504,6 +505,17 @@ func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecut
 		runTask.SetGroup(utility.FromStringPtr(opts.PlacementOpts.Group))
 	}
 	return &runTask
+}
+
+// exportCapacityProvider converts the capacity provider name into an ECS
+// capacity provider strategy.
+func (pc *BasicECSPodCreator) exportCapacityProvider(provider *string) []*ecs.CapacityProviderStrategyItem {
+	if provider == nil {
+		return nil
+	}
+	var converted ecs.CapacityProviderStrategyItem
+	converted.SetCapacityProvider(utility.FromStringPtr(provider))
+	return []*ecs.CapacityProviderStrategyItem{&converted}
 }
 
 // exportPortMappings converts port mappings into ECS port mappings.
