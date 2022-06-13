@@ -23,6 +23,19 @@ func VaultTests(cleanupSecret func(ctx context.Context, t *testing.T, v cocoa.Va
 
 			defer cleanupSecret(ctx, t, v, id)
 		},
+		"CreateSecretIsIdempotent": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
+			s := cocoa.NewNamedSecret().SetName(testutil.NewSecretName(t)).SetValue("hello")
+			id, err := v.CreateSecret(ctx, *s)
+			require.NoError(t, err)
+			require.NotZero(t, id)
+
+			dupID, err := v.CreateSecret(ctx, *s)
+			require.NoError(t, err)
+			require.NotZero(t, dupID)
+			assert.Equal(t, id, dupID, "creating a secret with an identical name should return the same unique identifier")
+
+			defer cleanupSecret(ctx, t, v, id)
+		},
 		"CreateSecretFailsWithInvalidInput": func(ctx context.Context, t *testing.T, v cocoa.Vault) {
 			id, err := v.CreateSecret(ctx, cocoa.NamedSecret{})
 			assert.Error(t, err)

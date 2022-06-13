@@ -40,17 +40,17 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 			// The secret already exists, so describe it to get the ARN.
 			describeOut, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{SecretId: s.Name})
 			if err != nil {
-				return "", err
+				return "", errors.Wrap(err, "describing already-existing secret")
 			}
 			if describeOut == nil || describeOut.ARN == nil {
-				return "", errors.New("expected an ID for an existing secret, but none was returned from Secrets Manager")
+				return "", errors.New("expected an ID for an already-existing secret in the response, but none was returned from Secrets Manager")
 			}
 			return *describeOut.ARN, nil
 		}
 		return "", err
 	}
 	if out == nil || out.ARN == nil {
-		return "", errors.New("expected an ID, but none was returned from Secrets Manager")
+		return "", errors.New("expected an ID in the response, but none was returned from Secrets Manager")
 	}
 	return *out.ARN, nil
 }
@@ -58,7 +58,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 // GetValue returns an existing secret's decrypted value.
 func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val string, err error) {
 	if id == "" {
-		return "", errors.New("must specify a non-empty id")
+		return "", errors.New("must specify a non-empty ID")
 	}
 
 	out, err := m.client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &id})
@@ -66,7 +66,7 @@ func (m *BasicSecretsManager) GetValue(ctx context.Context, id string) (val stri
 		return "", err
 	}
 	if out == nil || out.SecretString == nil {
-		return "", errors.New("expected a value, but none was returned from Secrets Manager")
+		return "", errors.New("expected a value in the response, but none was returned from Secrets Manager")
 	}
 	return *out.SecretString, nil
 }
@@ -87,7 +87,7 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, s cocoa.NamedSecr
 // If the secret does not exist, this will perform no operation.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
 	if id == "" {
-		return errors.New("must specify a non-empty id")
+		return errors.New("must specify a non-empty ID")
 	}
 	_, err := m.client.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 		ForceDeleteWithoutRecovery: aws.Bool(true),
