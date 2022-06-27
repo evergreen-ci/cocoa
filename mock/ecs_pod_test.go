@@ -195,6 +195,15 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			require.NoError(t, p.Stop(ctx))
 			assert.Equal(t, cocoa.StatusStopped, p.StatusInfo().Status)
 		},
+		"StopSucceedsWhenTaskIsNotFound": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
+			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
+			p, err := pc.CreatePod(ctx, *opts)
+			require.NoError(t, err)
+
+			c.StopTaskError = cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(p.Resources().TaskID))
+
+			assert.NoError(t, p.Stop(ctx), "should successfully stop pod when its task cannot be found")
+		},
 		"DeleteSucceedsWithoutTaskDefinition": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, smc *SecretsManagerClient) {
 			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t))
 			p, err := pc.CreatePod(ctx, *opts)

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ecs"
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -21,13 +21,13 @@ type ECSClientTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient
 func ECSClientTests() map[string]ECSClientTestCase {
 	return map[string]ECSClientTestCase{
 		"RegisterTaskDefinitionFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{})
+			out, err := c.RegisterTaskDefinition(ctx, &awsECS.RegisterTaskDefinitionInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"DeregisteringExistingTaskDefinitionMultipleTimesIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			registerOut, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
-				ContainerDefinitions: []*ecs.ContainerDefinition{
+			registerOut, err := c.RegisterTaskDefinition(ctx, &awsECS.RegisterTaskDefinitionInput{
+				ContainerDefinitions: []*awsECS.ContainerDefinition{
 					{
 						Command: []*string{aws.String("echo"), aws.String("hello")},
 						Image:   aws.String("busybox"),
@@ -44,7 +44,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
 
 			for i := 0; i < 3; i++ {
-				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 				})
 				require.NoError(t, err)
@@ -54,20 +54,20 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			}
 		},
 		"DeregisterTaskDefinitionFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{})
+			out, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"DeregisterTaskDefinitionFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			out, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 				TaskDefinition: aws.String(testutil.NewTaskDefinitionFamily(t) + ":1"),
 			})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"RegisterAndDeregisterTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			registerOut, err := c.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
-				ContainerDefinitions: []*ecs.ContainerDefinition{
+			registerOut, err := c.RegisterTaskDefinition(ctx, &awsECS.RegisterTaskDefinitionInput{
+				ContainerDefinitions: []*awsECS.ContainerDefinition{
 					{
 						Command: []*string{aws.String("echo"), aws.String("hello")},
 						Image:   aws.String("busybox"),
@@ -83,18 +83,18 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			require.NotNil(t, registerOut.TaskDefinition)
 			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
 			require.NotZero(t, registerOut.TaskDefinition.Status)
-			assert.Equal(t, ecs.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
+			assert.Equal(t, awsECS.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
 			require.NotZero(t, registerOut.TaskDefinition.RegisteredAt)
 			assert.NotZero(t, *registerOut.TaskDefinition.RegisteredAt)
 
-			out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+			out, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
 		},
 		"RunTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.RunTask(ctx, &ecs.RunTaskInput{
+			out, err := c.RunTask(ctx, &awsECS.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: aws.String(testutil.NewTaskDefinitionFamily(t) + ":1"),
 			})
@@ -102,57 +102,48 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			assert.Zero(t, out)
 		},
 		"RunTaskFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.RunTask(ctx, &ecs.RunTaskInput{})
+			out, err := c.RunTask(ctx, &awsECS.RunTaskInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"StopTaskFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.StopTask(ctx, &ecs.StopTaskInput{})
+			out, err := c.StopTask(ctx, &awsECS.StopTaskInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"StopTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
+			out, err := c.StopTask(ctx, &awsECS.StopTaskInput{
 				Cluster: aws.String(testutil.ECSClusterName()),
 				Task:    aws.String(utility.RandomString()),
 			})
 			assert.Error(t, err)
+			assert.True(t, cocoa.IsECSTaskNotFoundError(err))
 			assert.Zero(t, out)
 		},
 		"DescribeTasksFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{})
+			out, err := c.DescribeTasks(ctx, &awsECS.DescribeTasksInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
-		"DescribeTasksFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-				Cluster: aws.String(testutil.ECSClusterName()),
-				Tasks:   []*string{aws.String(utility.RandomString())},
-			})
-			require.NoError(t, err)
-			require.NotZero(t, out)
-			assert.NotZero(t, out.Failures)
-			assert.Empty(t, out.Tasks)
-		},
 		"DescribeTaskDefinitionFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{})
+			out, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"DescribeTaskDefinitionFailsWithNonexistentTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+			out, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
 				TaskDefinition: aws.String(testutil.NewTaskDefinitionFamily(t)),
 			})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"ListTasksFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{})
+			out, err := c.ListTasks(ctx, &awsECS.ListTasksInput{})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"ListTasksSucceedsWithNoResultsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
+			out, err := c.ListTasks(ctx, &awsECS.ListTasksInput{
 				Cluster: aws.String(testutil.ECSClusterName()),
 				Family:  aws.String(testutil.NewTaskDefinitionFamily(t)),
 			})
@@ -165,18 +156,18 @@ func ECSClientTests() map[string]ECSClientTestCase {
 
 // ECSClientRegisteredTaskDefinitionTestCase represents a test case for a
 // cocoa.ECSClient with a task definition already registered.
-type ECSClientRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition)
+type ECSClientRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition)
 
 // ECSClientRegisteredTaskDefinitionTests returns common test cases that a
 // cocoa.ECSClient should support that rely on an already-registered task
 // definition.
 func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTaskDefinitionTestCase {
 	return map[string]ECSClientRegisteredTaskDefinitionTestCase{
-		"RunAndStopTaskSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
+		"RunAndStopTaskSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
 			require.NotZero(t, def.Status)
-			assert.Equal(t, ecs.TaskDefinitionStatusActive, utility.FromStringPtr(def.Status))
+			assert.Equal(t, awsECS.TaskDefinitionStatusActive, utility.FromStringPtr(def.Status))
 
-			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
+			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: def.TaskDefinitionArn,
 			})
@@ -186,7 +177,7 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			require.NotEmpty(t, runOut.Tasks)
 			assert.Equal(t, runOut.Tasks[0].TaskDefinitionArn, def.TaskDefinitionArn)
 
-			out, err := c.StopTask(ctx, &ecs.StopTaskInput{
+			out, err := c.StopTask(ctx, &awsECS.StopTaskInput{
 				Cluster: aws.String(testutil.ECSClusterName()),
 				Task:    aws.String(*runOut.Tasks[0].TaskArn),
 			})
@@ -195,11 +186,11 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			require.NotZero(t, out.Task)
 			assert.Equal(t, runOut.Tasks[0].TaskArn, out.Task.TaskArn)
 		},
-		"DescribeTaskSucceedsWithRunningTask": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
+		"DescribeTaskSucceedsWithRunningTask": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
 			require.NotZero(t, def.Status)
-			assert.Equal(t, ecs.TaskDefinitionStatusActive, *def.Status)
+			assert.Equal(t, awsECS.TaskDefinitionStatusActive, *def.Status)
 
-			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
+			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: def.TaskDefinitionArn,
 			})
@@ -209,7 +200,7 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 
 			defer cleanupTask(ctx, t, c, runOut)
 
-			out, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+			out, err := c.DescribeTasks(ctx, &awsECS.DescribeTasksInput{
 				Cluster: aws.String(testutil.ECSClusterName()),
 				Tasks:   []*string{aws.String(*runOut.Tasks[0].TaskArn)},
 			})
@@ -223,7 +214,7 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			require.NotZero(t, runOut.Tasks[0].TaskArn)
 			assert.Equal(t, out.Tasks[0].TaskArn, runOut.Tasks[0].TaskArn)
 		},
-		"RegisterSucceedsWithDuplicateTaskDefinitionFamily": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
+		"RegisterSucceedsWithDuplicateTaskDefinitionFamily": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
 			duplicateTaskDef := testutil.ValidRegisterTaskDefinitionInput(t)
 			duplicateTaskDef.Family = def.Family
 
@@ -237,8 +228,8 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			assert.Equal(t, utility.FromStringPtr(def.Family), utility.FromStringPtr(outDuplicate.TaskDefinition.Family))
 			assert.True(t, utility.FromInt64Ptr(outDuplicate.TaskDefinition.Revision) > utility.FromInt64Ptr(def.Revision), "registering a task definition in the same family as another task definition should create a new, separate revision")
 		},
-		"DescribeTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
-			out, err := c.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		"DescribeTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
+			out, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
 				TaskDefinition: def.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
@@ -246,8 +237,8 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			require.NotZero(t, out.TaskDefinition)
 			assert.Equal(t, def, *out.TaskDefinition)
 		},
-		"ListTasksSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def ecs.TaskDefinition) {
-			runOut, err := c.RunTask(ctx, &ecs.RunTaskInput{
+		"ListTasksSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
+			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
 				Cluster:        aws.String(testutil.ECSClusterName()),
 				TaskDefinition: def.TaskDefinitionArn,
 			})
@@ -259,9 +250,9 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			taskARN := utility.FromStringPtr(runOut.Tasks[0].TaskArn)
 			assert.NotZero(t, taskARN)
 
-			out, err := c.ListTasks(ctx, &ecs.ListTasksInput{
+			out, err := c.ListTasks(ctx, &awsECS.ListTasksInput{
 				Cluster:       aws.String(testutil.ECSClusterName()),
-				DesiredStatus: aws.String(ecs.DesiredStatusRunning),
+				DesiredStatus: aws.String(awsECS.DesiredStatusRunning),
 			})
 			require.NoError(t, err)
 			require.NotZero(t, out)
@@ -279,9 +270,9 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 }
 
 // cleanupTaskDefinition cleans up an existing task definition.
-func cleanupTaskDefinition(ctx context.Context, t *testing.T, c cocoa.ECSClient, out *ecs.RegisterTaskDefinitionOutput) {
+func cleanupTaskDefinition(ctx context.Context, t *testing.T, c cocoa.ECSClient, out *awsECS.RegisterTaskDefinitionOutput) {
 	if out != nil && out.TaskDefinition != nil && out.TaskDefinition.TaskDefinitionArn != nil {
-		out, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+		out, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 			TaskDefinition: out.TaskDefinition.TaskDefinitionArn,
 		})
 		require.NoError(t, err)
@@ -290,9 +281,9 @@ func cleanupTaskDefinition(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 }
 
 // cleanupTask cleans up a running task.
-func cleanupTask(ctx context.Context, t *testing.T, c cocoa.ECSClient, runOut *ecs.RunTaskOutput) {
+func cleanupTask(ctx context.Context, t *testing.T, c cocoa.ECSClient, runOut *awsECS.RunTaskOutput) {
 	if runOut != nil && len(runOut.Tasks) > 0 && runOut.Tasks[0].TaskArn != nil {
-		out, err := c.StopTask(ctx, &ecs.StopTaskInput{
+		out, err := c.StopTask(ctx, &awsECS.StopTaskInput{
 			Cluster: aws.String(testutil.ECSClusterName()),
 			Task:    aws.String(*runOut.Tasks[0].TaskArn),
 		})

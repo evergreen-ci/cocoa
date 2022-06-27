@@ -140,8 +140,11 @@ func (p *BasicECSPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatus
 
 	if len(out.Failures) != 0 {
 		catcher := grip.NewBasicCatcher()
-		for _, failure := range out.Failures {
-			catcher.Errorf("%s: %s\n", utility.FromStringPtr(failure.Detail), utility.FromStringPtr(failure.Reason))
+		for _, f := range out.Failures {
+			if f == nil {
+				continue
+			}
+			catcher.Add(ConvertFailureToError(*f))
 		}
 		return nil, errors.Wrap(catcher.Resolve(), "describing task")
 	}
@@ -165,7 +168,12 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 	var stopTask ecs.StopTaskInput
 	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
 
-	if _, err := p.client.StopTask(ctx, &stopTask); err != nil {
+	_, err := p.client.StopTask(ctx, &stopTask)
+	// If the pod is already been stopped, ECS will not be have information
+	// about the task after some period of time, resulting in a not found error.
+	// In case the task is not found, stopping is considered successful since
+	// the task either never existed or has already been stopped.
+	if err != nil && !cocoa.IsECSTaskNotFoundError(err) {
 		return errors.Wrap(err, "stopping pod")
 	}
 
