@@ -169,10 +169,10 @@ func (p *BasicECSPod) Stop(ctx context.Context) error {
 	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
 
 	_, err := p.client.StopTask(ctx, &stopTask)
-	// If the pod is already been stopped, ECS will not be have information
-	// about the task after some period of time, resulting in a not found error.
-	// In case the task is not found, stopping is considered successful since
-	// the task either never existed or has already been stopped.
+	// If the pod has already been stopped, ECS will not have information about
+	// the task after some period of time, resulting in a not found error. In
+	// case the task is not found, stopping is considered successful since the
+	// task either never existed or has already been stopped.
 	if err != nil && !cocoa.IsECSTaskNotFoundError(err) {
 		return errors.Wrap(err, "stopping pod")
 	}
