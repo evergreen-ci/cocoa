@@ -140,7 +140,9 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		"ListTasksFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.ListTasks(ctx, &awsECS.ListTasksInput{})
 			assert.Error(t, err)
-			assert.Zero(t, out)
+			if out != nil {
+				assert.Empty(t, out.TaskArns)
+			}
 		},
 		"ListTasksSucceedsWithNoResultsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.ListTasks(ctx, &awsECS.ListTasksInput{
