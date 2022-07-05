@@ -49,22 +49,24 @@ func ECSPodTests() map[string]ECSPodTestCase {
 	}
 
 	makePodCreationOpts := func(t *testing.T) *cocoa.ECSPodCreationOptions {
-		return cocoa.NewECSPodCreationOptions().
+		defOpts := cocoa.NewECSPodDefinitionOptions().
 			SetName(testutil.NewTaskDefinitionFamily(t)).
 			SetMemoryMB(128).
 			SetCPU(128).
 			SetTaskRole(testutil.ECSTaskRole()).
-			SetExecutionRole(testutil.ECSExecutionRole()).
-			SetExecutionOptions(*cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName()))
+			SetExecutionRole(testutil.ECSExecutionRole())
+		execOpts := cocoa.NewECSPodExecutionOptions().
+			SetCluster(testutil.ECSClusterName())
+		return cocoa.NewECSPodCreationOptions().
+			SetDefinitionOptions(*defOpts).
+			SetExecutionOptions(*execOpts)
 	}
 
 	return map[string]ECSPodTestCase{
 		"InfoIsPopulated": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
 			secret := makeSecretEnvVar(t)
-			opts := makePodCreationOpts(t).AddContainerDefinitions(
-				*makeContainerDef(t).AddEnvironmentVariables(*secret),
-			)
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret))
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
@@ -84,7 +86,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			assert.Equal(t, utility.FromStringPtr(secret.SecretOpts.Name), utility.FromStringPtr(res.Containers[0].Secrets[0].Name))
 			val, err := v.GetValue(ctx, utility.FromStringPtr(res.Containers[0].Secrets[0].ID))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].EnvVars[0].SecretOpts.NewValue), val)
+			assert.Equal(t, utility.FromStringPtr(opts.DefinitionOpts.ContainerDefinitions[0].EnvVars[0].SecretOpts.NewValue), val)
 			assert.True(t, utility.FromBoolPtr(res.Containers[0].Secrets[0].Owned))
 
 			require.True(t, utility.FromBoolPtr(res.TaskDefinition.Owned))
@@ -93,7 +95,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			})
 			require.NoError(t, err)
 			require.NotZero(t, def.TaskDefinition)
-			assert.Equal(t, utility.FromStringPtr(opts.Name), utility.FromStringPtr(def.TaskDefinition.Family))
+			assert.Equal(t, utility.FromStringPtr(opts.DefinitionOpts.Name), utility.FromStringPtr(def.TaskDefinition.Family))
 
 			task, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: res.Cluster,
@@ -102,10 +104,12 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			require.NoError(t, err)
 			require.Len(t, task.Tasks, 1)
 			require.Len(t, task.Tasks[0].Containers, 1)
-			assert.Equal(t, utility.FromStringPtr(opts.ContainerDefinitions[0].Image), utility.FromStringPtr(task.Tasks[0].Containers[0].Image))
+			assert.Equal(t, utility.FromStringPtr(opts.DefinitionOpts.ContainerDefinitions[0].Image), utility.FromStringPtr(task.Tasks[0].Containers[0].Image))
 		},
 		"LatestStatusInfoSucceeds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			p, err := pc.CreatePod(ctx, *makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t)))
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t))
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			defer cleanupPod(ctx, t, p, c, v)
@@ -140,7 +144,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			}
 		},
 		"StopSucceeds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			opts := makePodCreationOpts(t).AddContainerDefinitions(
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(
 				*makeContainerDef(t).AddEnvironmentVariables(
 					*makeSecretEnvVar(t),
 				),
@@ -159,7 +164,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
-			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
 
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
@@ -193,9 +199,9 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					SetNewValue(utility.RandomString()))
 			ownedSecret := makeSecretEnvVar(t)
 
-			secretOpts := makePodCreationOpts(t).
-				AddContainerDefinitions(*makeContainerDef(t).
-					AddEnvironmentVariables(*secret, *ownedSecret))
+			secretOpts := makePodCreationOpts(t)
+			secretOpts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t).
+				AddEnvironmentVariables(*secret, *ownedSecret))
 
 			p, err := pc.CreatePod(ctx, *secretOpts)
 			require.NoError(t, err)
@@ -231,7 +237,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
 		"StopIsIdempotent": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			opts := makePodCreationOpts(t).AddContainerDefinitions(
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(
 				*makeContainerDef(t).AddEnvironmentVariables(
 					*makeSecretEnvVar(t),
 				),
@@ -250,7 +257,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			checkPodStatus(t, p, cocoa.StatusStopped)
 		},
 		"DeleteSucceeds": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			opts := makePodCreationOpts(t).AddContainerDefinitions(
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(
 				*makeContainerDef(t).AddEnvironmentVariables(
 					*makeSecretEnvVar(t),
 				),
@@ -271,7 +279,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 				SetName(testutil.NewSecretName(t)).
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().SetUsername("user").SetPassword("such_secure_password_wow")).
 				SetOwned(true)
-			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t).SetRepositoryCredentials(*creds))
 
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
@@ -307,7 +316,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 					SetNewValue("value2").
 					SetOwned(true))
 
-			opts := makePodCreationOpts(t).AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(*makeContainerDef(t).AddEnvironmentVariables(*secret, *ownedSecret))
 
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
@@ -338,7 +348,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			checkPodDeleted(ctx, t, c, v, p)
 		},
 		"DeleteIsIdempotent": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c cocoa.ECSClient, v cocoa.Vault) {
-			opts := makePodCreationOpts(t).AddContainerDefinitions(
+			opts := makePodCreationOpts(t)
+			opts.DefinitionOpts.AddContainerDefinitions(
 				*makeContainerDef(t).AddEnvironmentVariables(
 					*makeEnvVar(t),
 				),

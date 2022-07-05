@@ -23,6 +23,80 @@ type ECSPodCreator interface {
 
 // ECSPodCreationOptions provide options to create a pod backed by ECS.
 type ECSPodCreationOptions struct {
+	// DefinitionOpts specify options to configure the pod's definition.
+	DefinitionOpts ECSPodDefinitionOptions
+	// ExecutionOpts specify options to configure how the pod executes.
+	ExecutionOpts *ECSPodExecutionOptions
+}
+
+// NewECSPodCreationOptions returns new uninitialized options to create a pod.
+func NewECSPodCreationOptions() *ECSPodCreationOptions {
+	return &ECSPodCreationOptions{}
+}
+
+// SetDefinitionOptions sets the options to configure the pod definition.
+func (o *ECSPodCreationOptions) SetDefinitionOptions(opts ECSPodDefinitionOptions) *ECSPodCreationOptions {
+	o.DefinitionOpts = opts
+	return o
+}
+
+// SetExecutionOptions sets the options to configure how the pod executes.
+func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions) *ECSPodCreationOptions {
+	o.ExecutionOpts = &opts
+	return o
+}
+
+// Validate checks that all the required parameters are given and the values are
+// valid. It sets defaults where possible.
+func (o *ECSPodCreationOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.Wrap(o.DefinitionOpts.Validate(), "invalid pod definition options")
+	networkMode := o.DefinitionOpts.getNetworkMode()
+	catcher.NewWhen(networkMode == NetworkModeAWSVPC && (o.ExecutionOpts == nil || o.ExecutionOpts.AWSVPCOpts == nil), "must specify AWSVPC configuration when using AWSVPC network mode")
+	catcher.NewWhen(networkMode != NetworkModeAWSVPC && o.ExecutionOpts != nil && o.ExecutionOpts.AWSVPCOpts != nil, "cannot specify AWSVPC configuration when network mode is not AWSVPC")
+
+	if o.ExecutionOpts != nil {
+		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
+	}
+
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	if o.ExecutionOpts == nil {
+		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack).SetStrategyParameter(StrategyParamBinpackMemory)
+		o.ExecutionOpts = NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
+	}
+
+	return nil
+}
+
+// MergeECSPodCreationOptions merges all the given options to create an ECS pod.
+// Options are applied in the order that they're specified and conflicting
+// options are overwritten.
+func MergeECSPodCreationOptions(opts ...ECSPodCreationOptions) ECSPodCreationOptions {
+	merged := ECSPodCreationOptions{}
+
+	for _, opt := range opts {
+		merged.DefinitionOpts = MergeECSPodDefinitionOptions(merged.DefinitionOpts, opt.DefinitionOpts)
+
+		if opt.ExecutionOpts != nil {
+			var execOpts ECSPodExecutionOptions
+			if merged.ExecutionOpts != nil {
+				execOpts = MergeECSPodExecutionOptions(*merged.ExecutionOpts, *opt.ExecutionOpts)
+			} else {
+				execOpts = *opt.ExecutionOpts
+			}
+			merged.ExecutionOpts = &execOpts
+		}
+	}
+
+	return merged
+}
+
+// ECSPodDefinitionOptions represent options to configure a template for running
+// a pod.
+type ECSPodDefinitionOptions struct {
 	// Name is the friendly name of the pod. By default, this is a random
 	// string.
 	Name *string
@@ -53,77 +127,76 @@ type ECSPodCreationOptions struct {
 	ExecutionRole *string
 	// Tags are resource tags to apply to the pod definition.
 	Tags map[string]string
-	// ExecutionOpts specify options to configure how the pod executes.
-	ExecutionOpts *ECSPodExecutionOptions
 }
 
-// NewECSPodCreationOptions returns new uninitialized options to create a pod.
-func NewECSPodCreationOptions() *ECSPodCreationOptions {
-	return &ECSPodCreationOptions{}
+// NewECSPodDefinitionOptions returns new uninitialized options to create a pod
+// definition.
+func NewECSPodDefinitionOptions() *ECSPodDefinitionOptions {
+	return &ECSPodDefinitionOptions{}
 }
 
 // SetName sets the friendly name of the pod.
-func (o *ECSPodCreationOptions) SetName(name string) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetName(name string) *ECSPodDefinitionOptions {
 	o.Name = &name
 	return o
 }
 
 // SetContainerDefinitions sets the container definitions for the pod. This
 // overwrites any existing container definitions.
-func (o *ECSPodCreationOptions) SetContainerDefinitions(defs []ECSContainerDefinition) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetContainerDefinitions(defs []ECSContainerDefinition) *ECSPodDefinitionOptions {
 	o.ContainerDefinitions = defs
 	return o
 }
 
 // AddContainerDefinitions add new container definitions to the existing ones
 // for the pod.
-func (o *ECSPodCreationOptions) AddContainerDefinitions(defs ...ECSContainerDefinition) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) AddContainerDefinitions(defs ...ECSContainerDefinition) *ECSPodDefinitionOptions {
 	o.ContainerDefinitions = append(o.ContainerDefinitions, defs...)
 	return o
 }
 
 // SetMemoryMB sets the memory limit (in MB) that applies across the entire
 // pod's containers.
-func (o *ECSPodCreationOptions) SetMemoryMB(mem int) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetMemoryMB(mem int) *ECSPodDefinitionOptions {
 	o.MemoryMB = &mem
 	return o
 }
 
 // SetCPU sets the CPU limit (in CPU units) that applies across the entire pod's
 // containers.
-func (o *ECSPodCreationOptions) SetCPU(cpu int) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetCPU(cpu int) *ECSPodDefinitionOptions {
 	o.CPU = &cpu
 	return o
 }
 
 // SetNetworkMode sets the network mode that applies for all the pod's
 // containers.
-func (o *ECSPodCreationOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodDefinitionOptions {
 	o.NetworkMode = &mode
 	return o
 }
 
 // SetTaskRole sets the task role that the pod can use.
-func (o *ECSPodCreationOptions) SetTaskRole(role string) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOptions {
 	o.TaskRole = &role
 	return o
 }
 
 // SetExecutionRole sets the execution role that the pod can use.
-func (o *ECSPodCreationOptions) SetExecutionRole(role string) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetExecutionRole(role string) *ECSPodDefinitionOptions {
 	o.ExecutionRole = &role
 	return o
 }
 
 // SetTags sets the tags for the pod definition. This overwrites any existing
 // tags.
-func (o *ECSPodCreationOptions) SetTags(tags map[string]string) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) SetTags(tags map[string]string) *ECSPodDefinitionOptions {
 	o.Tags = tags
 	return o
 }
 
 // AddTags adds new tags to the existing ones for the pod definition.
-func (o *ECSPodCreationOptions) AddTags(tags map[string]string) *ECSPodCreationOptions {
+func (o *ECSPodDefinitionOptions) AddTags(tags map[string]string) *ECSPodDefinitionOptions {
 	if o.Tags == nil {
 		o.Tags = map[string]string{}
 	}
@@ -133,16 +206,20 @@ func (o *ECSPodCreationOptions) AddTags(tags map[string]string) *ECSPodCreationO
 	return o
 }
 
-// SetExecutionOptions sets the options to configure how the pod executes.
-func (o *ECSPodCreationOptions) SetExecutionOptions(opts ECSPodExecutionOptions) *ECSPodCreationOptions {
-	o.ExecutionOpts = &opts
-	return o
+// getNetworkMode returns the network mode. If no network mode is explicitly
+// set, this returns the default network mode.
+func (o *ECSPodDefinitionOptions) getNetworkMode() ECSNetworkMode {
+	if o.NetworkMode != nil {
+		return *o.NetworkMode
+	}
+	return NetworkModeBridge
 }
 
 // Validate checks that all the required parameters are given and the values are
-// valid.
-func (o *ECSPodCreationOptions) Validate() error {
+// valid. It sets default values where possible.
+func (o *ECSPodDefinitionOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
+
 	catcher.NewWhen(o.Name != nil && *o.Name == "", "cannot specify an empty name")
 	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if non-default")
 	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if non-default")
@@ -151,32 +228,17 @@ func (o *ECSPodCreationOptions) Validate() error {
 
 	networkMode := o.getNetworkMode()
 	catcher.Wrap(networkMode.Validate(), "invalid network mode")
-	catcher.NewWhen(networkMode == NetworkModeAWSVPC && (o.ExecutionOpts == nil || o.ExecutionOpts.AWSVPCOpts == nil), "must specify AWSVPC configuration when using AWSVPC network mode")
-	catcher.NewWhen(networkMode != NetworkModeAWSVPC && o.ExecutionOpts != nil && o.ExecutionOpts.AWSVPCOpts != nil, "cannot specify AWSVPC configuration when network mode is not AWSVPC")
-
-	if o.ExecutionOpts != nil {
-		catcher.Wrap(o.ExecutionOpts.Validate(), "invalid execution options")
-	}
-
-	if catcher.HasErrors() {
-		return catcher.Resolve()
-	}
 
 	if o.Name == nil {
 		o.Name = utility.ToStringPtr(utility.RandomString())
 	}
 
-	if o.ExecutionOpts == nil {
-		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack).SetStrategyParameter(StrategyParamBinpackMemory)
-		o.ExecutionOpts = NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
-	}
-
-	return nil
+	return catcher.Resolve()
 }
 
 // validateContainerDefinitions checks that all the individual container
 // definitions are valid.
-func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
+func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 	catcher := grip.NewBasicCatcher()
 
 	catcher.NewWhen(len(o.ContainerDefinitions) == 0, "must specify at least one container definition")
@@ -230,20 +292,11 @@ func (o *ECSPodCreationOptions) validateContainerDefinitions() error {
 	return catcher.Resolve()
 }
 
-// getNetworkMode returns the network mode. If no network mode is explicitly
-// set, this returns the default network mode.
-func (o *ECSPodCreationOptions) getNetworkMode() ECSNetworkMode {
-	if o.NetworkMode != nil {
-		return *o.NetworkMode
-	}
-	return NetworkModeBridge
-}
-
-// MergeECSPodCreationOptions merges all the given options to create an ECS pod.
-// Options are applied in the order that they're specified and conflicting
-// options are overwritten.
-func MergeECSPodCreationOptions(opts ...ECSPodCreationOptions) ECSPodCreationOptions {
-	merged := ECSPodCreationOptions{}
+// MergeECSPodDefinitionOptions merges all the given options to create an ECS
+// pod definition. Options are applied in the order that they're specified and
+// conflicting options are overwritten.
+func MergeECSPodDefinitionOptions(opts ...ECSPodDefinitionOptions) ECSPodDefinitionOptions {
+	merged := ECSPodDefinitionOptions{}
 
 	for _, opt := range opts {
 		if opt.Name != nil {
@@ -276,10 +329,6 @@ func MergeECSPodCreationOptions(opts ...ECSPodCreationOptions) ECSPodCreationOpt
 
 		if opt.Tags != nil {
 			merged.Tags = opt.Tags
-		}
-
-		if opt.ExecutionOpts != nil {
-			merged.ExecutionOpts = opt.ExecutionOpts
 		}
 	}
 
@@ -778,7 +827,7 @@ func (o *ECSPodExecutionOptions) Validate() error {
 	return nil
 }
 
-// MergeECSPodExecutionOptions merges all the given options to execute an ECS pod.
+// MergeECSPodExecutionOptions merges all the given options to run an ECS pod.
 // Options are applied in the order that they're specified and conflicting
 // options are overwritten.
 func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecutionOptions {
