@@ -81,3 +81,29 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertFailureToError(t *testing.T) {
+	t.Run("ConvertsToFormattedError", func(t *testing.T) {
+		const (
+			arn    = "some_arn"
+			reason = "some reason"
+			detail = "some detail"
+		)
+		err := ConvertFailureToError(ecs.Failure{
+			Arn:    aws.String(arn),
+			Reason: aws.String(reason),
+			Detail: aws.String(detail),
+		})
+		require.NotZero(t, err)
+		assert.Contains(t, err.Error(), arn)
+		assert.Contains(t, err.Error(), reason)
+		assert.Contains(t, err.Error(), detail)
+	})
+	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
+		err := ConvertFailureToError(ecs.Failure{
+			Arn:    aws.String("arn"),
+			Reason: aws.String("MISSING"),
+		})
+		assert.True(t, cocoa.IsECSTaskNotFoundError(err))
+	})
+}

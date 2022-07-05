@@ -172,8 +172,11 @@ func (pc *BasicECSPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExec
 func (pc *BasicECSPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) error {
 	if len(out.Failures) > 0 {
 		catcher := grip.NewBasicCatcher()
-		for _, failure := range out.Failures {
-			catcher.Errorf("task '%s': %s: %s\n", utility.FromStringPtr(failure.Arn), utility.FromStringPtr(failure.Detail), utility.FromStringPtr(failure.Reason))
+		for _, f := range out.Failures {
+			if f == nil {
+				continue
+			}
+			catcher.Add(ConvertFailureToError(*f))
 		}
 		return errors.Wrap(catcher.Resolve(), "running task")
 	}

@@ -2,12 +2,15 @@ package ecs
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
@@ -268,6 +271,9 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 			out, err = c.ecs.StopTaskWithContext(ctx, in)
 			if awsErr, ok := err.(awserr.Error); ok {
 				grip.Debug(message.WrapError(awsErr, msg))
+				if isTaskNotFoundError(awsErr) {
+					return false, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
+				}
 				if c.isNonRetryableErrorCode(awsErr.Code()) {
 					return false, err
 				}
@@ -299,4 +305,44 @@ func (c *BasicECSClient) isNonRetryableErrorCode(code string) bool {
 	default:
 		return false
 	}
+}
+
+// isTaskNotFoundError returns whether or not the error returned from ECS is
+// because the task cannot be found.
+func isTaskNotFoundError(err error) bool {
+	awsErr, ok := err.(awserr.Error)
+	if !ok {
+		return false
+	}
+	return awsErr.Code() == ecs.ErrCodeInvalidParameterException && strings.Contains(awsErr.Message(), "The referenced task was not found")
+}
+
+// ConvertFailureToError converts an ECS failure message into a formatted error.
+// If the failure is due to being unable to find the task, it will return a
+// cocoa.ECSTaskNotFound error.
+// Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/api_failures_messages.html
+func ConvertFailureToError(f ecs.Failure) error {
+	if isTaskNotFoundFailure(f) {
+		return cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(f.Arn))
+	}
+	var parts []string
+	if arn := utility.FromStringPtr(f.Arn); arn != "" {
+		parts = append(parts, fmt.Sprintf("task '%s'", arn))
+	}
+	if reason := utility.FromStringPtr(f.Reason); reason != "" {
+		parts = append(parts, fmt.Sprintf("(reason) %s", reason))
+	}
+	if detail := utility.FromStringPtr(f.Detail); detail != "" {
+		parts = append(parts, fmt.Sprintf("(detail) %s", detail))
+	}
+	if len(parts) == 0 {
+		return errors.New("ECS failure did not contain any additional failure information")
+	}
+	return errors.New(strings.Join(parts, ": "))
+}
+
+// isTaskNotFoundFailure returns whether or not the failure reason returned from
+// ECS is because the task cannot be found.
+func isTaskNotFoundFailure(f ecs.Failure) bool {
+	return f.Arn != nil && utility.FromStringPtr(f.Reason) == "MISSING"
 }

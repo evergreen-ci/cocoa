@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
 )
 
@@ -645,8 +646,10 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 		task, ok := cluster[id]
 		if !ok {
 			failures = append(failures, &ecs.Failure{
-				Arn:    utility.ToStringPtr(id),
-				Reason: utility.ToStringPtr("task not found"),
+				Arn: utility.ToStringPtr(id),
+				// This reason specifically matches the one returned by ECS when
+				// it cannot find the task.
+				Reason: utility.ToStringPtr("MISSING"),
 			})
 			continue
 		}
@@ -672,7 +675,7 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
+		return &ecs.ListTasksOutput{}, nil
 	}
 
 	var arns []string
@@ -714,7 +717,7 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 
 	task, ok := cluster[utility.FromStringPtr(in.Task)]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task not found", nil)
+		return nil, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
 	}
 
 	task.Status = utility.ToStringPtr(ecs.DesiredStatusStopped)
