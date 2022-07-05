@@ -675,7 +675,7 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
+		return &ecs.ListTasksOutput{}, nil
 	}
 
 	var arns []string
