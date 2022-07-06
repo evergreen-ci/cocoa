@@ -9,6 +9,11 @@ needing to make direct calls to the API.
 The ECSPod is a self-contained unit that allows users to manage their pod
 without having to make direct calls to the AWS ECS API.
 
+The ECSPodDefinitionManager provides a means to manage pod definition templates
+in AWS ECS without needing to make direct calls to the API. This can be used in
+conjunction with a ECSPodDefinitionCache to both manage pod definitions in AWS
+ECS and also track these definitions in an external cache.
+
 The ECSClient provides a convenience wrapper around the AWS ECS API. If the
 ECSPodCreator and ECSPod do not fulfill your needs, you can instead make calls
 directly to the ECS API using this client.

@@ -64,7 +64,7 @@ func (p *ECSPod) Resources() cocoa.ECSPodResources {
 }
 
 // Stop stops the mock pod. The mock output can be customized. By default, it
-// will set the cached status to stopped.
+// will return the result of stopping the backing ECS pod.
 func (p *ECSPod) Stop(ctx context.Context) error {
 	if p.StopError != nil {
 		return p.StopError
@@ -75,7 +75,7 @@ func (p *ECSPod) Stop(ctx context.Context) error {
 
 // Delete deletes the mock pod and all of its underlying resources. The mock
 // output can be customized. By default, it will return the result of the
-// backing ECS pod.
+// deleting the backing ECS pod.
 func (p *ECSPod) Delete(ctx context.Context) error {
 	if p.DeleteError != nil {
 		return p.DeleteError

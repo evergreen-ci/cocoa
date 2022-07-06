@@ -26,22 +26,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			assert.Zero(t, out)
 		},
 		"DeregisteringExistingTaskDefinitionMultipleTimesIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			registerOut, err := c.RegisterTaskDefinition(ctx, &awsECS.RegisterTaskDefinitionInput{
-				ContainerDefinitions: []*awsECS.ContainerDefinition{
-					{
-						Command: []*string{aws.String("echo"), aws.String("hello")},
-						Image:   aws.String("busybox"),
-						Name:    aws.String("hello_world"),
-					},
-				},
-				Cpu:    aws.String("128"),
-				Memory: aws.String("4"),
-				Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-			})
-			require.NoError(t, err)
-			require.NotNil(t, registerOut)
-			require.NotNil(t, registerOut.TaskDefinition)
-			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 
 			for i := 0; i < 3; i++ {
 				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
@@ -66,32 +51,15 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			assert.Zero(t, out)
 		},
 		"RegisterAndDeregisterTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			registerOut, err := c.RegisterTaskDefinition(ctx, &awsECS.RegisterTaskDefinitionInput{
-				ContainerDefinitions: []*awsECS.ContainerDefinition{
-					{
-						Command: []*string{aws.String("echo"), aws.String("hello")},
-						Image:   aws.String("busybox"),
-						Name:    aws.String("hello_world"),
-					},
-				},
-				Cpu:    aws.String("128"),
-				Memory: aws.String("4"),
-				Family: aws.String(testutil.NewTaskDefinitionFamily(t)),
-			})
-			require.NoError(t, err)
-			require.NotNil(t, registerOut)
-			require.NotNil(t, registerOut.TaskDefinition)
-			require.NotNil(t, registerOut.TaskDefinition.TaskDefinitionArn)
-			require.NotZero(t, registerOut.TaskDefinition.Status)
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 			assert.Equal(t, awsECS.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
-			require.NotZero(t, registerOut.TaskDefinition.RegisteredAt)
-			assert.NotZero(t, *registerOut.TaskDefinition.RegisteredAt)
+			assert.NotZero(t, utility.FromTimePtr(registerOut.TaskDefinition.RegisteredAt))
 
-			out, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
+			deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
-			require.NotZero(t, out)
+			require.NotZero(t, deregisterOut)
 		},
 		"RunTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.RunTask(ctx, &awsECS.RunTaskInput{
@@ -152,6 +120,141 @@ func ECSClientTests() map[string]ECSClientTestCase {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 			assert.Empty(t, out.TaskArns)
+		},
+		"TagResourceSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
+			defer func() {
+				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
+					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				})
+				assert.NoError(t, err)
+				assert.NotZero(t, deregisterOut)
+			}()
+
+			tags := []*awsECS.Tag{
+				{
+					Key:   aws.String("some_key"),
+					Value: aws.String("some_value"),
+				},
+			}
+			_, err := c.TagResource(ctx, &awsECS.TagResourceInput{
+				ResourceArn: registerOut.TaskDefinition.TaskDefinitionArn,
+				Tags:        tags,
+			})
+			require.NoError(t, err)
+
+			describeOut, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
+				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				Include:        []*string{aws.String("TAGS")},
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeOut)
+			require.NotZero(t, describeOut.TaskDefinition)
+			require.Len(t, describeOut.Tags, 1)
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Key), utility.FromStringPtr(tags[0].Key))
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Value), utility.FromStringPtr(tags[0].Value))
+		},
+		"TagResourceIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
+			defer func() {
+				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
+					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				})
+				assert.NoError(t, err)
+				assert.NotZero(t, deregisterOut)
+			}()
+
+			tags := []*awsECS.Tag{
+				{
+					Key:   aws.String("some_key"),
+					Value: aws.String("some_value"),
+				},
+			}
+			for i := 0; i < 3; i++ {
+				_, err := c.TagResource(ctx, &awsECS.TagResourceInput{
+					ResourceArn: registerOut.TaskDefinition.TaskDefinitionArn,
+					Tags:        tags,
+				})
+				require.NoError(t, err)
+			}
+
+			describeOut, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
+				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				Include:        []*string{aws.String("TAGS")},
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeOut)
+			require.NotZero(t, describeOut.TaskDefinition)
+			require.Len(t, describeOut.Tags, 1)
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Key), utility.FromStringPtr(tags[0].Key))
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Value), utility.FromStringPtr(tags[0].Value))
+		},
+		"TagResourceOverwritesExistingTagValue": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
+			defer func() {
+				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
+					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				})
+				assert.NoError(t, err)
+				assert.NotZero(t, deregisterOut)
+			}()
+
+			oldTags := []*awsECS.Tag{
+				{
+					Key:   aws.String("mango"),
+					Value: aws.String("is second best fruit"),
+				},
+				{
+					Key:   aws.String("fish"),
+					Value: aws.String("are friends and food"),
+				},
+			}
+
+			_, err := c.TagResource(ctx, &awsECS.TagResourceInput{
+				ResourceArn: registerOut.TaskDefinition.TaskDefinitionArn,
+				Tags:        oldTags,
+			})
+			require.NoError(t, err)
+
+			newTags := []*awsECS.Tag{
+				{
+					Key:   aws.String("mango"),
+					Value: aws.String("is best fruit"),
+				},
+			}
+			_, err = c.TagResource(ctx, &awsECS.TagResourceInput{
+				ResourceArn: registerOut.TaskDefinition.TaskDefinitionArn,
+				Tags:        newTags,
+			})
+			require.NoError(t, err)
+
+			describeOut, err := c.DescribeTaskDefinition(ctx, &awsECS.DescribeTaskDefinitionInput{
+				TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
+				Include:        []*string{aws.String("TAGS")},
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeOut)
+			require.NotZero(t, describeOut.TaskDefinition)
+			require.Len(t, describeOut.Tags, 2)
+			for _, tag := range describeOut.Tags {
+				k := utility.FromStringPtr(tag.Key)
+				switch k {
+				case utility.FromStringPtr(oldTags[0].Key):
+					assert.Equal(t, utility.FromStringPtr(newTags[0].Value), utility.FromStringPtr(tag.Value), "first tag should have new value")
+				case utility.FromStringPtr(oldTags[1].Key):
+					assert.Equal(t, utility.FromStringPtr(oldTags[1].Value), utility.FromStringPtr(tag.Value), "second tag should have unmodified value")
+				default:
+					assert.Fail(t, "unexpected tag key '%s'", k)
+				}
+			}
+		},
+		"TagResourceFailsWithZeroInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			_, err := c.TagResource(ctx, &awsECS.TagResourceInput{})
+			assert.Error(t, err)
+		},
+		"TagResourceFailsWithNonexistentResource": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
+			_, err := c.TagResource(ctx, &awsECS.TagResourceInput{ResourceArn: aws.String("foo")})
+			assert.Error(t, err)
 		},
 	}
 }

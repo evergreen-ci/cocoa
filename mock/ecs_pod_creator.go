@@ -20,7 +20,8 @@ type ECSPodCreator struct {
 	CreatePodFromExistingDefinitionError  error
 }
 
-// NewECSPodCreator creates a mock ECS Pod Creator backed by the given Pod Creator.
+// NewECSPodCreator creates a mock ECS pod creator backed by the given pod
+// creator.
 func NewECSPodCreator(c cocoa.ECSPodCreator) *ECSPodCreator {
 	return &ECSPodCreator{
 		ECSPodCreator: c,
@@ -28,8 +29,8 @@ func NewECSPodCreator(c cocoa.ECSPodCreator) *ECSPodCreator {
 }
 
 // CreatePod saves the input and returns a new mock pod. The mock output can be
-// customized. By default, it will return the result of the backing ECS pod
-// creator.
+// customized. By default, it will return the result of creating the pod in the
+// backing ECS pod creator.
 func (m *ECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
 	m.CreatePodInput = opts
 
@@ -44,7 +45,7 @@ func (m *ECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCreat
 
 // CreatePodFromExistingDefinition saves the input and returns a new mock pod.
 // The mock output can be customized. By default, it will return the result of
-// the backing ECS pod creator.
+// creating the pod in the backing ECS pod creator.
 func (m *ECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
 	m.CreatePodFromExistingDefinitionInput = opts
 

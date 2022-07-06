@@ -167,14 +167,13 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 	return t
 }
 
-func (t *ECSTask) export() *ecs.Task {
+func (t *ECSTask) export(includeTags bool) *ecs.Task {
 	exported := ecs.Task{
 		TaskArn:              t.ARN,
 		ClusterArn:           t.Cluster,
 		CapacityProviderName: t.CapacityProvider,
 		EnableExecuteCommand: t.ExecEnabled,
 		Group:                t.Group,
-		Tags:                 exportTags(t.Tags),
 		TaskDefinitionArn:    t.TaskDef.ARN,
 		Cpu:                  t.TaskDef.CPU,
 		Memory:               t.TaskDef.MemoryMB,
@@ -184,6 +183,9 @@ func (t *ECSTask) export() *ecs.Task {
 		StopCode:             t.StopCode,
 		StoppedReason:        t.StopReason,
 		StoppedAt:            t.Stopped,
+	}
+	if includeTags {
+		exported.Tags = exportTags(t.Tags)
 	}
 
 	for _, container := range t.Containers {
@@ -469,6 +471,10 @@ type ECSClient struct {
 	StopTaskOutput *ecs.StopTaskOutput
 	StopTaskError  error
 
+	TagResourceInput  *ecs.TagResourceInput
+	TagResourceOutput *ecs.TagResourceOutput
+	TagResourceError  error
+
 	CloseError error
 }
 
@@ -516,9 +522,19 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task definition not found", err)
 	}
 
-	return &ecs.DescribeTaskDefinitionOutput{
+	resp := ecs.DescribeTaskDefinitionOutput{
 		TaskDefinition: def.export(),
-	}, nil
+	}
+	for _, include := range in.Include {
+		// "TAGS" is a magic string in the ECS API that indicates that the
+		// response should include resource tags.
+		if utility.FromStringPtr(include) == "TAGS" {
+			resp.Tags = exportTags(def.Tags)
+			break
+		}
+	}
+
+	return &resp, nil
 }
 
 // ListTaskDefinitions saves the input and lists all matching task definitions.
@@ -612,7 +628,7 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 	cluster[utility.FromStringPtr(task.ARN)] = task
 
 	return &ecs.RunTaskOutput{
-		Tasks: []*ecs.Task{task.export()},
+		Tasks: []*ecs.Task{task.export(true)},
 	}, nil
 }
 
@@ -638,6 +654,16 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
 	}
 
+	var includeTags bool
+	for _, include := range in.Include {
+		// "TAGS" is a magic string in the ECS API that indicates that the
+		// response should include resource tags.
+		if utility.FromStringPtr(include) == "TAGS" {
+			includeTags = true
+			break
+		}
+	}
+
 	ids := utility.FromStringPtrSlice(in.Tasks)
 
 	var tasks []*ecs.Task
@@ -654,7 +680,7 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 			continue
 		}
 
-		tasks = append(tasks, task.export())
+		tasks = append(tasks, task.export(includeTags))
 	}
 
 	return &ecs.DescribeTasksOutput{
@@ -732,8 +758,49 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 	cluster[utility.FromStringPtr(in.Task)] = task
 
 	return &ecs.StopTaskOutput{
-		Task: task.export(),
+		Task: task.export(true),
 	}, nil
+}
+
+// TagResource saves the input and tags a mock task or task definition. The mock
+// output can be customized. By default, it will add the tag to the resource if
+// it exists.
+func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error) {
+	c.TagResourceInput = in
+
+	if c.TagResourceOutput != nil || c.TagResourceError != nil {
+		return c.TagResourceOutput, c.TagResourceError
+	}
+
+	id := utility.FromStringPtr(in.ResourceArn)
+
+	taskDef, err := GlobalECSService.getTaskDefinition(id)
+	if err == nil {
+		for _, t := range in.Tags {
+			if t == nil {
+				continue
+			}
+			taskDef.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		}
+		return &ecs.TagResourceOutput{}, nil
+	}
+
+	for _, cluster := range GlobalECSService.Clusters {
+		task, ok := cluster[id]
+		if !ok {
+			continue
+		}
+		for _, t := range in.Tags {
+			if t == nil {
+				continue
+			}
+			task.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		}
+		cluster[id] = task
+		return &ecs.TagResourceOutput{}, nil
+	}
+
+	return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task or task definition not found", nil)
 }
 
 // Close closes the mock client. The mock output can be customized. By default,

@@ -9,7 +9,6 @@ import (
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // defaultTestTimeout is the default test timeout for mock tests.
@@ -44,12 +43,7 @@ func TestECSClient(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
-			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
-			require.NoError(t, err)
-			require.NotZero(t, registerOut)
-			require.NotZero(t, registerOut.TaskDefinition)
-
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 			tCase(tctx, t, c, *registerOut.TaskDefinition)
 		})
 	}
