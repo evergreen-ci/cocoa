@@ -155,6 +155,14 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetMemoryMB(128).
 				SetCPU(256).
 				AddEnvironmentVariables(*envVar)
+			defOpts := cocoa.NewECSPodDefinitionOptions().
+				SetMemoryMB(512).
+				SetCPU(1024).
+				SetTaskRole("task_role").
+				SetExecutionRole("execution_role").
+				SetNetworkMode(cocoa.NetworkModeAWSVPC).
+				SetTags(map[string]string{"creation_tag": "creation_val"}).
+				AddContainerDefinitions(*containerDef)
 			placementOpts := cocoa.NewECSPodPlacementOptions().
 				SetGroup("group").
 				SetStrategy(cocoa.StrategyBinpack).
@@ -171,13 +179,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetTags(map[string]string{"execution_tag": "execution_val"}).
 				SetSupportsDebugMode(true)
 			opts := cocoa.NewECSPodCreationOptions().
-				SetMemoryMB(512).
-				SetCPU(1024).
-				SetTaskRole("task_role").
-				SetExecutionRole("execution_role").
-				SetNetworkMode(cocoa.NetworkModeAWSVPC).
-				SetTags(map[string]string{"creation_tag": "creation_val"}).
-				AddContainerDefinitions(*containerDef).
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 
 			_, err := pc.CreatePod(ctx, *opts)
@@ -187,17 +189,17 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			mem, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Memory))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.MemoryMB), mem)
+			assert.Equal(t, utility.FromIntPtr(defOpts.MemoryMB), mem)
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
-			require.NotZero(t, opts.NetworkMode)
-			assert.EqualValues(t, *opts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
-			assert.Equal(t, utility.FromStringPtr(opts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
-			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
+			require.NotZero(t, defOpts.NetworkMode)
+			assert.EqualValues(t, *defOpts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
+			assert.Equal(t, utility.FromStringPtr(defOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
+			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 1)
 			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
-			assert.Equal(t, opts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
+			assert.Equal(t, defOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
 			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
@@ -241,13 +243,15 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				AddEnvironmentVariables(*envVar)
-			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetMemoryMB(512).
 				SetCPU(1024).
 				SetExecutionRole("execution_role").
-				AddContainerDefinitions(*containerDef).
+				AddContainerDefinitions(*containerDef)
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName())
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 
 			_, err := pc.CreatePod(ctx, *opts)
@@ -257,11 +261,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			mem, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Memory))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.MemoryMB), mem)
+			assert.Equal(t, utility.FromIntPtr(defOpts.MemoryMB), mem)
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
-			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
+			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
 			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets, 1)
@@ -282,13 +286,15 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				SetRepositoryCredentials(*repoCreds)
-			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetMemoryMB(512).
 				SetCPU(1024).
 				SetExecutionRole("execution_role").
-				AddContainerDefinitions(*containerDef).
+				AddContainerDefinitions(*containerDef)
+			execOpts := cocoa.NewECSPodExecutionOptions().
+				SetCluster(testutil.ECSClusterName())
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 
 			p, err := pc.CreatePod(ctx, *opts)
@@ -298,11 +304,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			mem, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Memory))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.MemoryMB), mem)
+			assert.Equal(t, utility.FromIntPtr(defOpts.MemoryMB), mem)
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
-			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
+			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
 			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			res := p.Resources()
@@ -328,6 +334,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				AddEnvironmentVariables(*envVar)
+			defOpts := cocoa.NewECSPodDefinitionOptions().
+				SetMemoryMB(512).
+				SetCPU(1024).
+				SetExecutionRole("execution_role").
+				AddContainerDefinitions(*containerDef)
 			placementOpts := cocoa.NewECSPodPlacementOptions().
 				SetStrategy(cocoa.StrategyBinpack).
 				SetStrategyParameter(cocoa.StrategyParamBinpackMemory)
@@ -335,10 +346,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetCluster(testutil.ECSClusterName()).
 				SetPlacementOptions(*placementOpts)
 			opts := cocoa.NewECSPodCreationOptions().
-				SetMemoryMB(512).
-				SetCPU(1024).
-				SetExecutionRole("execution_role").
-				AddContainerDefinitions(*containerDef).
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 
 			c.RegisterTaskDefinitionError = errors.New("fake error")

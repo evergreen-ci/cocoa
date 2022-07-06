@@ -31,13 +31,15 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetName("container")
 
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetNetworkMode(cocoa.NetworkModeBridge).
+				SetNetworkMode(cocoa.NetworkModeBridge)
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -71,14 +73,15 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetName("container")
 
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole(testutil.ECSTaskRole()).
-				SetExecutionRole(testutil.ECSExecutionRole()).
+				SetExecutionRole(testutil.ECSExecutionRole())
+
+			opts := cocoa.NewECSPodCreationOptions().SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -99,14 +102,16 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetName("container")
 
 			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
-
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole(testutil.ECSTaskRole()).
-				SetExecutionRole(testutil.ECSExecutionRole()).
+				SetExecutionRole(testutil.ECSExecutionRole())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -142,13 +147,16 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName())
 
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
-				SetTaskRole(testutil.ECSTaskRole()).
-				SetExecutionOptions(*execOpts).
-				SetName(testutil.NewTaskDefinitionFamily(t))
+				SetTaskRole(testutil.ECSTaskRole())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
 			assert.Error(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -173,13 +181,16 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName())
 
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole(testutil.ECSTaskRole()).
-				SetExecutionRole(testutil.ECSExecutionRole()).
+				SetExecutionRole(testutil.ECSExecutionRole())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 
@@ -212,13 +223,16 @@ func ECSPodCreatorWithVaultTests() map[string]ECSPodCreatorTestCase {
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName())
 
-			opts := cocoa.NewECSPodCreationOptions().
+			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole(testutil.ECSTaskRole()).
-				SetExecutionRole(testutil.ECSExecutionRole()).
+				SetExecutionRole(testutil.ECSExecutionRole())
+
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 			assert.NoError(t, opts.Validate())
 

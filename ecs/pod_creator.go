@@ -50,7 +50,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 		return nil, errors.Wrap(err, "creating new secrets")
 	}
 
-	taskDefinition, err := pc.registerTaskDefinition(ctx, mergedPodCreationOpts)
+	taskDefinition, err := pc.registerTaskDefinition(ctx, mergedPodCreationOpts.DefinitionOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "registering task definition")
 	}
@@ -64,7 +64,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 		return nil, errors.Wrap(err, "running task")
 	}
 
-	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, mergedPodCreationOpts.ContainerDefinitions)
+	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, mergedPodCreationOpts.DefinitionOpts.ContainerDefinitions)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod after requesting task")
 	}
@@ -124,9 +124,9 @@ func (pc *BasicECSPodCreator) createPod(cluster string, task ecs.Task, def cocoa
 }
 
 // registerTaskDefinition makes the request to register an ECS task definition
-// from the options checks that it returns a valid task definition.
-func (pc *BasicECSPodCreator) registerTaskDefinition(ctx context.Context, opts cocoa.ECSPodCreationOptions) (*ecs.TaskDefinition, error) {
-	in := pc.exportPodCreationOptions(opts)
+// from the options and checks that it returns a valid task definition.
+func (pc *BasicECSPodCreator) registerTaskDefinition(ctx context.Context, opts cocoa.ECSPodDefinitionOptions) (*ecs.TaskDefinition, error) {
+	in := pc.exportPodDefinitionOptions(opts)
 	out, err := pc.client.RegisterTaskDefinition(ctx, in)
 	if err != nil {
 		return nil, errors.Wrap(err, "registering task definition")
@@ -199,7 +199,7 @@ func (pc *BasicECSPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) erro
 // set.
 func (pc *BasicECSPodCreator) createSecrets(ctx context.Context, opts *cocoa.ECSPodCreationOptions) error {
 	var defs []cocoa.ECSContainerDefinition
-	for i, def := range opts.ContainerDefinitions {
+	for i, def := range opts.DefinitionOpts.ContainerDefinitions {
 		defs = append(defs, def)
 		containerName := utility.FromStringPtr(def.Name)
 
@@ -213,7 +213,7 @@ func (pc *BasicECSPodCreator) createSecrets(ctx context.Context, opts *cocoa.ECS
 
 			id, err := pc.createSecret(ctx, *envVar.SecretOpts)
 			if err != nil {
-				return errors.Wrapf(err, "creating secret environment variable '%s' for container '%s'", utility.FromStringPtr(opts.Name), containerName)
+				return errors.Wrapf(err, "creating secret environment variable '%s' for container '%s'", utility.FromStringPtr(opts.DefinitionOpts.Name), containerName)
 			}
 
 			updated := *envVar.SecretOpts
@@ -251,7 +251,7 @@ func (pc *BasicECSPodCreator) createSecrets(ctx context.Context, opts *cocoa.ECS
 	// have to avoid mutating the original input. Therefore, replace the
 	// entire slice of container definitions to create a separate slice in
 	// memory and avoid mutating the original input's container definitions.
-	opts.ContainerDefinitions = defs
+	opts.DefinitionOpts.ContainerDefinitions = defs
 
 	return nil
 }
@@ -427,9 +427,9 @@ func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContai
 	return statuses
 }
 
-// exportPodCreationOptions converts options to create a pod into its equivalent
-// ECS task definition.
-func (pc *BasicECSPodCreator) exportPodCreationOptions(opts cocoa.ECSPodCreationOptions) *ecs.RegisterTaskDefinitionInput {
+// exportPodDefinitionOptions converts options to create a pod definition into
+// its equivalent ECS task definition.
+func (pc *BasicECSPodCreator) exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.RegisterTaskDefinitionInput {
 	var taskDef ecs.RegisterTaskDefinitionInput
 
 	var containerDefs []*ecs.ContainerDefinition

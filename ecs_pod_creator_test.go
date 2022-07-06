@@ -15,15 +15,244 @@ func TestECSPodCreationOptions(t *testing.T) {
 		require.NotZero(t, opts)
 		assert.Zero(t, *opts)
 	})
+	t.Run("SetDefinitionOptions", func(t *testing.T) {
+		defOpts := NewECSPodDefinitionOptions().SetName("name")
+		opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+		assert.Equal(t, *defOpts, opts.DefinitionOpts)
+	})
+	t.Run("SetExecutionOptions", func(t *testing.T) {
+		execOpts := NewECSPodExecutionOptions().SetCluster("cluster")
+		opts := NewECSPodCreationOptions().SetExecutionOptions(*execOpts)
+		assert.Equal(t, *execOpts, *opts.ExecutionOpts)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		getValidPodDefOpts := func() *ECSPodDefinitionOptions {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128)
+			return defOpts
+		}
+
+		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
+			assert.Error(t, NewECSPodCreationOptions().Validate())
+		})
+		t.Run("SucceedsWithValidFieldsPopulated", func(t *testing.T) {
+			containerDef := NewECSContainerDefinition().SetImage("image")
+			defOpts := NewECSPodDefinitionOptions().
+				SetName("name").
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetTaskRole("role").
+				AddTags(map[string]string{"key": "val"})
+			placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyRandom)
+			execOpts := NewECSPodExecutionOptions().
+				SetCluster("cluster").
+				SetCapacityProvider("provider").
+				SetPlacementOptions(*placementOpts).
+				SetSupportsDebugMode(true).
+				SetTags(map[string]string{"other_key": "other_val"})
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithBadExecutionOptions", func(t *testing.T) {
+			defOpts := getValidPodDefOpts()
+			assert.NoError(t, defOpts.Validate())
+			placementOpts := NewECSPodPlacementOptions().SetStrategy("foo")
+			execOpts := NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
+			assert.Error(t, execOpts.Validate())
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*getValidPodDefOpts()).
+				SetExecutionOptions(*execOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("AWSVPCOptionsWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
+			defOpts := getValidPodDefOpts().SetNetworkMode(NetworkModeAWSVPC)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("MissingExecutionOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			defOpts := getValidPodDefOpts().SetNetworkMode(NetworkModeAWSVPC)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("MissingAWSVPCOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			defOpts := getValidPodDefOpts().SetNetworkMode(NetworkModeAWSVPC)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*NewECSPodExecutionOptions())
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("AWSVPCOptionsWithoutNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
+			defOpts := getValidPodDefOpts()
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeAWSVPCAndPortMappingToIdenticalPortAndAWSVPCOptions", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeAWSVPCAndPortMappingToUnspecifiedHostPortAndAWSVPCOptions", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithNetworkModeAWSVPCANdPortMappingsToDifferentHostPort", func(t *testing.T) {
+			pm := NewPortMapping().
+				SetContainerPort(1337).
+				SetHostPort(9001)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeAWSVPC)
+			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
+			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
+			opts := NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*execOpts)
+			assert.Error(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeHostAndPortMappingToIdenticalHostPort", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeHost)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeHostAndPortMappingToUnspecifiedHostPort", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeHost)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithNetworkModeHostAndPortMappingsToDifferentHostPort", func(t *testing.T) {
+			pm := NewPortMapping().
+				SetContainerPort(1337).
+				SetHostPort(9001)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeBridge)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("FailsWithNetworkModeBridgeAndPortMappingToIdenticalHostPort", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeHost)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeBridgeAndPortMappingToUnspecifiedHostPort", func(t *testing.T) {
+			pm := NewPortMapping().SetContainerPort(1337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeBridge)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+		t.Run("SucceedsWithNetworkModeBridgeAndPortMappingsToDifferentHostPort", func(t *testing.T) {
+			pm := NewPortMapping().
+				SetContainerPort(1337).
+				SetHostPort(13337)
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				AddPortMappings(*pm)
+			defOpts := NewECSPodDefinitionOptions().
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128).
+				SetNetworkMode(NetworkModeBridge)
+			opts := NewECSPodCreationOptions().SetDefinitionOptions(*defOpts)
+			assert.NoError(t, opts.Validate())
+		})
+	})
+}
+
+func TestECSPodDefinition(t *testing.T) {
+	t.Run("NewECSPodDefinitionOptions", func(t *testing.T) {
+		opts := NewECSPodDefinitionOptions()
+		require.NotZero(t, opts)
+		assert.Zero(t, *opts)
+	})
 	t.Run("SetName", func(t *testing.T) {
 		name := "name"
-		def := NewECSPodCreationOptions().SetName(name)
+		def := NewECSPodDefinitionOptions().SetName(name)
 		assert.Equal(t, name, utility.FromStringPtr(def.Name))
 	})
 	t.Run("SetContainerDefinitions", func(t *testing.T) {
 		containerDef := NewECSContainerDefinition().SetImage("image")
 
-		opts := NewECSPodCreationOptions().SetContainerDefinitions([]ECSContainerDefinition{*containerDef})
+		opts := NewECSPodDefinitionOptions().SetContainerDefinitions([]ECSContainerDefinition{*containerDef})
 		require.Len(t, opts.ContainerDefinitions, 1)
 		assert.Equal(t, *containerDef, opts.ContainerDefinitions[0])
 
@@ -35,41 +264,41 @@ func TestECSPodCreationOptions(t *testing.T) {
 			*NewECSContainerDefinition().SetImage("image0"),
 			*NewECSContainerDefinition().SetImage("image1"),
 		}
-		def := NewECSPodCreationOptions().AddContainerDefinitions(cDefs...)
+		def := NewECSPodDefinitionOptions().AddContainerDefinitions(cDefs...)
 		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
 		def.AddContainerDefinitions()
 		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
 	})
 	t.Run("SetMemoryMB", func(t *testing.T) {
 		mem := 128
-		opts := NewECSPodCreationOptions().SetMemoryMB(mem)
+		opts := NewECSPodDefinitionOptions().SetMemoryMB(mem)
 		assert.Equal(t, mem, utility.FromIntPtr(opts.MemoryMB))
 	})
 	t.Run("SetCPU", func(t *testing.T) {
 		cpu := 128
-		opts := NewECSPodCreationOptions().SetCPU(cpu)
+		opts := NewECSPodDefinitionOptions().SetCPU(cpu)
 		assert.Equal(t, cpu, utility.FromIntPtr(opts.CPU))
 	})
 	t.Run("SetNetworkMode", func(t *testing.T) {
 		mode := NetworkModeAWSVPC
-		opts := NewECSPodCreationOptions().SetNetworkMode(mode)
+		opts := NewECSPodDefinitionOptions().SetNetworkMode(mode)
 		require.NotZero(t, opts.NetworkMode)
 		assert.Equal(t, mode, *opts.NetworkMode)
 	})
 	t.Run("SetTaskRole", func(t *testing.T) {
 		r := "task_role"
-		opts := NewECSPodCreationOptions().SetTaskRole(r)
+		opts := NewECSPodDefinitionOptions().SetTaskRole(r)
 		assert.Equal(t, r, utility.FromStringPtr(opts.TaskRole))
 	})
 	t.Run("SetExecutionRole", func(t *testing.T) {
 		r := "execution_role"
-		opts := NewECSPodCreationOptions().SetExecutionRole(r)
+		opts := NewECSPodDefinitionOptions().SetExecutionRole(r)
 		assert.Equal(t, r, utility.FromStringPtr(opts.ExecutionRole))
 	})
 	t.Run("SetTags", func(t *testing.T) {
 		tags := map[string]string{"key": "value"}
 
-		opts := NewECSPodCreationOptions().SetTags(tags)
+		opts := NewECSPodDefinitionOptions().SetTags(tags)
 		require.Len(t, opts.Tags, len(tags))
 		for k, v := range tags {
 			assert.Equal(t, v, opts.Tags[k])
@@ -80,32 +309,29 @@ func TestECSPodCreationOptions(t *testing.T) {
 	})
 	t.Run("AddTags", func(t *testing.T) {
 		tags := map[string]string{"key0": "val0", "key1": "val1"}
-		opts := NewECSPodCreationOptions().AddTags(tags)
+		opts := NewECSPodDefinitionOptions().AddTags(tags)
 		assert.Equal(t, tags, opts.Tags)
 		opts.AddTags(map[string]string{})
 		assert.Equal(t, tags, opts.Tags)
 	})
 	t.Run("Validate", func(t *testing.T) {
-		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
-			assert.Error(t, NewECSPodCreationOptions().Validate())
-		})
 		t.Run("SucceedsWithMemoryCPUAndContainerDefinition", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutContainerDefinition", func(t *testing.T) {
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				SetMemoryMB(128).
 				SetCPU(128)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("NameIsGenerated", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128)
@@ -113,7 +339,7 @@ func TestECSPodCreationOptions(t *testing.T) {
 			assert.NotZero(t, utility.FromStringPtr(opts.Name))
 		})
 		t.Run("FailsWithBadContainerDefinition", func(t *testing.T) {
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*NewECSContainerDefinition()).
 				SetMemoryMB(128).
 				SetCPU(128)
@@ -121,33 +347,32 @@ func TestECSPodCreationOptions(t *testing.T) {
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				SetName("name").
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(128).
 				SetTaskRole("role").
-				AddTags(map[string]string{"key": "val"}).
-				SetExecutionOptions(*NewECSPodExecutionOptions())
+				AddTags(map[string]string{"key": "val"})
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithMissingCPU", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithoutPodCPUWhenContainerCPUIsGiven", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image").SetCPU(128)
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWhenTotalContainerCPUExceedsPodCPU", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image").SetCPU(256)
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(1024).
 				SetCPU(128)
@@ -155,7 +380,7 @@ func TestECSPodCreationOptions(t *testing.T) {
 		})
 		t.Run("FailsWithZeroCPU", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(0)
@@ -163,21 +388,21 @@ func TestECSPodCreationOptions(t *testing.T) {
 		})
 		t.Run("FailsWithoutMemory", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetCPU(128)
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedWithoutPodMemoryWhenContainerMemoryIsGiven", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image").SetMemoryMB(128)
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetCPU(128)
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithTotalContainerMemoryExceedingPodMemory", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image").SetMemoryMB(256)
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
 				SetCPU(1024)
@@ -185,227 +410,11 @@ func TestECSPodCreationOptions(t *testing.T) {
 		})
 		t.Run("FailsWithZeroMemory", func(t *testing.T) {
 			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
+			opts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(0).
 				SetCPU(128)
 			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithBadExecutionOptions", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			placementOpts := NewECSPodPlacementOptions().SetStrategy("foo")
-			execOpts := NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetExecutionOptions(*execOpts)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithSecretEnvironmentVariablesWithoutExecutionRole", func(t *testing.T) {
-			secretOpts := NewSecretOptions().SetName("name").SetNewValue("value")
-			ev := NewEnvironmentVariable().SetName("name").SetSecretOptions(*secretOpts)
-			containerDef := NewECSContainerDefinition().SetImage("image").AddEnvironmentVariables(*ev)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithBadNetworkMode", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode("invalid")
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeNoneAndNoPortMappings", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeNone)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("FailsWithNetworkModeNoneAndPortMappings", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeNone)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("AWSVPCOptionsWithNetworkModeAWSVPCIsValid", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
-			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC).
-				SetExecutionOptions(*execOpts)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("MissingExecutionOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("MissingAWSVPCOptionsWithNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC).
-				SetExecutionOptions(*NewECSPodExecutionOptions())
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("AWSVPCOptionsWithoutNetworkModeAWSVPCIsInvalid", func(t *testing.T) {
-			containerDef := NewECSContainerDefinition().SetImage("image")
-			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
-			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetExecutionOptions(*execOpts)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeAWSVPCAndPortMappingToIdenticalPortAndAWSVPCOptions", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
-			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC).
-				SetExecutionOptions(*execOpts)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeAWSVPCAndPortMappingToUnspecifiedHostPortAndAWSVPCOptions", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
-			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC).
-				SetExecutionOptions(*execOpts)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("FailsWithNetworkModeAWSVPCANdPortMappingsToDifferentHostPort", func(t *testing.T) {
-			pm := NewPortMapping().
-				SetContainerPort(1337).
-				SetHostPort(9001)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			awsvpcOpts := NewAWSVPCOptions().AddSubnets("subnet-12345")
-			execOpts := NewECSPodExecutionOptions().SetAWSVPCOptions(*awsvpcOpts)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeAWSVPC).
-				SetExecutionOptions(*execOpts)
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeHostAndPortMappingToIdenticalHostPort", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeHost)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeHostAndPortMappingToUnspecifiedHostPort", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeHost)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("FailsWithNetworkModeHostAndPortMappingsToDifferentHostPort", func(t *testing.T) {
-			pm := NewPortMapping().
-				SetContainerPort(1337).
-				SetHostPort(9001)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeBridge)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("FailsWithNetworkModeBridgeAndPortMappingToIdenticalHostPort", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337).SetHostPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeHost)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeBridgeAndPortMappingToUnspecifiedHostPort", func(t *testing.T) {
-			pm := NewPortMapping().SetContainerPort(1337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeBridge)
-			assert.NoError(t, opts.Validate())
-		})
-		t.Run("SucceedsWithNetworkModeBridgeAndPortMappingsToDifferentHostPort", func(t *testing.T) {
-			pm := NewPortMapping().
-				SetContainerPort(1337).
-				SetHostPort(13337)
-			containerDef := NewECSContainerDefinition().
-				SetImage("image").
-				AddPortMappings(*pm)
-			opts := NewECSPodCreationOptions().
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetNetworkMode(NetworkModeBridge)
-			assert.NoError(t, opts.Validate())
 		})
 	})
 }
