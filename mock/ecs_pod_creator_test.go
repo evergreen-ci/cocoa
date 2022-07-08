@@ -135,12 +135,6 @@ func TestECSPodCreator(t *testing.T) {
 	}
 }
 
-type ecsPodDefOptions struct {
-	envVar       cocoa.EnvironmentVariable
-	containerDef cocoa.ECSContainerDefinition
-	defOpts      cocoa.ECSPodDefinitionOptions
-}
-
 // ecsPodCreatorTests are mock-specific tests for ECS and Secrets Manager with
 // the ECS pod creator.
 func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
