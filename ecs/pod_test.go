@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -18,10 +19,11 @@ import (
 func TestBasicECSPod(t *testing.T) {
 	assert.Implements(t, (*cocoa.ECSPod)(nil), &BasicECSPod{})
 
-	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	hc := utility.GetHTTPClient()
+	defer utility.PutHTTPClient(hc)
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient){
 		"InvalidPodOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
@@ -52,18 +54,11 @@ func TestBasicECSPod(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			hc := utility.GetHTTPClient()
-			defer utility.PutHTTPClient(hc)
-
-			awsOpts := awsutil.NewClientOptions().
-				SetHTTPClient(hc).
-				SetCredentials(credentials.NewEnvCredentials()).
-				SetRole(testutil.AWSRole()).
-				SetRegion(testutil.AWSRegion())
-
-			c, err := NewBasicECSClient(*awsOpts)
+			c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
-			defer c.Close(ctx)
+			defer func() {
+				assert.NoError(t, c.Close(ctx))
+			}()
 
 			tCase(tctx, t, c)
 		})
@@ -79,13 +74,9 @@ func TestECSPod(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts := awsutil.NewClientOptions().
-		SetHTTPClient(hc).
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(testutil.AWSRole()).
-		SetRegion(testutil.AWSRegion())
+	awsOpts := validIntegrationAWSOpts(hc)
 
-	c, err := NewBasicECSClient(*awsOpts)
+	c, err := NewBasicECSClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -94,7 +85,7 @@ func TestECSPod(t *testing.T) {
 		assert.NoError(t, c.Close(ctx))
 	}()
 
-	smc, err := secret.NewBasicSecretsManagerClient(*awsOpts)
+	smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)
@@ -117,20 +108,42 @@ func TestECSPod(t *testing.T) {
 	}
 }
 
+// validNonIntegrationAWSOpts returns valid options to create an AWS client that
+// doesn't actually make any actual requests to AWS.
+func validNonIntegrationAWSOpts(hc *http.Client) awsutil.ClientOptions {
+	return *awsutil.NewClientOptions().
+		SetCredentials(credentials.NewEnvCredentials()).
+		SetRegion("us-east-1")
+}
+
+// validIntegrationAWSOpts returns valid options to create an AWS client for
+// integration testing that can make actual requests to AWS.
+func validIntegrationAWSOpts(hc *http.Client) awsutil.ClientOptions {
+	return *awsutil.NewClientOptions().
+		SetCredentials(credentials.NewEnvCredentials()).
+		SetRole(testutil.AWSRole()).
+		SetRegion(testutil.AWSRegion())
+}
+
 func TestBasicECSPodOptions(t *testing.T) {
+	hc := utility.GetHTTPClient()
+	defer utility.PutHTTPClient(hc)
 	t.Run("NewBasicECSPodOptions", func(t *testing.T) {
 		opts := NewBasicECSPodOptions()
 		require.NotZero(t, opts)
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetClient", func(t *testing.T) {
-		c, err := NewBasicECSClient(*awsutil.NewClientOptions().SetCredentials(credentials.NewEnvCredentials()).SetRegion("us-east-1"))
+		c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, err)
+		}()
 		opts := NewBasicECSPodOptions().SetClient(c)
 		assert.Equal(t, c, opts.Client)
 	})
 	t.Run("SetVault", func(t *testing.T) {
-		c, err := secret.NewBasicSecretsManagerClient(*awsutil.NewClientOptions().SetCredentials(credentials.NewEnvCredentials()).SetRegion("us-east-1"))
+		c, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 		require.NoError(t, err)
 		v := secret.NewBasicSecretsManager(c)
 		opts := NewBasicECSPodOptions().SetVault(v)
@@ -165,19 +178,14 @@ func TestBasicECSPodOptions(t *testing.T) {
 					SetName("name").
 					SetStatus(cocoa.StatusRunning))
 		}
-		validAWSOpts := func() awsutil.ClientOptions {
-			return *awsutil.NewClientOptions().
-				SetCredentials(credentials.NewEnvCredentials()).
-				SetRegion("us-east-1")
-		}
 		t.Run("FailsWithEmpty", func(t *testing.T) {
 			opts := NewBasicECSPodOptions()
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
-			smClient, err := secret.NewBasicSecretsManagerClient(validAWSOpts())
+			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			v := secret.NewBasicSecretsManager(smClient)
 			opts := NewBasicECSPodOptions().
@@ -188,7 +196,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutClient", func(t *testing.T) {
-			smClient, err := secret.NewBasicSecretsManagerClient(validAWSOpts())
+			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			v := secret.NewBasicSecretsManager(smClient)
 			opts := NewBasicECSPodOptions().
@@ -198,7 +206,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithoutVault", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
@@ -207,7 +215,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutResources", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
@@ -215,7 +223,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithBadResources", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
@@ -224,7 +232,7 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithoutStatus", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
@@ -232,14 +240,13 @@ func TestBasicECSPodOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithBadStatus", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validAWSOpts())
+			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
 				SetResources(validResources()).
 				SetStatusInfo(*cocoa.NewECSPodStatusInfo())
 			assert.Error(t, opts.Validate())
-
 		})
 	})
 }

@@ -79,7 +79,7 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	for tName, tCase := range testcase.ECSPodCreatorWithVaultTests() {
+	for tName, tCase := range testcase.ECSPodCreatorVaultTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
@@ -118,11 +118,7 @@ func TestECSPodCreator(t *testing.T) {
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
 			}()
-			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
-			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
-			require.NoError(t, err)
-			require.NotZero(t, registerOut)
-			require.NotZero(t, registerOut.TaskDefinition)
+			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 
 			sm := &SecretsManagerClient{}
 			defer func() {
@@ -231,7 +227,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
 			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
 		},
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
 				SetNewValue("secret_value")
@@ -275,7 +271,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			repoCreds := cocoa.NewRepositoryCredentials().
 				SetName("repo_creds_secret_name").
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().

@@ -285,6 +285,31 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 	return out, nil
 }
 
+// TagResource adds tags to an existing resource in ECS.
+func (c *BasicECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error) {
+	if err := c.setup(); err != nil {
+		return nil, errors.Wrap(err, "setting up client")
+	}
+
+	var out *ecs.TagResourceOutput
+	var err error
+	if err := utility.Retry(ctx,
+		func() (bool, error) {
+			msg := awsutil.MakeAPILogMessage("TagResource", in)
+			out, err = c.ecs.TagResourceWithContext(ctx, in)
+			if awsErr, ok := err.(awserr.Error); ok {
+				grip.Debug(message.WrapError(awsErr, msg))
+				if c.isNonRetryableErrorCode(awsErr.Code()) {
+					return false, err
+				}
+			}
+			return true, err
+		}, *c.opts.RetryOpts); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Close closes the client and cleans up its resources.
 func (c *BasicECSClient) Close(ctx context.Context) error {
 	c.opts.Close()

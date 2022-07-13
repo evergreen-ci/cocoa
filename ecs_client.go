@@ -27,6 +27,8 @@ type ECSClient interface {
 	ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
 	// StopTask stops a running task.
 	StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error)
+	// TagResource adds tags to an ECS resource.
+	TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error)
 	// Close closes the client and cleans up its resources. Implementations
 	// should ensure that this is idempotent.
 	Close(ctx context.Context) error

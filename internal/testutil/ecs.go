@@ -14,6 +14,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // NewTaskDefinitionFamily makes a new test family for a task definition with a
@@ -182,4 +183,16 @@ func ValidRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionIn
 		Memory: aws.String("256"),
 		Family: aws.String(NewTaskDefinitionFamily(t)),
 	}
+}
+
+// RegisterTaskDefinition is a convenience function for registering an ECS task
+// definition and verifying that the result is successful and populates the task
+// definition ARN.
+func RegisterTaskDefinition(ctx context.Context, t *testing.T, c cocoa.ECSClient, in ecs.RegisterTaskDefinitionInput) ecs.RegisterTaskDefinitionOutput {
+	out, err := c.RegisterTaskDefinition(ctx, &in)
+	require.NoError(t, err)
+	require.NotZero(t, out)
+	require.NotZero(t, out.TaskDefinition)
+	require.NotZero(t, out.TaskDefinition.TaskDefinitionArn)
+	return *out
 }

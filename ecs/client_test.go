@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -30,15 +28,7 @@ func TestECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicECSClient(awsutil.ClientOptions{
-		Creds:  credentials.NewEnvCredentials(),
-		Region: aws.String(testutil.AWSRegion()),
-		Role:   aws.String(testutil.AWSRole()),
-		RetryOpts: &utility.RetryOptions{
-			MaxAttempts: 5,
-		},
-		HTTPClient: hc,
-	})
+	c, err := NewBasicECSClient(validIntegrationAWSOpts(hc))
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -60,11 +50,7 @@ func TestECSClient(t *testing.T) {
 		})
 	}
 
-	registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
-	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
-	require.NoError(t, err)
-	require.NotZero(t, registerOut)
-	require.NotZero(t, registerOut.TaskDefinition)
+	registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 	defer func() {
 		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
 			TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,

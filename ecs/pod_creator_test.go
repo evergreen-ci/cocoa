@@ -4,10 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/cocoa/secret"
@@ -53,19 +51,15 @@ func TestBasicECSPodCreator(t *testing.T) {
 			hc := utility.GetHTTPClient()
 			defer utility.PutHTTPClient(hc)
 
-			awsOpts := awsutil.NewClientOptions().
-				SetHTTPClient(hc).
-				SetCredentials(credentials.NewEnvCredentials()).
-				SetRole(testutil.AWSRole()).
-				SetRegion(testutil.AWSRegion())
+			awsOpts := validNonIntegrationAWSOpts(hc)
 
-			c, err := NewBasicECSClient(*awsOpts)
+			c, err := NewBasicECSClient(awsOpts)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
 			}()
 
-			smc, err := secret.NewBasicSecretsManagerClient(*awsOpts)
+			smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
 			require.NoError(t, err)
 			require.NotNil(t, c)
 			defer func() {
@@ -89,13 +83,9 @@ func TestECSPodCreator(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts := awsutil.NewClientOptions().
-		SetHTTPClient(hc).
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(testutil.AWSRole()).
-		SetRegion(testutil.AWSRegion())
+	awsOpts := validIntegrationAWSOpts(hc)
 
-	c, err := NewBasicECSClient(*awsOpts)
+	c, err := NewBasicECSClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -116,7 +106,7 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	smc, err := secret.NewBasicSecretsManagerClient(*awsOpts)
+	smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)
@@ -124,7 +114,7 @@ func TestECSPodCreator(t *testing.T) {
 		assert.NoError(t, smc.Close(ctx))
 	}()
 
-	for tName, tCase := range testcase.ECSPodCreatorWithVaultTests() {
+	for tName, tCase := range testcase.ECSPodCreatorVaultTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
@@ -139,11 +129,7 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
-	registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
-	require.NoError(t, err)
-	require.NotZero(t, registerOut)
-	require.NotZero(t, registerOut.TaskDefinition)
+	registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 	defer func() {
 		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
 			TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,

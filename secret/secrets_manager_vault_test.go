@@ -2,6 +2,7 @@ package secret
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -13,6 +14,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// validIntegrationAWSOpts returns valid options to create an AWS client for
+// integration testing that can make actual requests to AWS.
+func validIntegrationAWSOpts(hc *http.Client) awsutil.ClientOptions {
+	return *awsutil.NewClientOptions().
+		SetCredentials(credentials.NewEnvCredentials()).
+		SetRole(testutil.AWSRole()).
+		SetRegion(testutil.AWSRegion())
+}
 
 func TestSecretsManager(t *testing.T) {
 	assert.Implements(t, (*cocoa.Vault)(nil), &BasicSecretsManager{})
@@ -31,11 +41,7 @@ func TestSecretsManager(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicSecretsManagerClient(*awsutil.NewClientOptions().
-		SetHTTPClient(hc).
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(testutil.AWSRole()).
-		SetRegion(testutil.AWSRegion()))
+	c, err := NewBasicSecretsManagerClient(validIntegrationAWSOpts(hc))
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)
