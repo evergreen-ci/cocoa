@@ -2,6 +2,12 @@ package cocoa
 
 import (
 	"context"
+	"crypto/sha1"
+	"fmt"
+	"hash"
+	"io"
+	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -292,6 +298,156 @@ func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 	return catcher.Resolve()
 }
 
+// tagPair represents a tag with a key and value pair.
+type tagPair struct {
+	key   string
+	value string
+}
+
+// hash returns the hash digest of the tag pair.
+func (tp tagPair) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if _, err := io.WriteString(h, tp.key); err != nil {
+			return errors.Wrap(err, "hashing key")
+		}
+		if _, err := io.WriteString(h, tp.value); err != nil {
+			return errors.Wrap(err, "hashing value")
+		}
+
+		return nil
+	})
+}
+
+// hashableTagPairs represents a slice of key-value tag that can be hashed.
+type hashableTagPairs []tagPair
+
+// newHashableTagPairs returns a sorted slice of hashable tag pairs.
+func newHashableTagPairs(tags map[string]string) hashableTagPairs {
+	var htp hashableTagPairs
+	for k, v := range tags {
+		htp = append(htp, tagPair{key: k, value: v})
+	}
+	sort.Sort(htp)
+	return htp
+}
+
+// Len returns the number of container definitions.
+func (htp hashableTagPairs) Len() int {
+	return len(htp)
+}
+
+// Less returns whether or not the key for the pair at index i is
+// lexicographically before the key for the pair at index j.
+func (htp hashableTagPairs) Less(i, j int) bool {
+	return htp[i].key < htp[j].key
+}
+
+// Swap swaps the tag pairs at indexes i and j.
+func (htp hashableTagPairs) Swap(i, j int) {
+	htp[i], htp[j] = htp[j], htp[i]
+}
+
+// hash returns the hash digest of the tag pairs.
+func (htp hashableTagPairs) hash() (string, error) {
+	if !sort.IsSorted(htp) {
+		sort.Sort(htp)
+	}
+
+	return hashSum(func(h hash.Hash) error {
+		for _, tp := range htp {
+			hashed, err := tp.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing tag")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed tag")
+			}
+		}
+
+		return nil
+	})
+}
+
+// kim: TODO: test hash fn for same/different inputs incrementally for each
+// field/substruct. Test order of fields doesn't matter.
+
+// Hash returns the hash digest for the pod definition.
+//nolint:gocognit
+func (o *ECSPodDefinitionOptions) Hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if o.Name != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(o.Name)); err != nil {
+				return errors.Wrap(err, "writing name")
+			}
+		}
+
+		if len(o.ContainerDefinitions) != 0 {
+			hashed, err := newHashableContainerDefinitions(o.ContainerDefinitions).hash()
+			if err != nil {
+				if _, err := io.WriteString(h, hashed); err != nil {
+					return errors.Wrap(err, "writing memory")
+				}
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed container definitions")
+			}
+		}
+
+		if o.MemoryMB != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(o.MemoryMB))); err != nil {
+				return errors.Wrap(err, "writing memory")
+			}
+		}
+
+		if o.CPU != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(o.CPU))); err != nil {
+				return errors.Wrap(err, "writing CPU")
+			}
+		}
+
+		if o.NetworkMode != nil {
+			if _, err := io.WriteString(h, string(*o.NetworkMode)); err != nil {
+				return errors.Wrap(err, "writing network mode")
+			}
+		}
+
+		if o.TaskRole != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(o.TaskRole)); err != nil {
+				return errors.Wrap(err, "writing task role")
+			}
+		}
+
+		if o.ExecutionRole != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(o.ExecutionRole)); err != nil {
+				return errors.Wrap(err, "writing execution role")
+			}
+		}
+
+		if len(o.Tags) != 0 {
+			hashed, err := newHashableTagPairs(o.Tags).hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing tags")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed tags")
+			}
+		}
+
+		return nil
+	})
+}
+
+// hashSum returns the SHA1 sum of all the values written by write.
+func hashSum(write func(h hash.Hash) error) (string, error) {
+	h := sha1.New()
+
+	if err := write(h); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
 // MergeECSPodDefinitionOptions merges all the given options to create an ECS
 // pod definition. Options are applied in the order that they're specified and
 // conflicting options are overwritten.
@@ -471,6 +627,129 @@ func (d *ECSContainerDefinition) Validate() error {
 	return nil
 }
 
+// hash returns the hash digest of the definition.
+//nolint:gocognit
+func (d *ECSContainerDefinition) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if d.Name != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(d.Name)); err != nil {
+				return errors.Wrap(err, "writing name")
+			}
+		}
+
+		if d.Image != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(d.Image)); err != nil {
+				return errors.Wrap(err, "writing image")
+			}
+		}
+
+		if len(d.Command) != 0 {
+			for _, arg := range d.Command {
+				if _, err := io.WriteString(h, arg); err != nil {
+					return errors.Wrap(err, "writing command argument")
+				}
+			}
+		}
+
+		if d.WorkingDir != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(d.WorkingDir)); err != nil {
+				return errors.Wrap(err, "writing working directory")
+			}
+		}
+
+		if d.MemoryMB != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(d.MemoryMB))); err != nil {
+				return errors.Wrap(err, "writing memory")
+			}
+		}
+
+		if d.CPU != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(d.CPU))); err != nil {
+				return errors.Wrap(err, "writing CPU")
+			}
+		}
+
+		if len(d.EnvVars) != 0 {
+			hashed, err := newHashableEnvironmentVariables(d.EnvVars).hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing environment variables")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed environment variables")
+			}
+		}
+
+		if d.RepoCreds != nil {
+			hashed, err := d.RepoCreds.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing repository credentials")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed repository credentials")
+			}
+		}
+
+		if len(d.PortMappings) != 0 {
+			hashed, err := newHashablePortMappings(d.PortMappings).hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing port mappings")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed port mappings")
+			}
+		}
+
+		return nil
+	})
+}
+
+// hashableECSContainerDefinitions represents a hashable slice of ECS container
+// definitions ordered by container name.
+type hashableECSContainerDefinitions []ECSContainerDefinition
+
+func newHashableContainerDefinitions(containerDefs []ECSContainerDefinition) hashableECSContainerDefinitions {
+	hcd := hashableECSContainerDefinitions(containerDefs)
+	sort.Sort(hcd)
+	return hcd
+}
+
+// Len returns the number of container definitions.
+func (hcd hashableECSContainerDefinitions) Len() int {
+	return len(hcd)
+}
+
+// Less returns whether or not the name of the container definition at index i
+// is lexicographically before the name of the container definition at index j.
+func (hcd hashableECSContainerDefinitions) Less(i, j int) bool {
+	return utility.FromStringPtr(hcd[i].Name) < utility.FromStringPtr(hcd[j].Name)
+}
+
+// Swap swaps the container definitions at indexes i and j.
+func (hcd hashableECSContainerDefinitions) Swap(i, j int) {
+	hcd[i], hcd[j] = hcd[j], hcd[i]
+}
+
+// hash returns the hash digest of the container definitions.
+func (hcd hashableECSContainerDefinitions) hash() (string, error) {
+	if !sort.IsSorted(hcd) {
+		sort.Sort(hcd)
+	}
+
+	return hashSum(func(h hash.Hash) error {
+		for _, cd := range hcd {
+			hashed, err := cd.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing container definition")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed container definition")
+			}
+		}
+
+		return nil
+	})
+}
+
 // EnvironmentVariable represents an environment variable, which can be
 // optionally backed by a secret.
 type EnvironmentVariable struct {
@@ -522,6 +801,84 @@ func (e *EnvironmentVariable) Validate() error {
 		catcher.Wrap(e.SecretOpts.Validate(), "invalid secret options")
 	}
 	return catcher.Resolve()
+}
+
+// hash is the hash digest of the environment variable.
+func (e *EnvironmentVariable) hash() (string, error) {
+
+	return hashSum(func(h hash.Hash) error {
+		if e.Name != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(e.Name)); err != nil {
+				return errors.Wrap(err, "writing name")
+			}
+		}
+
+		if e.Value != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(e.Value)); err != nil {
+				return errors.Wrap(err, "writing value")
+			}
+		}
+
+		if e.SecretOpts != nil {
+			hashed, err := e.SecretOpts.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing secret options")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed secret options")
+			}
+		}
+
+		return nil
+	})
+}
+
+// hashableEnvironmentVariables represents a slice of environment variables that
+// can be hashed.
+type hashableEnvironmentVariables []EnvironmentVariable
+
+// newHashableEnvironmentVariables returns a sorted slice of hashable
+// environment variables.
+func newHashableEnvironmentVariables(ev []EnvironmentVariable) hashableEnvironmentVariables {
+	hev := hashableEnvironmentVariables(ev)
+	sort.Sort(hev)
+	return hev
+}
+
+// Len returns the number of environment variables.
+func (hev hashableEnvironmentVariables) Len() int {
+	return len(hev)
+}
+
+// Less returns whether or not the name of the environment variable at index i
+// is lexicographically before the name of the environment variable at index j.
+func (hev hashableEnvironmentVariables) Less(i, j int) bool {
+	return utility.FromStringPtr(hev[i].Name) < utility.FromStringPtr(hev[j].Name)
+}
+
+// Swap swaps the environment variables at indexes i and j.
+func (hev hashableEnvironmentVariables) Swap(i, j int) {
+	hev[i], hev[j] = hev[j], hev[i]
+}
+
+func (hev hashableEnvironmentVariables) hash() (string, error) {
+	if !sort.IsSorted(hev) {
+		sort.Sort(hev)
+	}
+
+	return hashSum(func(h hash.Hash) error {
+		for _, ev := range hev {
+			hashed, err := ev.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing environment variable")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed environment variable")
+			}
+		}
+
+		return nil
+	})
 }
 
 // SecretOptions represents a secret with a name and value that may or may not
@@ -576,6 +933,37 @@ func (s *SecretOptions) Validate() error {
 	catcher.NewWhen(s.NewValue != nil && s.Name == nil, "cannot specify a new secret to be created without a name")
 	catcher.NewWhen(s.ID != nil && utility.FromStringPtr(s.ID) == "", "cannot specify an empty secret ID")
 	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the secret options.
+func (s *SecretOptions) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if s.ID != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(s.ID)); err != nil {
+				return errors.Wrap(err, "writing ID")
+			}
+		}
+
+		if s.Name != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(s.Name)); err != nil {
+				return errors.Wrap(err, "writing name")
+			}
+		}
+
+		if s.NewValue != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(s.NewValue)); err != nil {
+				return errors.Wrap(err, "writing new value")
+			}
+		}
+
+		if s.Owned != nil {
+			if _, err := io.WriteString(h, strconv.FormatBool(utility.FromBoolPtr(s.Owned))); err != nil {
+				return errors.Wrap(err, "writing owned")
+			}
+		}
+
+		return nil
+	})
 }
 
 // RepositoryCredentials are credentials for using images from private
@@ -639,6 +1027,41 @@ func (c *RepositoryCredentials) Validate() error {
 	return catcher.Resolve()
 }
 
+// hash returns the hash digest of the repository credentials.
+func (c *RepositoryCredentials) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if c.ID != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(c.ID)); err != nil {
+				return errors.Wrap(err, "writing ID")
+			}
+		}
+
+		if c.Name != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(c.Name)); err != nil {
+				return errors.Wrap(err, "writing name")
+			}
+		}
+
+		if c.NewCreds != nil {
+			hashed, err := c.NewCreds.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing new stored credentials")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed new stored credentials")
+			}
+		}
+
+		if c.Owned != nil {
+			if _, err := io.WriteString(h, strconv.FormatBool(utility.FromBoolPtr(c.Owned))); err != nil {
+				return errors.Wrap(err, "writing owned")
+			}
+		}
+
+		return nil
+	})
+}
+
 // StoredRepositoryCredentials represents the storage format of repository
 // credentials for using images from private repositories.
 type StoredRepositoryCredentials struct {
@@ -672,6 +1095,24 @@ func (c *StoredRepositoryCredentials) Validate() error {
 	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username")
 	catcher.NewWhen(utility.FromStringPtr(c.Password) == "", "must specify a password")
 	return catcher.Resolve()
+}
+
+func (c *StoredRepositoryCredentials) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if c.Username != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(c.Username)); err != nil {
+				return errors.Wrap(err, "writing username")
+			}
+		}
+
+		if c.Password != nil {
+			if _, err := io.WriteString(h, utility.FromStringPtr(c.Password)); err != nil {
+				return errors.Wrap(err, "writing password")
+			}
+		}
+
+		return nil
+	})
 }
 
 // PortMapping represents a mapping from a container port to a port in the
@@ -724,6 +1165,77 @@ func (m *PortMapping) Validate() error {
 		catcher.ErrorfWhen(hostPort <= minPort || hostPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
 	}
 	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the port mapping.
+func (m *PortMapping) hash() (string, error) {
+	return hashSum(func(h hash.Hash) error {
+		if m.ContainerPort != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(m.ContainerPort))); err != nil {
+				return errors.Wrap(err, "writing container port")
+			}
+		}
+
+		if m.HostPort != nil {
+			if _, err := io.WriteString(h, strconv.Itoa(utility.FromIntPtr(m.HostPort))); err != nil {
+				return errors.Wrap(err, "writing host port")
+			}
+		}
+
+		return nil
+	})
+}
+
+type hashablePortMappings []PortMapping
+
+// newHashablePortMappings returns a sorted slice of hashable port mappings.
+func newHashablePortMappings(pm []PortMapping) hashablePortMappings {
+	hpm := hashablePortMappings(pm)
+	sort.Sort(hpm)
+	return hpm
+}
+
+// Len returns the number of port mappings.
+func (hpm hashablePortMappings) Len() int {
+	return len(hpm)
+}
+
+// Less returns whether or not the container port for the mapping at index i is
+// less than the container port for the mapping at index j. If they're equal,
+// the host ports are compared.
+func (hpm hashablePortMappings) Less(i, j int) bool {
+	cpi, cpj := utility.FromIntPtr(hpm[i].ContainerPort), utility.FromIntPtr(hpm[j].ContainerPort)
+	if cpi == cpj {
+		return utility.FromIntPtr(hpm[i].HostPort) < utility.FromIntPtr(hpm[j].HostPort)
+	}
+
+	return cpi < cpj
+}
+
+// Swap swaps the port mappings at indexes i and j.
+func (hpm hashablePortMappings) Swap(i, j int) {
+	hpm[i], hpm[j] = hpm[j], hpm[i]
+}
+
+// hash returns the hash digest of the port mappings.
+func (hpm hashablePortMappings) hash() (string, error) {
+	if !sort.IsSorted(hpm) {
+		sort.Sort(hpm)
+	}
+
+	return hashSum(func(h hash.Hash) error {
+		for _, pm := range hpm {
+			hashed, err := pm.hash()
+			if err != nil {
+				return errors.Wrap(err, "hashing port mapping")
+			}
+			if _, err := io.WriteString(h, hashed); err != nil {
+				return errors.Wrap(err, "writing hashed port mapping")
+			}
+		}
+
+		return nil
+	})
 }
 
 // ECSPodExecutionOptions represent options to configure how a pod is started.
