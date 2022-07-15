@@ -27,7 +27,9 @@ func TestECSPodCreationOptions(t *testing.T) {
 	})
 	t.Run("Validate", func(t *testing.T) {
 		getValidPodDefOpts := func() *ECSPodDefinitionOptions {
-			containerDef := NewECSContainerDefinition().SetImage("image")
+			containerDef := NewECSContainerDefinition().
+				SetImage("image").
+				SetCommand([]string{"echo"})
 			defOpts := NewECSPodDefinitionOptions().
 				AddContainerDefinitions(*containerDef).
 				SetMemoryMB(128).
@@ -415,6 +417,339 @@ func TestECSPodDefinition(t *testing.T) {
 				SetMemoryMB(0).
 				SetCPU(128)
 			assert.Error(t, opts.Validate())
+		})
+	})
+	t.Run("Hash", func(t *testing.T) {
+		getValidPodDefOpts := func() *ECSPodDefinitionOptions {
+			containerDef := NewECSContainerDefinition().
+				SetName("container_name").
+				SetImage("image")
+			defOpts := NewECSPodDefinitionOptions().
+				SetName("pod_name").
+				AddContainerDefinitions(*containerDef).
+				SetMemoryMB(128).
+				SetCPU(128)
+			return defOpts
+		}
+		baseHash := getValidPodDefOpts().Hash()
+
+		t.Run("ReturnsSameValueForSameInput", func(t *testing.T) {
+			assert.Equal(t, baseHash, getValidPodDefOpts().Hash())
+		})
+		t.Run("ChangesForName", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetName("new_name")
+			assert.NotEqual(t, baseHash, opts.Hash(), "name should affect hash")
+		})
+		t.Run("ChangesForMemory", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetMemoryMB(1024)
+			assert.NotEqual(t, baseHash, opts.Hash(), "memory should affect hash")
+		})
+		t.Run("ChangesForCPU", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetCPU(1024)
+			assert.NotEqual(t, baseHash, opts.Hash(), "CPU should affect hash")
+		})
+		t.Run("ChangesForNetworkMode", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetNetworkMode(NetworkModeHost)
+			assert.NotEqual(t, baseHash, opts.Hash(), "network mode should affect hash")
+		})
+		t.Run("ChangesForTaskRole", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetTaskRole("task_role")
+			assert.NotEqual(t, baseHash, opts.Hash(), "task role should affect hash")
+		})
+		t.Run("ChangesForExecutionRole", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetExecutionRole("execution_role")
+			assert.NotEqual(t, baseHash, opts.Hash(), "execution role should affect hash")
+		})
+		t.Run("ChangesForTags", func(t *testing.T) {
+			opts := getValidPodDefOpts().SetTags(map[string]string{
+				"key": "value",
+			})
+			assert.NotEqual(t, baseHash, opts.Hash(), "tags should affect hash")
+		})
+		t.Run("ReturnsSameValueForSameUnorderedTags", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			for i := 0; i < 10; i++ {
+				opts.AddTags(map[string]string{
+					utility.RandomString(): utility.RandomString(),
+				})
+			}
+			h0 := opts.Hash()
+			h1 := opts.Hash()
+			assert.Equal(t, h0, h1, "order of tags should not affect hash")
+		})
+		t.Run("ReturnsSameValueForDifferentContainerDefinitionOrder", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			cd0 := NewECSContainerDefinition().SetName("container0").SetImage("debian")
+			cd1 := NewECSContainerDefinition().SetName("container1").SetImage("ubuntu")
+
+			opts.SetContainerDefinitions([]ECSContainerDefinition{*cd0, *cd1})
+			h0 := opts.Hash()
+
+			opts.SetContainerDefinitions([]ECSContainerDefinition{*cd1, *cd0})
+			h1 := opts.Hash()
+
+			assert.Equal(t, h0, h1, "order of container definitions should not affect hash")
+		})
+		t.Run("ChangesForContainerName", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetName("new_name")
+			assert.NotEqual(t, baseHash, opts.Hash(), "container name should affect hash")
+		})
+		t.Run("ChangesForContainerImage", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetImage("alpine")
+			assert.NotEqual(t, baseHash, opts.Hash(), "container image should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerCommand", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetCommand([]string{"echo", "foo", "bar"})
+			assert.NotEqual(t, baseHash, opts.Hash(), "container command should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerCommandArgOrder", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			opts.ContainerDefinitions[0].SetCommand([]string{"echo", "foo", "bar"})
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetCommand([]string{"echo", "bar", "foo"})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "order of container command args should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerWorkingDir", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetWorkingDir("/var/run")
+			assert.NotEqual(t, baseHash, opts.Hash(), "container working directory should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerMemoryMB", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetMemoryMB(64)
+			assert.NotEqual(t, baseHash, opts.Hash(), "container memory should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerCPU", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			opts.ContainerDefinitions[0].SetCPU(64)
+			assert.NotEqual(t, baseHash, opts.Hash(), "container CPU should affect hash")
+		})
+		t.Run("ChangesForDifferentEnvVars", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			ev := NewEnvironmentVariable().SetName("ENV_VAR").SetValue("value")
+			opts.ContainerDefinitions[0].AddEnvironmentVariables(*ev)
+			assert.NotEqual(t, baseHash, opts.Hash(), "container environment variables should affect hash")
+		})
+		t.Run("ChangesForDifferentEnvVarName", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			ev := NewEnvironmentVariable().SetName("ENV_VAR")
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			ev.SetName("NEW_ENV_VAR")
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container environment variable name should affect hash")
+		})
+		t.Run("ChangesForDifferentEnvVarValue", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			ev := NewEnvironmentVariable().SetValue("value")
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			ev.SetValue("new_value")
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container environment variable value should affect hash")
+		})
+		t.Run("ChangesForDifferentSecretID", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			secretOpts := NewSecretOptions()
+			ev := NewEnvironmentVariable().SetSecretOptions(*secretOpts)
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			secretOpts.SetID("id")
+			ev.SetSecretOptions(*secretOpts)
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container secret ID should affect hash")
+		})
+		t.Run("ChangesForDifferentSecretName", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			secretOpts := NewSecretOptions()
+			ev := NewEnvironmentVariable().SetSecretOptions(*secretOpts)
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			secretOpts.SetName("secret_name")
+			ev.SetSecretOptions(*secretOpts)
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container secret name should affect hash")
+		})
+		t.Run("ChangesForDifferentSecretValue", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			secretOpts := NewSecretOptions()
+			ev := NewEnvironmentVariable().SetSecretOptions(*secretOpts)
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			secretOpts.SetNewValue("new_value")
+			ev.SetSecretOptions(*secretOpts)
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container secret value should affect hash")
+		})
+		t.Run("ChangesForDifferentSecretOwnership", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			secretOpts := NewSecretOptions()
+			ev := NewEnvironmentVariable().SetSecretOptions(*secretOpts)
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h0 := opts.Hash()
+
+			secretOpts.SetOwned(true)
+			ev.SetSecretOptions(*secretOpts)
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container secret value should affect hash")
+		})
+		t.Run("ReturnsSameValueForDifferentEnvVarOrder", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			ev0 := NewEnvironmentVariable().SetName("ENV_VAR0").SetValue("value0")
+			ev1 := NewEnvironmentVariable().SetName("ENV_VAR1").SetValue("value1")
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev0, *ev1})
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetEnvironmentVariables([]EnvironmentVariable{*ev1, *ev0})
+			h1 := opts.Hash()
+
+			assert.Equal(t, h0, h1, "order of container environment variables should not affect hash")
+		})
+		t.Run("ChangesForDifferentRepoCreds", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			creds := NewRepositoryCredentials().SetID("id")
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			assert.NotEqual(t, baseHash, opts.Hash(), "container repo creds should affect hash")
+		})
+		t.Run("ChangesForDifferentRepoCredsID", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			creds := NewRepositoryCredentials()
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds.SetID("id"))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container repo creds ID should affect hash")
+		})
+		t.Run("ChangesForDifferentRepoCredsName", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			creds := NewRepositoryCredentials()
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds.SetName("name"))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container repo creds name should affect hash")
+		})
+		t.Run("ChangesForNewRepoCredsUsername", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			newCreds := NewStoredRepositoryCredentials()
+			creds := NewRepositoryCredentials().SetNewCredentials(*newCreds)
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds.SetNewCredentials(*newCreds.SetUsername("username")))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container new repo creds should affect hash")
+		})
+		t.Run("ChangesForNewRepoCredsPassword", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			newCreds := NewStoredRepositoryCredentials()
+			creds := NewRepositoryCredentials().SetNewCredentials(*newCreds)
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds.SetNewCredentials(*newCreds.SetPassword("password")))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container new repo creds should affect hash")
+		})
+		t.Run("ChangesForDifferentRepoCredsOwnership", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			creds := NewRepositoryCredentials()
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds.SetOwned(true))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container repo creds name should affect hash")
+		})
+		t.Run("ChangesForDifferentPortMappings", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			pm := NewPortMapping().SetContainerPort(12345)
+			opts.ContainerDefinitions[0].AddPortMappings(*pm)
+
+			assert.NotEqual(t, baseHash, opts.Hash(), "port mapping should affect hash")
+		})
+		t.Run("ChangesForDifferentContainerPortMapping", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			pm := NewPortMapping()
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm})
+			h0 := opts.Hash()
+
+			pm.SetContainerPort(12345)
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "container port mapping should affect hash")
+		})
+		t.Run("ChangesForDifferentHostPortMapping", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			pm := NewPortMapping()
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm})
+			h0 := opts.Hash()
+
+			pm.SetHostPort(12345)
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm})
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "host port mapping should affect hash")
+		})
+		t.Run("ReturnsSameValueForDifferentPortMappingOrder", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			pm0 := NewPortMapping().SetContainerPort(1234).SetHostPort(5678)
+			pm1 := NewPortMapping().SetContainerPort(1337).SetHostPort(9001)
+
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm0, *pm1})
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetPortMappings([]PortMapping{*pm1, *pm0})
+			h1 := opts.Hash()
+
+			assert.Equal(t, h0, h1, "order of port mappings should not affect hash")
 		})
 	})
 }

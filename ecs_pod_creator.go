@@ -356,9 +356,6 @@ func (htp hashableTagPairs) hash() string {
 	return h.sum()
 }
 
-// kim: TODO: test hash fn for same/different inputs incrementally for each
-// field/substruct. Test order of fields doesn't matter.
-
 // Hash returns the hash digest of the pod definition.
 func (o *ECSPodDefinitionOptions) Hash() string {
 	h := newSHA1Hasher()
