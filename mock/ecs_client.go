@@ -525,13 +525,8 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 	resp := ecs.DescribeTaskDefinitionOutput{
 		TaskDefinition: def.export(),
 	}
-	for _, include := range in.Include {
-		// "TAGS" is a magic string in the ECS API that indicates that the
-		// response should include resource tags.
-		if utility.FromStringPtr(include) == "TAGS" {
-			resp.Tags = exportTags(def.Tags)
-			break
-		}
+	if shouldIncludeTags(in.Include) {
+		resp.Tags = exportTags(def.Tags)
 	}
 
 	return &resp, nil
@@ -654,16 +649,7 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
 	}
 
-	var includeTags bool
-	for _, include := range in.Include {
-		// "TAGS" is a magic string in the ECS API that indicates that the
-		// response should include resource tags.
-		if utility.FromStringPtr(include) == "TAGS" {
-			includeTags = true
-			break
-		}
-	}
-
+	includeTags := shouldIncludeTags(in.Include)
 	ids := utility.FromStringPtrSlice(in.Tasks)
 
 	var tasks []*ecs.Task
@@ -687,6 +673,19 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 		Tasks:    tasks,
 		Failures: failures,
 	}, nil
+}
+
+// shouldIncludeTags returns whether or not the ECS response should include
+// resource tags.
+func shouldIncludeTags(includes []*string) bool {
+	for _, include := range includes {
+		// "TAGS" is a magic string in the ECS API that indicates that the
+		// response should include resource tags.
+		if utility.FromStringPtr(include) == "TAGS" {
+			return true
+		}
+	}
+	return false
 }
 
 // ListTasks saves the input and lists all matching tasks. The mock output can

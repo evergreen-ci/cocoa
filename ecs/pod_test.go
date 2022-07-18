@@ -109,7 +109,7 @@ func TestECSPod(t *testing.T) {
 }
 
 // validNonIntegrationAWSOpts returns valid options to create an AWS client that
-// doesn't actually make any actual requests to AWS.
+// doesn't make any actual requests to AWS.
 func validNonIntegrationAWSOpts(hc *http.Client) awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
 		SetCredentials(credentials.NewEnvCredentials()).

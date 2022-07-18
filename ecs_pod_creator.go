@@ -2,6 +2,12 @@ package cocoa
 
 import (
 	"context"
+	"crypto/sha1"
+	"fmt"
+	"hash"
+	"io"
+	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 
@@ -292,6 +298,125 @@ func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 	return catcher.Resolve()
 }
 
+// tagPair represents a tag with a key and value pair.
+type tagPair struct {
+	key   string
+	value string
+}
+
+// hash returns the hash digest of the tag pair.
+func (tp tagPair) hash() string {
+	h := newSHA1Hasher()
+	h.add(tp.key)
+	h.add(tp.value)
+	return h.sum()
+}
+
+// hashableTagPairs represents a slice of key-value tag that can be hashed.
+type hashableTagPairs []tagPair
+
+// newHashableTagPairs returns a sorted slice of hashable tag pairs.
+func newHashableTagPairs(tags map[string]string) hashableTagPairs {
+	var htp hashableTagPairs
+	for k, v := range tags {
+		htp = append(htp, tagPair{key: k, value: v})
+	}
+	sort.Sort(htp)
+	return htp
+}
+
+// Len returns the number of container definitions.
+func (htp hashableTagPairs) Len() int {
+	return len(htp)
+}
+
+// Less returns whether or not the key for the pair at index i is
+// lexicographically before the key for the pair at index j.
+func (htp hashableTagPairs) Less(i, j int) bool {
+	return htp[i].key < htp[j].key
+}
+
+// Swap swaps the tag pairs at indexes i and j.
+func (htp hashableTagPairs) Swap(i, j int) {
+	htp[i], htp[j] = htp[j], htp[i]
+}
+
+// hash returns the hash digest of the tag pairs.
+func (htp hashableTagPairs) hash() string {
+	if !sort.IsSorted(htp) {
+		sort.Sort(htp)
+	}
+
+	h := newSHA1Hasher()
+
+	for _, tp := range htp {
+		h.add(tp.hash())
+	}
+
+	return h.sum()
+}
+
+// Hash returns the hash digest of the pod definition.
+func (o *ECSPodDefinitionOptions) Hash() string {
+	h := newSHA1Hasher()
+
+	if o.Name != nil {
+		h.add(utility.FromStringPtr(o.Name))
+	}
+
+	if len(o.ContainerDefinitions) != 0 {
+		h.add(newHashableContainerDefinitions(o.ContainerDefinitions).hash())
+	}
+
+	if o.MemoryMB != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(o.MemoryMB)))
+	}
+
+	if o.CPU != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(o.CPU)))
+	}
+
+	if o.NetworkMode != nil {
+		h.add(string(*o.NetworkMode))
+	}
+
+	if o.TaskRole != nil {
+		h.add(utility.FromStringPtr(o.TaskRole))
+	}
+
+	if o.ExecutionRole != nil {
+		h.add(utility.FromStringPtr(o.ExecutionRole))
+	}
+
+	if len(o.Tags) != 0 {
+		h.add(newHashableTagPairs(o.Tags).hash())
+	}
+
+	return h.sum()
+}
+
+// hasher is a wrapper around a hashing algorithm.
+type hasher struct {
+	hash.Hash
+}
+
+// newSHA1Hasher returns a hasher that uses the SHA1 algorithm.
+func newSHA1Hasher() hasher {
+	return hasher{Hash: sha1.New()}
+}
+
+// add adds data to the hasher.
+func (h hasher) add(data string) {
+	// The hash.Hash interface says the io.Writer will never return an error, so
+	// the returned error can be squashed.
+	_, _ = io.WriteString(h, data)
+}
+
+// sum returns the hash sum of the accumulated data.
+func (h hasher) sum() string {
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 // MergeECSPodDefinitionOptions merges all the given options to create an ECS
 // pod definition. Options are applied in the order that they're specified and
 // conflicting options are overwritten.
@@ -471,6 +596,91 @@ func (d *ECSContainerDefinition) Validate() error {
 	return nil
 }
 
+// hash returns the hash digest of the container definition.
+func (d *ECSContainerDefinition) hash() string {
+	h := newSHA1Hasher()
+	if d.Name != nil {
+		h.add(utility.FromStringPtr(d.Name))
+	}
+
+	if d.Image != nil {
+		h.add(utility.FromStringPtr(d.Image))
+	}
+
+	if len(d.Command) != 0 {
+		for _, arg := range d.Command {
+			h.add(arg)
+		}
+	}
+
+	if d.WorkingDir != nil {
+		h.add(utility.FromStringPtr(d.WorkingDir))
+	}
+
+	if d.MemoryMB != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(d.MemoryMB)))
+	}
+
+	if d.CPU != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(d.CPU)))
+	}
+
+	if len(d.EnvVars) != 0 {
+		h.add(newHashableEnvironmentVariables(d.EnvVars).hash())
+	}
+
+	if d.RepoCreds != nil {
+		h.add(d.RepoCreds.hash())
+	}
+
+	if len(d.PortMappings) != 0 {
+		h.add(newHashablePortMappings(d.PortMappings).hash())
+	}
+
+	return h.sum()
+}
+
+// hashableECSContainerDefinitions represents a hashable slice of ECS container
+// definitions ordered by container name.
+type hashableECSContainerDefinitions []ECSContainerDefinition
+
+func newHashableContainerDefinitions(containerDefs []ECSContainerDefinition) hashableECSContainerDefinitions {
+	hcd := hashableECSContainerDefinitions(containerDefs)
+	sort.Sort(hcd)
+	return hcd
+}
+
+// Len returns the number of container definitions.
+func (hcd hashableECSContainerDefinitions) Len() int {
+	return len(hcd)
+}
+
+// Less returns whether or not the name of the container definition at index i
+// is lexicographically before the name of the container definition at index j.
+func (hcd hashableECSContainerDefinitions) Less(i, j int) bool {
+	return utility.FromStringPtr(hcd[i].Name) < utility.FromStringPtr(hcd[j].Name)
+}
+
+// Swap swaps the container definitions at indexes i and j.
+func (hcd hashableECSContainerDefinitions) Swap(i, j int) {
+	hcd[i], hcd[j] = hcd[j], hcd[i]
+}
+
+// hash returns the hash digest of the container definitions.
+func (hcd hashableECSContainerDefinitions) hash() string {
+	if !sort.IsSorted(hcd) {
+		sort.Sort(hcd)
+	}
+
+	h := newSHA1Hasher()
+
+	for _, cd := range hcd {
+		h.add(cd.hash())
+	}
+
+	return h.sum()
+}
+
 // EnvironmentVariable represents an environment variable, which can be
 // optionally backed by a secret.
 type EnvironmentVariable struct {
@@ -522,6 +732,66 @@ func (e *EnvironmentVariable) Validate() error {
 		catcher.Wrap(e.SecretOpts.Validate(), "invalid secret options")
 	}
 	return catcher.Resolve()
+}
+
+// hash is the hash digest of the environment variable.
+func (e *EnvironmentVariable) hash() string {
+	h := newSHA1Hasher()
+	if e.Name != nil {
+		h.add(utility.FromStringPtr(e.Name))
+	}
+
+	if e.Value != nil {
+		h.add(utility.FromStringPtr(e.Value))
+	}
+
+	if e.SecretOpts != nil {
+		h.add(e.SecretOpts.hash())
+	}
+
+	return h.sum()
+}
+
+// hashableEnvironmentVariables represents a slice of environment variables that
+// can be hashed.
+type hashableEnvironmentVariables []EnvironmentVariable
+
+// newHashableEnvironmentVariables returns a sorted slice of hashable
+// environment variables.
+func newHashableEnvironmentVariables(ev []EnvironmentVariable) hashableEnvironmentVariables {
+	hev := hashableEnvironmentVariables(ev)
+	sort.Sort(hev)
+	return hev
+}
+
+// Len returns the number of environment variables.
+func (hev hashableEnvironmentVariables) Len() int {
+	return len(hev)
+}
+
+// Less returns whether or not the name of the environment variable at index i
+// is lexicographically before the name of the environment variable at index j.
+func (hev hashableEnvironmentVariables) Less(i, j int) bool {
+	return utility.FromStringPtr(hev[i].Name) < utility.FromStringPtr(hev[j].Name)
+}
+
+// Swap swaps the environment variables at indexes i and j.
+func (hev hashableEnvironmentVariables) Swap(i, j int) {
+	hev[i], hev[j] = hev[j], hev[i]
+}
+
+// hash returns the hash digest of the environment variables.
+func (hev hashableEnvironmentVariables) hash() string {
+	if !sort.IsSorted(hev) {
+		sort.Sort(hev)
+	}
+
+	h := newSHA1Hasher()
+	for _, ev := range hev {
+		h.add(ev.hash())
+	}
+
+	return h.sum()
 }
 
 // SecretOptions represents a secret with a name and value that may or may not
@@ -576,6 +846,28 @@ func (s *SecretOptions) Validate() error {
 	catcher.NewWhen(s.NewValue != nil && s.Name == nil, "cannot specify a new secret to be created without a name")
 	catcher.NewWhen(s.ID != nil && utility.FromStringPtr(s.ID) == "", "cannot specify an empty secret ID")
 	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the secret options.
+func (s *SecretOptions) hash() string {
+	h := newSHA1Hasher()
+	if s.ID != nil {
+		h.add(utility.FromStringPtr(s.ID))
+	}
+
+	if s.Name != nil {
+		h.add(utility.FromStringPtr(s.Name))
+	}
+
+	if s.NewValue != nil {
+		h.add(utility.FromStringPtr(s.NewValue))
+	}
+
+	if s.Owned != nil {
+		h.add(strconv.FormatBool(utility.FromBoolPtr(s.Owned)))
+	}
+
+	return h.sum()
 }
 
 // RepositoryCredentials are credentials for using images from private
@@ -639,6 +931,28 @@ func (c *RepositoryCredentials) Validate() error {
 	return catcher.Resolve()
 }
 
+// hash returns the hash digest of the repository credentials.
+func (c *RepositoryCredentials) hash() string {
+	h := newSHA1Hasher()
+	if c.ID != nil {
+		h.add(utility.FromStringPtr(c.ID))
+	}
+
+	if c.Name != nil {
+		h.add(utility.FromStringPtr(c.Name))
+	}
+
+	if c.NewCreds != nil {
+		h.add(c.NewCreds.hash())
+	}
+
+	if c.Owned != nil {
+		h.add(strconv.FormatBool(utility.FromBoolPtr(c.Owned)))
+	}
+
+	return h.sum()
+}
+
 // StoredRepositoryCredentials represents the storage format of repository
 // credentials for using images from private repositories.
 type StoredRepositoryCredentials struct {
@@ -672,6 +986,20 @@ func (c *StoredRepositoryCredentials) Validate() error {
 	catcher.NewWhen(utility.FromStringPtr(c.Username) == "", "must specify a username")
 	catcher.NewWhen(utility.FromStringPtr(c.Password) == "", "must specify a password")
 	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the stored repository credentials.
+func (c *StoredRepositoryCredentials) hash() string {
+	h := newSHA1Hasher()
+	if c.Username != nil {
+		h.add(utility.FromStringPtr(c.Username))
+	}
+
+	if c.Password != nil {
+		h.add(utility.FromStringPtr(c.Password))
+	}
+
+	return h.sum()
 }
 
 // PortMapping represents a mapping from a container port to a port in the
@@ -724,6 +1052,66 @@ func (m *PortMapping) Validate() error {
 		catcher.ErrorfWhen(hostPort <= minPort || hostPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
 	}
 	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the port mapping.
+func (m *PortMapping) hash() string {
+	h := newSHA1Hasher()
+	if m.ContainerPort != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(m.ContainerPort)))
+	}
+
+	if m.HostPort != nil {
+		h.add(strconv.Itoa(utility.FromIntPtr(m.HostPort)))
+	}
+
+	return h.sum()
+}
+
+type hashablePortMappings []PortMapping
+
+// newHashablePortMappings returns a sorted slice of hashable port mappings.
+func newHashablePortMappings(pm []PortMapping) hashablePortMappings {
+	hpm := hashablePortMappings(pm)
+	sort.Sort(hpm)
+	return hpm
+}
+
+// Len returns the number of port mappings.
+func (hpm hashablePortMappings) Len() int {
+	return len(hpm)
+}
+
+// Less returns whether or not the container port for the mapping at index i is
+// less than the container port for the mapping at index j. If they're equal,
+// the host ports are compared.
+func (hpm hashablePortMappings) Less(i, j int) bool {
+	cpi, cpj := utility.FromIntPtr(hpm[i].ContainerPort), utility.FromIntPtr(hpm[j].ContainerPort)
+	if cpi == cpj {
+		return utility.FromIntPtr(hpm[i].HostPort) < utility.FromIntPtr(hpm[j].HostPort)
+	}
+
+	return cpi < cpj
+}
+
+// Swap swaps the port mappings at indexes i and j.
+func (hpm hashablePortMappings) Swap(i, j int) {
+	hpm[i], hpm[j] = hpm[j], hpm[i]
+}
+
+// hash returns the hash digest of the port mappings.
+func (hpm hashablePortMappings) hash() string {
+	if !sort.IsSorted(hpm) {
+		sort.Sort(hpm)
+	}
+
+	h := newSHA1Hasher()
+
+	for _, pm := range hpm {
+		h.add(pm.hash())
+	}
+
+	return h.sum()
 }
 
 // ECSPodExecutionOptions represent options to configure how a pod is started.
