@@ -37,13 +37,13 @@ func NewBasicPodDefinitionManagerOptions() *BasicPodDefinitionManagerOptions {
 	return &BasicPodDefinitionManagerOptions{}
 }
 
-// SetClient sets the client the pod uses to communicate with ECS.
+// SetClient sets the client the pod manager uses to communicate with ECS.
 func (o *BasicPodDefinitionManagerOptions) SetClient(c cocoa.ECSClient) *BasicPodDefinitionManagerOptions {
 	o.Client = c
 	return o
 }
 
-// SetVault sets the vault that the pod uses to manage secrets.
+// SetVault sets the vault that the pod manager uses to manage secrets.
 func (o *BasicPodDefinitionManagerOptions) SetVault(v cocoa.Vault) *BasicPodDefinitionManagerOptions {
 	o.Vault = v
 	return o
@@ -132,7 +132,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 	}
 
 	if err := m.cache.Put(ctx, item); err != nil {
-		return nil, errors.Wrapf(err, "adding pod definition item '%s' to cache", item.ID)
+		return nil, errors.Wrapf(err, "adding pod definition item '%s' named '%s' to cache", item.ID, utility.FromStringPtr(item.DefinitionOpts.Name))
 	}
 
 	// Now that the cloud pod definition is being tracked in the cache, re-tag
@@ -141,7 +141,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 		ResourceArn: aws.String(item.ID),
 		Tags:        exportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
 	}); err != nil {
-		return nil, errors.Wrapf(err, "re-tagging pod definition item '%s' to indicate that it is tracked", item.ID)
+		return nil, errors.Wrapf(err, "re-tagging pod definition item '%s' named '%s' to indicate that it is tracked", item.ID, utility.FromStringPtr(item.DefinitionOpts.Name))
 	}
 
 	return &item, nil

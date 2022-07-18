@@ -23,6 +23,8 @@ type SecretsManagerClient interface {
 	UpdateSecretValue(ctx context.Context, in *secretsmanager.UpdateSecretInput) (*secretsmanager.UpdateSecretOutput, error)
 	// DeleteSecret deletes an existing secret.
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
+	// TagResource adds tags to a secret.
+	TagResource(ctx context.Context, in *secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error)
 	// Close closes the client and cleans up its resources. Implementations
 	// should ensure that this is idempotent.
 	Close(ctx context.Context) error

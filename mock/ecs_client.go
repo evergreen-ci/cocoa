@@ -49,7 +49,7 @@ func newECSTaskDefinition(def *ecs.RegisterTaskDefinitionInput, rev int) ECSTask
 		Registered: utility.ToTimePtr(time.Now()),
 	}
 
-	taskDef.Tags = newTags(def.Tags)
+	taskDef.Tags = newECSTags(def.Tags)
 
 	for _, containerDef := range def.ContainerDefinitions {
 		if containerDef == nil {
@@ -157,7 +157,7 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		GoalStatus:       utility.ToStringPtr(ecs.DesiredStatusRunning),
 		Created:          utility.ToTimePtr(time.Now()),
 		TaskDef:          taskDef,
-		Tags:             newTags(in.Tags),
+		Tags:             newECSTags(in.Tags),
 	}
 
 	for _, containerDef := range taskDef.ContainerDefs {
@@ -185,7 +185,7 @@ func (t *ECSTask) export(includeTags bool) *ecs.Task {
 		StoppedAt:            t.Stopped,
 	}
 	if includeTags {
-		exported.Tags = exportTags(t.Tags)
+		exported.Tags = exportECSTags(t.Tags)
 	}
 
 	for _, container := range t.Containers {
@@ -249,7 +249,7 @@ func (c *ECSContainer) export() *ecs.Container {
 	return exported
 }
 
-func newTags(tags []*ecs.Tag) map[string]string {
+func newECSTags(tags []*ecs.Tag) map[string]string {
 	converted := map[string]string{}
 	for _, t := range tags {
 		if t == nil {
@@ -260,7 +260,7 @@ func newTags(tags []*ecs.Tag) map[string]string {
 	return converted
 }
 
-func exportTags(tags map[string]string) []*ecs.Tag {
+func exportECSTags(tags map[string]string) []*ecs.Tag {
 	var exported []*ecs.Tag
 	for k, v := range tags {
 		exported = append(exported, &ecs.Tag{
@@ -526,7 +526,7 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 		TaskDefinition: def.export(),
 	}
 	if shouldIncludeTags(in.Include) {
-		resp.Tags = exportTags(def.Tags)
+		resp.Tags = exportECSTags(def.Tags)
 	}
 
 	return &resp, nil
@@ -775,11 +775,8 @@ func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (
 
 	taskDef, err := GlobalECSService.getTaskDefinition(id)
 	if err == nil {
-		for _, t := range in.Tags {
-			if t == nil {
-				continue
-			}
-			taskDef.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		for k, v := range newECSTags(in.Tags) {
+			taskDef.Tags[k] = v
 		}
 		return &ecs.TagResourceOutput{}, nil
 	}
@@ -789,11 +786,8 @@ func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (
 		if !ok {
 			continue
 		}
-		for _, t := range in.Tags {
-			if t == nil {
-				continue
-			}
-			task.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		for k, v := range newECSTags(in.Tags) {
+			task.Tags[k] = v
 		}
 		cluster[id] = task
 		return &ecs.TagResourceOutput{}, nil

@@ -52,6 +52,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		},
 		"RegisterAndDeregisterTaskDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
+			defer cleanupTaskDefinition(ctx, t, c, &registerOut)
 			assert.Equal(t, awsECS.TaskDefinitionStatusActive, *registerOut.TaskDefinition.Status)
 			assert.NotZero(t, utility.FromTimePtr(registerOut.TaskDefinition.RegisteredAt))
 
@@ -123,14 +124,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		},
 		"TagResourceSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
-			defer func() {
-				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
-					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
-				})
-				assert.NoError(t, err)
-				assert.NotZero(t, deregisterOut)
-			}()
-
+			defer cleanupTaskDefinition(ctx, t, c, &registerOut)
 			tags := []*awsECS.Tag{
 				{
 					Key:   aws.String("some_key"),
@@ -156,13 +150,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		},
 		"TagResourceIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
-			defer func() {
-				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
-					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
-				})
-				assert.NoError(t, err)
-				assert.NotZero(t, deregisterOut)
-			}()
+			defer cleanupTaskDefinition(ctx, t, c, &registerOut)
 
 			tags := []*awsECS.Tag{
 				{
@@ -191,13 +179,7 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		},
 		"TagResourceOverwritesExistingTagValue": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
-			defer func() {
-				deregisterOut, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
-					TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
-				})
-				assert.NoError(t, err)
-				assert.NotZero(t, deregisterOut)
-			}()
+			defer cleanupTaskDefinition(ctx, t, c, &registerOut)
 
 			oldTags := []*awsECS.Tag{
 				{

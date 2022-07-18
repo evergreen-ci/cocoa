@@ -130,18 +130,15 @@ func SecretsManagerClientTests() map[string]SecretsManagerClientTestCase {
 			assert.Equal(t, createOut.ARN, describeOut.ARN)
 		},
 		"DescribeSecretSucceedsAfterDeletion": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
-			createOut, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+			createOut := testutil.CreateSecret(ctx, t, c, secretsmanager.CreateSecretInput{
 				Name:         aws.String(testutil.NewSecretName(t)),
 				SecretString: aws.String("bar"),
 			})
-			require.NoError(t, err)
-			require.NotZero(t, createOut)
-
-			defer cleanupSecret(ctx, t, c, createOut)
+			defer cleanupSecret(ctx, t, c, &createOut)
 
 			require.NotZero(t, createOut.ARN)
 
-			cleanupSecret(ctx, t, c, createOut)
+			cleanupSecret(ctx, t, c, &createOut)
 
 			describeOut, err := c.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
 				SecretId: createOut.ARN,
@@ -168,12 +165,10 @@ func SecretsManagerClientTests() map[string]SecretsManagerClientTestCase {
 			assert.Zero(t, out)
 		},
 		"DeleteSecretSucceeds": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
-			createOut, err := c.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+			createOut := testutil.CreateSecret(ctx, t, c, secretsmanager.CreateSecretInput{
 				Name:         aws.String(testutil.NewSecretName(t)),
 				SecretString: aws.String("hello"),
 			})
-			require.NoError(t, err)
-			require.NotZero(t, createOut)
 			out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{
 				ForceDeleteWithoutRecovery: aws.Bool(true),
 				SecretId:                   createOut.ARN,
@@ -181,10 +176,76 @@ func SecretsManagerClientTests() map[string]SecretsManagerClientTestCase {
 			require.NoError(t, err)
 			require.NotZero(t, out)
 		},
+		"TagResourceSucceeds": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
+			createOut := testutil.CreateSecret(ctx, t, c, secretsmanager.CreateSecretInput{
+				Name:         aws.String(testutil.NewSecretName(t)),
+				SecretString: aws.String(utility.RandomString()),
+			})
+			defer cleanupSecret(ctx, t, c, &createOut)
+
+			tags := []*secretsmanager.Tag{
+				{
+					Key:   aws.String("some_key"),
+					Value: aws.String("some_value"),
+				},
+			}
+			_, err := c.TagResource(ctx, &secretsmanager.TagResourceInput{
+				SecretId: createOut.ARN,
+				Tags:     tags,
+			})
+			require.NoError(t, err)
+
+			describeOut, err := c.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
+				SecretId: createOut.ARN,
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeOut)
+			require.Len(t, describeOut.Tags, 1)
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Key), utility.FromStringPtr(tags[0].Key))
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Value), utility.FromStringPtr(tags[0].Value))
+		},
+		"TagResourceIsIdempotent": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
+			createOut := testutil.CreateSecret(ctx, t, c, secretsmanager.CreateSecretInput{
+				Name:         aws.String(testutil.NewSecretName(t)),
+				SecretString: aws.String(utility.RandomString()),
+			})
+			defer cleanupSecret(ctx, t, c, &createOut)
+
+			tags := []*secretsmanager.Tag{
+				{
+					Key:   aws.String("some_key"),
+					Value: aws.String("some_value"),
+				},
+			}
+			for i := 0; i < 3; i++ {
+				_, err := c.TagResource(ctx, &secretsmanager.TagResourceInput{
+					SecretId: createOut.ARN,
+					Tags:     tags,
+				})
+				require.NoError(t, err)
+			}
+
+			describeOut, err := c.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{
+				SecretId: createOut.ARN,
+			})
+			require.NoError(t, err)
+			require.NotZero(t, describeOut)
+			require.Len(t, describeOut.Tags, 1)
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Key), utility.FromStringPtr(tags[0].Key))
+			assert.Equal(t, utility.FromStringPtr(describeOut.Tags[0].Value), utility.FromStringPtr(tags[0].Value))
+		},
+		"TagResourceFailsWithZeroInput": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
+			_, err := c.TagResource(ctx, &secretsmanager.TagResourceInput{})
+			assert.Error(t, err)
+		},
+		"TagResourceFailsWithNonexistentResource": func(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient) {
+			_, err := c.TagResource(ctx, &secretsmanager.TagResourceInput{SecretId: aws.String("foo")})
+			assert.Error(t, err)
+		},
 	}
 }
 
-// cleanupSecret cleans up an existing secret if it exists.
+// cleanupSecret cleans up an existing secret.
 func cleanupSecret(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient, out *secretsmanager.CreateSecretOutput) {
 	if out != nil && out.ARN != nil {
 		out, err := c.DeleteSecret(ctx, &secretsmanager.DeleteSecretInput{

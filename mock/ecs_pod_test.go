@@ -42,9 +42,12 @@ func TestECSPod(t *testing.T) {
 			defer func() {
 				assert.NoError(t, smc.Close(tctx))
 			}()
-			v := NewVault(secret.NewBasicSecretsManager(smc))
 
-			pc, err := ecs.NewBasicECSPodCreator(c, v)
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
+			mv := NewVault(v)
+
+			pc, err := ecs.NewBasicECSPodCreator(c, mv)
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 
@@ -68,9 +71,12 @@ func TestECSPod(t *testing.T) {
 			defer func() {
 				assert.NoError(t, smc.Close(tctx))
 			}()
-			v := NewVault(secret.NewBasicSecretsManager(smc))
 
-			pc, err := ecs.NewBasicECSPodCreator(c, v)
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
+			mv := NewVault(v)
+
+			pc, err := ecs.NewBasicECSPodCreator(c, mv)
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 
@@ -321,7 +327,10 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			assert.Error(t, noVault.Delete(ctx), "should fail when deleting the pod secrets")
 			assert.Equal(t, cocoa.StatusStopped, noVault.StatusInfo().Status)
 
-			podOpts.SetVault(NewVault(secret.NewBasicSecretsManager(smc)))
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
+			podOpts.SetVault(NewVault(v))
+
 			withVault, err := makePod(podOpts)
 			require.NoError(t, err)
 

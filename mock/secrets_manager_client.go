@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/utility"
@@ -22,6 +21,41 @@ type StoredSecret struct {
 	Updated     time.Time
 	Accessed    time.Time
 	Deleted     time.Time
+	Tags        map[string]string
+}
+
+func newStoredSecret(in *secretsmanager.CreateSecretInput, ts time.Time) StoredSecret {
+	s := StoredSecret{
+		ARN:         utility.FromStringPtr(in.Name),
+		Value:       utility.FromStringPtr(in.SecretString),
+		BinaryValue: in.SecretBinary,
+		Created:     ts,
+		Accessed:    ts,
+		Tags:        newSecretsManagerTags(in.Tags),
+	}
+	return s
+}
+
+func newSecretsManagerTags(tags []*secretsmanager.Tag) map[string]string {
+	converted := map[string]string{}
+	for _, t := range tags {
+		if t == nil {
+			continue
+		}
+		converted[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+	}
+	return converted
+}
+
+func exportSecretsManagerTags(tags map[string]string) []*secretsmanager.Tag {
+	var exported []*secretsmanager.Tag
+	for k, v := range tags {
+		exported = append(exported, &secretsmanager.Tag{
+			Key:   utility.ToStringPtr(k),
+			Value: utility.ToStringPtr(v),
+		})
+	}
+	return exported
 }
 
 // GlobalSecretCache is a global secret storage cache that provides a simplified
@@ -68,6 +102,10 @@ type SecretsManagerClient struct {
 	DeleteSecretInput  *secretsmanager.DeleteSecretInput
 	DeleteSecretOutput *secretsmanager.DeleteSecretOutput
 	DeleteSecretError  error
+
+	TagResourceInput  *secretsmanager.TagResourceInput
+	TagResourceOutput *secretsmanager.TagResourceOutput
+	TagResourceError  error
 }
 
 // CreateSecret saves the input options and returns a new mock secret. The mock
@@ -95,14 +133,7 @@ func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmana
 		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret already exists", nil)
 	}
 
-	ts := time.Now()
-	GlobalSecretCache[name] = StoredSecret{
-		ARN:         utility.FromStringPtr(in.Name),
-		Value:       utility.FromStringPtr(in.SecretString),
-		BinaryValue: in.SecretBinary,
-		Created:     ts,
-		Accessed:    ts,
-	}
+	GlobalSecretCache[name] = newStoredSecret(in, time.Now())
 
 	return &secretsmanager.CreateSecretOutput{
 		ARN:  in.Name,
@@ -139,9 +170,9 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 	return &secretsmanager.GetSecretValueOutput{
 		Name:         in.SecretId,
 		ARN:          in.SecretId,
-		SecretString: aws.String(s.Value),
+		SecretString: utility.ToStringPtr(s.Value),
 		SecretBinary: s.BinaryValue,
-		CreatedDate:  aws.Time(s.Created),
+		CreatedDate:  utility.ToTimePtr(s.Created),
 	}, nil
 }
 
@@ -172,6 +203,7 @@ func (c *SecretsManagerClient) DescribeSecret(ctx context.Context, in *secretsma
 		LastAccessedDate: utility.ToTimePtr(s.Accessed),
 		LastChangedDate:  utility.ToTimePtr(s.Updated),
 		DeletedDate:      utility.ToTimePtr(s.Deleted),
+		Tags:             exportSecretsManagerTags(s.Tags),
 	}, nil
 }
 
@@ -221,6 +253,7 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 			LastAccessedDate: utility.ToTimePtr(s.Accessed),
 			LastChangedDate:  utility.ToTimePtr(s.Updated),
 			DeletedDate:      utility.ToTimePtr(s.Deleted),
+			Tags:             exportSecretsManagerTags(s.Tags),
 		})
 	}
 
@@ -331,8 +364,30 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 	return &secretsmanager.DeleteSecretOutput{
 		ARN:          in.SecretId,
 		Name:         in.SecretId,
-		DeletionDate: aws.Time(s.Deleted),
+		DeletionDate: utility.ToTimePtr(s.Deleted),
 	}, nil
+}
+
+// TagResource saves the input options and tags an existing mock secret. The
+// mock output can be customized. By default, it will tag the cached mock
+// secret if it exists.
+func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error) {
+	c.TagResourceInput = in
+
+	if c.TagResourceOutput != nil || c.TagResourceError != nil {
+		return c.TagResourceOutput, c.TagResourceError
+	}
+
+	id := utility.FromStringPtr(in.SecretId)
+
+	s, ok := GlobalSecretCache[id]
+	if !ok {
+		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret not found", nil)
+	}
+	for k, v := range newSecretsManagerTags(in.Tags) {
+		s.Tags[k] = v
+	}
+	return &secretsmanager.TagResourceOutput{}, nil
 }
 
 // Close closes the mock client. The mock output can be customized. By default,

@@ -98,7 +98,8 @@ func TestECSPod(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			v := secret.NewBasicSecretsManager(smc)
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
 
 			pc, err := NewBasicECSPodCreator(c, v)
 			require.NoError(t, err)
@@ -145,7 +146,8 @@ func TestBasicECSPodOptions(t *testing.T) {
 	t.Run("SetVault", func(t *testing.T) {
 		c, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 		require.NoError(t, err)
-		v := secret.NewBasicSecretsManager(c)
+		v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(c))
+		require.NoError(t, err)
 		opts := NewBasicECSPodOptions().SetVault(v)
 		assert.Equal(t, v, opts.Vault)
 	})
@@ -187,7 +189,8 @@ func TestBasicECSPodOptions(t *testing.T) {
 			require.NoError(t, err)
 			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
-			v := secret.NewBasicSecretsManager(smClient)
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
+			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetClient(ecsClient).
 				SetVault(v).
@@ -198,7 +201,8 @@ func TestBasicECSPodOptions(t *testing.T) {
 		t.Run("FailsWithoutClient", func(t *testing.T) {
 			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
 			require.NoError(t, err)
-			v := secret.NewBasicSecretsManager(smClient)
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
+			require.NoError(t, err)
 			opts := NewBasicECSPodOptions().
 				SetVault(v).
 				SetResources(validResources()).

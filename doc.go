@@ -20,7 +20,9 @@ directly to the ECS API using this client.
 
 The Vault is an ancillary service for pods that supports interacting with a
 dedicated secrets management service. It conveniently integrates with pods to
-securely pass secrets into containers.
+securely pass secrets into containers. This can be used in conjunction with a
+SecretCache to both manage the cloud secrets and also keep track of these
+secrets in an external cache.
 
 The SecretsManagerClient provides a convenience wrapper around the AWS Secrets
 Manager API. If the Vault does not fulfill your needs, you can instead make
