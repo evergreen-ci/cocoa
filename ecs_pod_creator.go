@@ -596,7 +596,7 @@ func (d *ECSContainerDefinition) Validate() error {
 	return nil
 }
 
-// hash returns the hash digest of the definition.
+// hash returns the hash digest of the container definition.
 func (d *ECSContainerDefinition) hash() string {
 	h := newSHA1Hasher()
 	if d.Name != nil {
