@@ -184,8 +184,6 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, s cocoa.NamedSecr
 
 // DeleteSecret deletes an existing secret.
 // If the secret does not exist, this will perform no operation.
-// kim: TODO: mark the cached secret as preparing to delete, then delete, then
-// mark as deleted.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("must specify a non-empty ID")
