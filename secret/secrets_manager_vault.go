@@ -195,7 +195,6 @@ func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error
 	return err
 }
 
-// shouldCache
 func (m *BasicSecretsManager) shouldCache() bool {
 	return m.cache != nil
 }
