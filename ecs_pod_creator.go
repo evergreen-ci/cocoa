@@ -2,10 +2,6 @@ package cocoa
 
 import (
 	"context"
-	"crypto/sha1"
-	"fmt"
-	"hash"
-	"io"
 	"sort"
 	"strconv"
 
@@ -306,10 +302,10 @@ type tagPair struct {
 
 // hash returns the hash digest of the tag pair.
 func (tp tagPair) hash() string {
-	h := newSHA1Hasher()
-	h.add(tp.key)
-	h.add(tp.value)
-	return h.sum()
+	h := utility.NewSHA1Hash()
+	h.Add(tp.key)
+	h.Add(tp.value)
+	return h.Sum()
 }
 
 // hashableTagPairs represents a slice of key-value tag that can be hashed.
@@ -347,74 +343,52 @@ func (htp hashableTagPairs) hash() string {
 		sort.Sort(htp)
 	}
 
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 
 	for _, tp := range htp {
-		h.add(tp.hash())
+		h.Add(tp.hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // Hash returns the hash digest of the pod definition.
 func (o *ECSPodDefinitionOptions) Hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 
 	if o.Name != nil {
-		h.add(utility.FromStringPtr(o.Name))
+		h.Add(utility.FromStringPtr(o.Name))
 	}
 
 	if len(o.ContainerDefinitions) != 0 {
-		h.add(newHashableContainerDefinitions(o.ContainerDefinitions).hash())
+		h.Add(newHashableContainerDefinitions(o.ContainerDefinitions).hash())
 	}
 
 	if o.MemoryMB != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(o.MemoryMB)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(o.MemoryMB)))
 	}
 
 	if o.CPU != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(o.CPU)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(o.CPU)))
 	}
 
 	if o.NetworkMode != nil {
-		h.add(string(*o.NetworkMode))
+		h.Add(string(*o.NetworkMode))
 	}
 
 	if o.TaskRole != nil {
-		h.add(utility.FromStringPtr(o.TaskRole))
+		h.Add(utility.FromStringPtr(o.TaskRole))
 	}
 
 	if o.ExecutionRole != nil {
-		h.add(utility.FromStringPtr(o.ExecutionRole))
+		h.Add(utility.FromStringPtr(o.ExecutionRole))
 	}
 
 	if len(o.Tags) != 0 {
-		h.add(newHashableTagPairs(o.Tags).hash())
+		h.Add(newHashableTagPairs(o.Tags).hash())
 	}
 
-	return h.sum()
-}
-
-// hasher is a wrapper around a hashing algorithm.
-type hasher struct {
-	hash.Hash
-}
-
-// newSHA1Hasher returns a hasher that uses the SHA1 algorithm.
-func newSHA1Hasher() hasher {
-	return hasher{Hash: sha1.New()}
-}
-
-// add adds data to the hasher.
-func (h hasher) add(data string) {
-	// The hash.Hash interface says the io.Writer will never return an error, so
-	// the returned error can be squashed.
-	_, _ = io.WriteString(h, data)
-}
-
-// sum returns the hash sum of the accumulated data.
-func (h hasher) sum() string {
-	return fmt.Sprintf("%x", h.Sum(nil))
+	return h.Sum()
 }
 
 // MergeECSPodDefinitionOptions merges all the given options to create an ECS
@@ -598,46 +572,46 @@ func (d *ECSContainerDefinition) Validate() error {
 
 // hash returns the hash digest of the container definition.
 func (d *ECSContainerDefinition) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if d.Name != nil {
-		h.add(utility.FromStringPtr(d.Name))
+		h.Add(utility.FromStringPtr(d.Name))
 	}
 
 	if d.Image != nil {
-		h.add(utility.FromStringPtr(d.Image))
+		h.Add(utility.FromStringPtr(d.Image))
 	}
 
 	if len(d.Command) != 0 {
 		for _, arg := range d.Command {
-			h.add(arg)
+			h.Add(arg)
 		}
 	}
 
 	if d.WorkingDir != nil {
-		h.add(utility.FromStringPtr(d.WorkingDir))
+		h.Add(utility.FromStringPtr(d.WorkingDir))
 	}
 
 	if d.MemoryMB != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(d.MemoryMB)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(d.MemoryMB)))
 	}
 
 	if d.CPU != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(d.CPU)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(d.CPU)))
 	}
 
 	if len(d.EnvVars) != 0 {
-		h.add(newHashableEnvironmentVariables(d.EnvVars).hash())
+		h.Add(newHashableEnvironmentVariables(d.EnvVars).hash())
 	}
 
 	if d.RepoCreds != nil {
-		h.add(d.RepoCreds.hash())
+		h.Add(d.RepoCreds.hash())
 	}
 
 	if len(d.PortMappings) != 0 {
-		h.add(newHashablePortMappings(d.PortMappings).hash())
+		h.Add(newHashablePortMappings(d.PortMappings).hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // hashableECSContainerDefinitions represents a hashable slice of ECS container
@@ -672,13 +646,13 @@ func (hcd hashableECSContainerDefinitions) hash() string {
 		sort.Sort(hcd)
 	}
 
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 
 	for _, cd := range hcd {
-		h.add(cd.hash())
+		h.Add(cd.hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // EnvironmentVariable represents an environment variable, which can be
@@ -736,20 +710,20 @@ func (e *EnvironmentVariable) Validate() error {
 
 // hash is the hash digest of the environment variable.
 func (e *EnvironmentVariable) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if e.Name != nil {
-		h.add(utility.FromStringPtr(e.Name))
+		h.Add(utility.FromStringPtr(e.Name))
 	}
 
 	if e.Value != nil {
-		h.add(utility.FromStringPtr(e.Value))
+		h.Add(utility.FromStringPtr(e.Value))
 	}
 
 	if e.SecretOpts != nil {
-		h.add(e.SecretOpts.hash())
+		h.Add(e.SecretOpts.hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // hashableEnvironmentVariables represents a slice of environment variables that
@@ -786,12 +760,12 @@ func (hev hashableEnvironmentVariables) hash() string {
 		sort.Sort(hev)
 	}
 
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	for _, ev := range hev {
-		h.add(ev.hash())
+		h.Add(ev.hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // SecretOptions represents a secret with a name and value that may or may not
@@ -850,24 +824,24 @@ func (s *SecretOptions) Validate() error {
 
 // hash returns the hash digest of the secret options.
 func (s *SecretOptions) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if s.ID != nil {
-		h.add(utility.FromStringPtr(s.ID))
+		h.Add(utility.FromStringPtr(s.ID))
 	}
 
 	if s.Name != nil {
-		h.add(utility.FromStringPtr(s.Name))
+		h.Add(utility.FromStringPtr(s.Name))
 	}
 
 	if s.NewValue != nil {
-		h.add(utility.FromStringPtr(s.NewValue))
+		h.Add(utility.FromStringPtr(s.NewValue))
 	}
 
 	if s.Owned != nil {
-		h.add(strconv.FormatBool(utility.FromBoolPtr(s.Owned)))
+		h.Add(strconv.FormatBool(utility.FromBoolPtr(s.Owned)))
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // RepositoryCredentials are credentials for using images from private
@@ -933,24 +907,24 @@ func (c *RepositoryCredentials) Validate() error {
 
 // hash returns the hash digest of the repository credentials.
 func (c *RepositoryCredentials) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if c.ID != nil {
-		h.add(utility.FromStringPtr(c.ID))
+		h.Add(utility.FromStringPtr(c.ID))
 	}
 
 	if c.Name != nil {
-		h.add(utility.FromStringPtr(c.Name))
+		h.Add(utility.FromStringPtr(c.Name))
 	}
 
 	if c.NewCreds != nil {
-		h.add(c.NewCreds.hash())
+		h.Add(c.NewCreds.hash())
 	}
 
 	if c.Owned != nil {
-		h.add(strconv.FormatBool(utility.FromBoolPtr(c.Owned)))
+		h.Add(strconv.FormatBool(utility.FromBoolPtr(c.Owned)))
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // StoredRepositoryCredentials represents the storage format of repository
@@ -990,16 +964,16 @@ func (c *StoredRepositoryCredentials) Validate() error {
 
 // hash returns the hash digest of the stored repository credentials.
 func (c *StoredRepositoryCredentials) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if c.Username != nil {
-		h.add(utility.FromStringPtr(c.Username))
+		h.Add(utility.FromStringPtr(c.Username))
 	}
 
 	if c.Password != nil {
-		h.add(utility.FromStringPtr(c.Password))
+		h.Add(utility.FromStringPtr(c.Password))
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // PortMapping represents a mapping from a container port to a port in the
@@ -1056,16 +1030,16 @@ func (m *PortMapping) Validate() error {
 
 // hash returns the hash digest of the port mapping.
 func (m *PortMapping) hash() string {
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 	if m.ContainerPort != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(m.ContainerPort)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(m.ContainerPort)))
 	}
 
 	if m.HostPort != nil {
-		h.add(strconv.Itoa(utility.FromIntPtr(m.HostPort)))
+		h.Add(strconv.Itoa(utility.FromIntPtr(m.HostPort)))
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 type hashablePortMappings []PortMapping
@@ -1105,13 +1079,13 @@ func (hpm hashablePortMappings) hash() string {
 		sort.Sort(hpm)
 	}
 
-	h := newSHA1Hasher()
+	h := utility.NewSHA1Hash()
 
 	for _, pm := range hpm {
-		h.add(pm.hash())
+		h.Add(pm.hash())
 	}
 
-	return h.sum()
+	return h.Sum()
 }
 
 // ECSPodExecutionOptions represent options to configure how a pod is started.
