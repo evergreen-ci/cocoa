@@ -13,25 +13,25 @@ import (
 // StoredSecret is a representation of a secret kept in the global secret
 // storage cache.
 type StoredSecret struct {
-	ARN         string
-	Value       string
-	BinaryValue []byte
-	IsDeleted   bool
-	Created     time.Time
-	Updated     time.Time
-	Accessed    time.Time
-	Deleted     time.Time
-	Tags        map[string]string
+	ARN          string
+	Value        string
+	BinaryValue  []byte
+	IsDeleted    bool
+	Created      time.Time
+	LastUpdated  time.Time
+	LastAccessed time.Time
+	Deleted      time.Time
+	Tags         map[string]string
 }
 
 func newStoredSecret(in *secretsmanager.CreateSecretInput, ts time.Time) StoredSecret {
 	s := StoredSecret{
-		ARN:         utility.FromStringPtr(in.Name),
-		Value:       utility.FromStringPtr(in.SecretString),
-		BinaryValue: in.SecretBinary,
-		Created:     ts,
-		Accessed:    ts,
-		Tags:        newSecretsManagerTags(in.Tags),
+		ARN:          utility.FromStringPtr(in.Name),
+		Value:        utility.FromStringPtr(in.SecretString),
+		BinaryValue:  in.SecretBinary,
+		Created:      ts,
+		LastAccessed: ts,
+		Tags:         newSecretsManagerTags(in.Tags),
 	}
 	return s
 }
@@ -164,7 +164,7 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
 	}
 
-	s.Accessed = time.Now()
+	s.LastAccessed = time.Now()
 	GlobalSecretCache[*in.SecretId] = s
 
 	return &secretsmanager.GetSecretValueOutput{
@@ -200,8 +200,8 @@ func (c *SecretsManagerClient) DescribeSecret(ctx context.Context, in *secretsma
 		ARN:              in.SecretId,
 		Name:             in.SecretId,
 		CreatedDate:      utility.ToTimePtr(s.Created),
-		LastAccessedDate: utility.ToTimePtr(s.Accessed),
-		LastChangedDate:  utility.ToTimePtr(s.Updated),
+		LastAccessedDate: utility.ToTimePtr(s.LastAccessed),
+		LastChangedDate:  utility.ToTimePtr(s.LastUpdated),
 		DeletedDate:      utility.ToTimePtr(s.Deleted),
 		Tags:             exportSecretsManagerTags(s.Tags),
 	}, nil
@@ -250,8 +250,8 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 			ARN:              utility.ToStringPtr(s.ARN),
 			Name:             utility.ToStringPtr(name),
 			CreatedDate:      utility.ToTimePtr(s.Created),
-			LastAccessedDate: utility.ToTimePtr(s.Accessed),
-			LastChangedDate:  utility.ToTimePtr(s.Updated),
+			LastAccessedDate: utility.ToTimePtr(s.LastAccessed),
+			LastChangedDate:  utility.ToTimePtr(s.LastUpdated),
 			DeletedDate:      utility.ToTimePtr(s.Deleted),
 			Tags:             exportSecretsManagerTags(s.Tags),
 		})
@@ -310,8 +310,8 @@ func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secret
 	}
 
 	ts := time.Now()
-	s.Accessed = ts
-	s.Updated = ts
+	s.LastAccessed = ts
+	s.LastUpdated = ts
 
 	GlobalSecretCache[*in.SecretId] = s
 
@@ -353,8 +353,8 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 	}
 
 	ts := time.Now()
-	s.Accessed = ts
-	s.Updated = ts
+	s.LastAccessed = ts
+	s.LastUpdated = ts
 	if !utility.FromBoolPtr(in.ForceDeleteWithoutRecovery) {
 		s.Deleted = ts.AddDate(0, 0, window)
 	}

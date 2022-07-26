@@ -271,8 +271,8 @@ func createSecret(ctx context.Context, v cocoa.Vault, secret cocoa.SecretOptions
 		SetValue(utility.FromStringPtr(secret.NewValue)))
 }
 
-// exportTags converts a mapping of tag names to values into ECS tags.
-func exportTags(tags map[string]string) []*ecs.Tag {
+// ExportTags converts a mapping of tag names to values into ECS tags.
+func ExportTags(tags map[string]string) []*ecs.Tag {
 	var ecsTags []*ecs.Tag
 
 	for k, v := range tags {
@@ -457,7 +457,7 @@ func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.Registe
 	taskDef.SetFamily(utility.FromStringPtr(opts.Name)).
 		SetTaskRoleArn(utility.FromStringPtr(opts.TaskRole)).
 		SetExecutionRoleArn(utility.FromStringPtr(opts.ExecutionRole)).
-		SetTags(exportTags(opts.Tags))
+		SetTags(ExportTags(opts.Tags))
 
 	return &taskDef
 }
@@ -503,7 +503,7 @@ func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecut
 	runTask.SetCluster(utility.FromStringPtr(opts.Cluster)).
 		SetCapacityProviderStrategy(pc.exportCapacityProvider(opts.CapacityProvider)).
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
-		SetTags(exportTags(opts.Tags)).
+		SetTags(ExportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
 		SetPlacementStrategy(pc.exportStrategy(opts.PlacementOpts)).
 		SetPlacementConstraints(pc.exportPlacementConstraints(opts.PlacementOpts)).

@@ -105,7 +105,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		// track whether the secret has been created but has not been
 		// successfully cached. In that case, the application can query Secrets
 		// Manager for secrets that are tagged as untracked to clean them up.
-		in.Tags = exportTags(map[string]string{m.cacheTag: strconv.FormatBool(false)})
+		in.Tags = ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(false)})
 	}
 
 	out, err := m.client.CreateSecret(ctx, in)
@@ -146,7 +146,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 	// that it's being tracked.
 	if _, err := m.client.TagResource(ctx, &secretsmanager.TagResourceInput{
 		SecretId: aws.String(arn),
-		Tags:     exportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
+		Tags:     ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
 	}); err != nil {
 		return "", errors.Wrapf(err, "re-tagging secret cache item '%s' named '%s' to indicate that it is tracked", item.ID, item.Name)
 	}
@@ -199,9 +199,9 @@ func (m *BasicSecretsManager) shouldCache() bool {
 	return m.cache != nil
 }
 
-// exportTags converts a mapping of tag names to values into Secrets Manager
+// ExportTags converts a mapping of tag names to values into Secrets Manager
 // tags.
-func exportTags(tags map[string]string) []*secretsmanager.Tag {
+func ExportTags(tags map[string]string) []*secretsmanager.Tag {
 	var smTags []*secretsmanager.Tag
 
 	for k, v := range tags {

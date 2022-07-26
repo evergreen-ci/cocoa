@@ -139,7 +139,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 	// it to indicate that it's being tracked.
 	if _, err := m.client.TagResource(ctx, &ecs.TagResourceInput{
 		ResourceArn: aws.String(item.ID),
-		Tags:        exportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
+		Tags:        ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
 	}); err != nil {
 		return nil, errors.Wrapf(err, "re-tagging pod definition item '%s' named '%s' to indicate that it is tracked", item.ID, utility.FromStringPtr(item.DefinitionOpts.Name))
 	}
