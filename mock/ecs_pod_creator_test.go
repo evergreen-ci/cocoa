@@ -47,9 +47,11 @@ func TestECSPodCreator(t *testing.T) {
 				assert.NoError(t, sm.Close(tctx))
 			}()
 
-			v := NewVault(secret.NewBasicSecretsManager(sm))
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
+			require.NoError(t, err)
+			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicECSPodCreator(c, v)
+			pc, err := ecs.NewBasicECSPodCreator(c, mv)
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)
@@ -96,9 +98,11 @@ func TestECSPodCreator(t *testing.T) {
 				assert.NoError(t, sm.Close(tctx))
 			}()
 
-			v := NewVault(secret.NewBasicSecretsManager(sm))
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
+			require.NoError(t, err)
+			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicECSPodCreator(c, v)
+			pc, err := ecs.NewBasicECSPodCreator(c, mv)
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)

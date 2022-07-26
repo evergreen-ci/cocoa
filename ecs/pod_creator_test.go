@@ -66,7 +66,8 @@ func TestBasicECSPodCreator(t *testing.T) {
 				assert.NoError(t, smc.Close(tctx))
 			}()
 
-			m := secret.NewBasicSecretsManager(smc)
+			m, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
 			require.NotNil(t, m)
 
 			tCase(tctx, t, c, m)
@@ -119,7 +120,8 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			m := secret.NewBasicSecretsManager(smc)
+			m, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
 			require.NotNil(t, m)
 
 			pc, err := NewBasicECSPodCreator(c, m)

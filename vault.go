@@ -24,7 +24,7 @@ type Vault interface {
 // NamedSecret represents a secret with a name.
 type NamedSecret struct {
 	// Name is either the friendly human-readable name to assign to the secret
-	// or the resource name.
+	// or the resource identifier if the secret already exists.
 	Name *string
 	// Value is the stored value of the secret.
 	Value *string

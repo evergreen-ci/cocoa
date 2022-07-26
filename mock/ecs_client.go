@@ -11,8 +11,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ecs"
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/utility"
 )
 
@@ -31,7 +32,7 @@ type ECSTaskDefinition struct {
 	Deregistered  *time.Time
 }
 
-func newECSTaskDefinition(def *ecs.RegisterTaskDefinitionInput, rev int) ECSTaskDefinition {
+func newECSTaskDefinition(def *awsECS.RegisterTaskDefinitionInput, rev int) ECSTaskDefinition {
 	id := arn.ARN{
 		Partition: "aws",
 		Service:   "ecs",
@@ -45,11 +46,11 @@ func newECSTaskDefinition(def *ecs.RegisterTaskDefinitionInput, rev int) ECSTask
 		CPU:        def.Cpu,
 		MemoryMB:   def.Memory,
 		TaskRole:   def.TaskRoleArn,
-		Status:     utility.ToStringPtr(ecs.TaskDefinitionStatusActive),
+		Status:     utility.ToStringPtr(awsECS.TaskDefinitionStatusActive),
 		Registered: utility.ToTimePtr(time.Now()),
 	}
 
-	taskDef.Tags = newTags(def.Tags)
+	taskDef.Tags = newECSTags(def.Tags)
 
 	for _, containerDef := range def.ContainerDefinitions {
 		if containerDef == nil {
@@ -61,13 +62,13 @@ func newECSTaskDefinition(def *ecs.RegisterTaskDefinitionInput, rev int) ECSTask
 	return taskDef
 }
 
-func (d *ECSTaskDefinition) export() *ecs.TaskDefinition {
-	var containerDefs []*ecs.ContainerDefinition
+func (d *ECSTaskDefinition) export() *awsECS.TaskDefinition {
+	var containerDefs []*awsECS.ContainerDefinition
 	for _, def := range d.ContainerDefs {
 		containerDefs = append(containerDefs, def.export())
 	}
 
-	return &ecs.TaskDefinition{
+	return &awsECS.TaskDefinition{
 		TaskDefinitionArn:    d.ARN,
 		Family:               d.Family,
 		Revision:             d.Revision,
@@ -93,7 +94,7 @@ type ECSContainerDefinition struct {
 	Secrets  map[string]string
 }
 
-func newECSContainerDefinition(def *ecs.ContainerDefinition) ECSContainerDefinition {
+func newECSContainerDefinition(def *awsECS.ContainerDefinition) ECSContainerDefinition {
 	return ECSContainerDefinition{
 		Name:     def.Name,
 		Image:    def.Image,
@@ -105,8 +106,8 @@ func newECSContainerDefinition(def *ecs.ContainerDefinition) ECSContainerDefinit
 	}
 }
 
-func (d *ECSContainerDefinition) export() *ecs.ContainerDefinition {
-	return &ecs.ContainerDefinition{
+func (d *ECSContainerDefinition) export() *awsECS.ContainerDefinition {
+	return &awsECS.ContainerDefinition{
 		Name:        d.Name,
 		Image:       d.Image,
 		Command:     utility.ToStringPtrSlice(d.Command),
@@ -140,7 +141,7 @@ type ECSTask struct {
 	Tags              map[string]string
 }
 
-func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
+func newECSTask(in *awsECS.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 	id := arn.ARN{
 		Partition: "aws",
 		Service:   "ecs",
@@ -153,11 +154,11 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		CapacityProvider: newCapacityProvider(in.CapacityProviderStrategy),
 		ExecEnabled:      in.EnableExecuteCommand,
 		Group:            in.Group,
-		Status:           utility.ToStringPtr(ecs.DesiredStatusPending),
-		GoalStatus:       utility.ToStringPtr(ecs.DesiredStatusRunning),
+		Status:           utility.ToStringPtr(awsECS.DesiredStatusPending),
+		GoalStatus:       utility.ToStringPtr(awsECS.DesiredStatusRunning),
 		Created:          utility.ToTimePtr(time.Now()),
 		TaskDef:          taskDef,
-		Tags:             newTags(in.Tags),
+		Tags:             newECSTags(in.Tags),
 	}
 
 	for _, containerDef := range taskDef.ContainerDefs {
@@ -167,8 +168,8 @@ func newECSTask(in *ecs.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 	return t
 }
 
-func (t *ECSTask) export(includeTags bool) *ecs.Task {
-	exported := ecs.Task{
+func (t *ECSTask) export(includeTags bool) *awsECS.Task {
+	exported := awsECS.Task{
 		TaskArn:              t.ARN,
 		ClusterArn:           t.Cluster,
 		CapacityProviderName: t.CapacityProvider,
@@ -185,7 +186,7 @@ func (t *ECSTask) export(includeTags bool) *ecs.Task {
 		StoppedAt:            t.Stopped,
 	}
 	if includeTags {
-		exported.Tags = exportTags(t.Tags)
+		exported.Tags = ecs.ExportTags(t.Tags)
 	}
 
 	for _, container := range t.Containers {
@@ -225,13 +226,13 @@ func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
 		Image:      def.Image,
 		CPU:        def.CPU,
 		MemoryMB:   def.MemoryMB,
-		Status:     utility.ToStringPtr(ecs.DesiredStatusPending),
-		GoalStatus: utility.ToStringPtr(ecs.DesiredStatusRunning),
+		Status:     utility.ToStringPtr(awsECS.DesiredStatusPending),
+		GoalStatus: utility.ToStringPtr(awsECS.DesiredStatusRunning),
 	}
 }
 
-func (c *ECSContainer) export() *ecs.Container {
-	exported := &ecs.Container{
+func (c *ECSContainer) export() *awsECS.Container {
+	exported := &awsECS.Container{
 		ContainerArn: c.ARN,
 		TaskArn:      c.TaskARN,
 		Name:         c.Name,
@@ -249,7 +250,7 @@ func (c *ECSContainer) export() *ecs.Container {
 	return exported
 }
 
-func newTags(tags []*ecs.Tag) map[string]string {
+func newECSTags(tags []*awsECS.Tag) map[string]string {
 	converted := map[string]string{}
 	for _, t := range tags {
 		if t == nil {
@@ -260,18 +261,7 @@ func newTags(tags []*ecs.Tag) map[string]string {
 	return converted
 }
 
-func exportTags(tags map[string]string) []*ecs.Tag {
-	var exported []*ecs.Tag
-	for k, v := range tags {
-		exported = append(exported, &ecs.Tag{
-			Key:   utility.ToStringPtr(k),
-			Value: utility.ToStringPtr(v),
-		})
-	}
-	return exported
-}
-
-func newCapacityProvider(providers []*ecs.CapacityProviderStrategyItem) *string {
+func newCapacityProvider(providers []*awsECS.CapacityProviderStrategyItem) *string {
 	if len(providers) == 0 {
 		return nil
 	}
@@ -280,7 +270,7 @@ func newCapacityProvider(providers []*ecs.CapacityProviderStrategyItem) *string 
 	return providers[0].CapacityProvider
 }
 
-func newEnvVars(envVars []*ecs.KeyValuePair) map[string]string {
+func newEnvVars(envVars []*awsECS.KeyValuePair) map[string]string {
 	converted := map[string]string{}
 	for _, envVar := range envVars {
 		if envVar == nil {
@@ -291,10 +281,10 @@ func newEnvVars(envVars []*ecs.KeyValuePair) map[string]string {
 	return converted
 }
 
-func exportEnvVars(envVars map[string]string) []*ecs.KeyValuePair {
-	var exported []*ecs.KeyValuePair
+func exportEnvVars(envVars map[string]string) []*awsECS.KeyValuePair {
+	var exported []*awsECS.KeyValuePair
 	for k, v := range envVars {
-		exported = append(exported, &ecs.KeyValuePair{
+		exported = append(exported, &awsECS.KeyValuePair{
 			Name:  utility.ToStringPtr(k),
 			Value: utility.ToStringPtr(v),
 		})
@@ -302,7 +292,7 @@ func exportEnvVars(envVars map[string]string) []*ecs.KeyValuePair {
 	return exported
 }
 
-func newSecrets(secrets []*ecs.Secret) map[string]string {
+func newSecrets(secrets []*awsECS.Secret) map[string]string {
 	converted := map[string]string{}
 	for _, secret := range secrets {
 		if secret == nil {
@@ -313,10 +303,10 @@ func newSecrets(secrets []*ecs.Secret) map[string]string {
 	return converted
 }
 
-func exportSecrets(secrets map[string]string) []*ecs.Secret {
-	var exported []*ecs.Secret
+func exportSecrets(secrets map[string]string) []*awsECS.Secret {
+	var exported []*awsECS.Secret
 	for k, v := range secrets {
-		exported = append(exported, &ecs.Secret{
+		exported = append(exported, &awsECS.Secret{
 			Name:      utility.ToStringPtr(k),
 			ValueFrom: utility.ToStringPtr(v),
 		})
@@ -367,7 +357,7 @@ func (s *ECSService) getLatestTaskDefinition(id string) (*ECSTaskDefinition, err
 	}
 
 	for i := len(revisions) - 1; i >= 0; i-- {
-		if utility.FromStringPtr(revisions[i].Status) == ecs.TaskDefinitionStatusActive {
+		if utility.FromStringPtr(revisions[i].Status) == awsECS.TaskDefinitionStatusActive {
 			return &revisions[i], nil
 		}
 	}
@@ -439,40 +429,40 @@ func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int,
 // output. It provides some default implementations where possible. For unmocked
 // methods, it will issue the API calls to the fake GlobalECSService.
 type ECSClient struct {
-	RegisterTaskDefinitionInput  *ecs.RegisterTaskDefinitionInput
-	RegisterTaskDefinitionOutput *ecs.RegisterTaskDefinitionOutput
+	RegisterTaskDefinitionInput  *awsECS.RegisterTaskDefinitionInput
+	RegisterTaskDefinitionOutput *awsECS.RegisterTaskDefinitionOutput
 	RegisterTaskDefinitionError  error
 
-	DescribeTaskDefinitionInput  *ecs.DescribeTaskDefinitionInput
-	DescribeTaskDefinitionOutput *ecs.DescribeTaskDefinitionOutput
+	DescribeTaskDefinitionInput  *awsECS.DescribeTaskDefinitionInput
+	DescribeTaskDefinitionOutput *awsECS.DescribeTaskDefinitionOutput
 	DescribeTaskDefinitionError  error
 
-	ListTaskDefinitionsInput  *ecs.ListTaskDefinitionsInput
-	ListTaskDefinitionsOutput *ecs.ListTaskDefinitionsOutput
+	ListTaskDefinitionsInput  *awsECS.ListTaskDefinitionsInput
+	ListTaskDefinitionsOutput *awsECS.ListTaskDefinitionsOutput
 	ListTaskDefinitionsError  error
 
-	DeregisterTaskDefinitionInput  *ecs.DeregisterTaskDefinitionInput
-	DeregisterTaskDefinitionOutput *ecs.DeregisterTaskDefinitionOutput
+	DeregisterTaskDefinitionInput  *awsECS.DeregisterTaskDefinitionInput
+	DeregisterTaskDefinitionOutput *awsECS.DeregisterTaskDefinitionOutput
 	DeregisterTaskDefinitionError  error
 
-	RunTaskInput  *ecs.RunTaskInput
-	RunTaskOutput *ecs.RunTaskOutput
+	RunTaskInput  *awsECS.RunTaskInput
+	RunTaskOutput *awsECS.RunTaskOutput
 	RunTaskError  error
 
-	DescribeTasksInput  *ecs.DescribeTasksInput
-	DescribeTasksOutput *ecs.DescribeTasksOutput
+	DescribeTasksInput  *awsECS.DescribeTasksInput
+	DescribeTasksOutput *awsECS.DescribeTasksOutput
 	DescribeTasksError  error
 
-	ListTasksInput  *ecs.ListTasksInput
-	ListTasksOutput *ecs.ListTasksOutput
+	ListTasksInput  *awsECS.ListTasksInput
+	ListTasksOutput *awsECS.ListTasksOutput
 	ListTasksError  error
 
-	StopTaskInput  *ecs.StopTaskInput
-	StopTaskOutput *ecs.StopTaskOutput
+	StopTaskInput  *awsECS.StopTaskInput
+	StopTaskOutput *awsECS.StopTaskOutput
 	StopTaskError  error
 
-	TagResourceInput  *ecs.TagResourceInput
-	TagResourceOutput *ecs.TagResourceOutput
+	TagResourceInput  *awsECS.TagResourceInput
+	TagResourceOutput *awsECS.TagResourceOutput
 	TagResourceError  error
 
 	CloseError error
@@ -481,7 +471,7 @@ type ECSClient struct {
 // RegisterTaskDefinition saves the input and returns a new mock task
 // definition. The mock output can be customized. By default, it will create a
 // cached task definition based on the input.
-func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
+func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *awsECS.RegisterTaskDefinitionInput) (*awsECS.RegisterTaskDefinitionOutput, error) {
 	c.RegisterTaskDefinitionInput = in
 
 	if c.RegisterTaskDefinitionOutput != nil || c.RegisterTaskDefinitionError != nil {
@@ -489,7 +479,7 @@ func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Register
 	}
 
 	if in.Family == nil {
-		return nil, awserr.New(ecs.ErrCodeInvalidParameterException, "missing family", nil)
+		return nil, awserr.New(awsECS.ErrCodeInvalidParameterException, "missing family", nil)
 	}
 
 	revisions := GlobalECSService.TaskDefs[utility.FromStringPtr(in.Family)]
@@ -499,7 +489,7 @@ func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Register
 
 	GlobalECSService.TaskDefs[utility.FromStringPtr(in.Family)] = append(revisions, taskDef)
 
-	return &ecs.RegisterTaskDefinitionOutput{
+	return &awsECS.RegisterTaskDefinitionOutput{
 		TaskDefinition: taskDef.export(),
 		Tags:           in.Tags,
 	}, nil
@@ -508,7 +498,7 @@ func (c *ECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Register
 // DescribeTaskDefinition saves the input and returns information about the
 // matching task definition. The mock output can be customized. By default, it
 // will return the task definition information if it exists.
-func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
+func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *awsECS.DescribeTaskDefinitionInput) (*awsECS.DescribeTaskDefinitionOutput, error) {
 	c.DescribeTaskDefinitionInput = in
 
 	if c.DescribeTaskDefinitionOutput != nil || c.DescribeTaskDefinitionError != nil {
@@ -519,14 +509,14 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 
 	def, err := GlobalECSService.getLatestTaskDefinition(id)
 	if err != nil {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task definition not found", err)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "task definition not found", err)
 	}
 
-	resp := ecs.DescribeTaskDefinitionOutput{
+	resp := awsECS.DescribeTaskDefinitionOutput{
 		TaskDefinition: def.export(),
 	}
 	if shouldIncludeTags(in.Include) {
-		resp.Tags = exportTags(def.Tags)
+		resp.Tags = ecs.ExportTags(def.Tags)
 	}
 
 	return &resp, nil
@@ -535,7 +525,7 @@ func (c *ECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Describe
 // ListTaskDefinitions saves the input and lists all matching task definitions.
 // The mock output can be customized. By default, it will list all cached task
 // definitions that match the input filters.
-func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
+func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *awsECS.ListTaskDefinitionsInput) (*awsECS.ListTaskDefinitionsOutput, error) {
 	c.ListTaskDefinitionsInput = in
 
 	if c.ListTaskDefinitionsOutput != nil || c.ListTaskDefinitionsError != nil {
@@ -556,7 +546,7 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDef
 		}
 	}
 
-	return &ecs.ListTaskDefinitionsOutput{
+	return &awsECS.ListTaskDefinitionsOutput{
 		TaskDefinitionArns: arns,
 	}, nil
 }
@@ -564,7 +554,7 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDef
 // DeregisterTaskDefinition saves the input and deletes an existing mock task
 // definition. The mock output can be customized. By default, it will delete a
 // cached task definition if it exists.
-func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
+func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *awsECS.DeregisterTaskDefinitionInput) (*awsECS.DeregisterTaskDefinitionOutput, error) {
 	c.DeregisterTaskDefinitionInput = in
 
 	if c.DeregisterTaskDefinitionOutput != nil || c.DeregisterTaskDefinitionError != nil {
@@ -572,21 +562,21 @@ func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.Deregi
 	}
 
 	if in.TaskDefinition == nil {
-		return nil, awserr.New(ecs.ErrCodeInvalidParameterException, "missing task definition", nil)
+		return nil, awserr.New(awsECS.ErrCodeInvalidParameterException, "missing task definition", nil)
 	}
 
 	id := utility.FromStringPtr(in.TaskDefinition)
 
 	def, err := GlobalECSService.getTaskDefinition(id)
 	if err != nil {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task definition not found", err)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "task definition not found", err)
 	}
 
-	def.Status = utility.ToStringPtr(ecs.TaskDefinitionStatusInactive)
+	def.Status = utility.ToStringPtr(awsECS.TaskDefinitionStatusInactive)
 	def.Deregistered = utility.ToTimePtr(time.Now())
 	GlobalECSService.TaskDefs[utility.FromStringPtr(def.Family)][utility.FromInt64Ptr(def.Revision)-1] = *def
 
-	return &ecs.DeregisterTaskDefinitionOutput{
+	return &awsECS.DeregisterTaskDefinitionOutput{
 		TaskDefinition: def.export(),
 	}, nil
 }
@@ -594,7 +584,7 @@ func (c *ECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.Deregi
 // RunTask saves the input options and returns the mock result of running a task
 // definition. The mock output can be customized. By default, it will create
 // mock output based on the input.
-func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
+func (c *ECSClient) RunTask(ctx context.Context, in *awsECS.RunTaskInput) (*awsECS.RunTaskOutput, error) {
 	c.RunTaskInput = in
 
 	if c.RunTaskOutput != nil || c.RunTaskError != nil {
@@ -602,28 +592,28 @@ func (c *ECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.Run
 	}
 
 	if in.TaskDefinition == nil {
-		return nil, awserr.New(ecs.ErrCodeInvalidParameterException, "missing task definition", nil)
+		return nil, awserr.New(awsECS.ErrCodeInvalidParameterException, "missing task definition", nil)
 	}
 
 	clusterName := c.getOrDefaultCluster(in.Cluster)
 	cluster, ok := GlobalECSService.Clusters[clusterName]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "cluster not found", nil)
 	}
 
 	taskDefID := utility.FromStringPtr(in.TaskDefinition)
 
 	def, err := GlobalECSService.getLatestTaskDefinition(taskDefID)
 	if err != nil {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task definition not found", err)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "task definition not found", err)
 	}
 
 	task := newECSTask(in, *def)
 
 	cluster[utility.FromStringPtr(task.ARN)] = task
 
-	return &ecs.RunTaskOutput{
-		Tasks: []*ecs.Task{task.export(true)},
+	return &awsECS.RunTaskOutput{
+		Tasks: []*awsECS.Task{task.export(true)},
 	}, nil
 }
 
@@ -637,7 +627,7 @@ func (c *ECSClient) getOrDefaultCluster(name *string) string {
 // DescribeTasks saves the input and returns information about the existing
 // tasks. The mock output can be customized. By default, it will describe all
 // cached tasks that match.
-func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
+func (c *ECSClient) DescribeTasks(ctx context.Context, in *awsECS.DescribeTasksInput) (*awsECS.DescribeTasksOutput, error) {
 	c.DescribeTasksInput = in
 
 	if c.DescribeTasksOutput != nil || c.DescribeTasksError != nil {
@@ -646,18 +636,18 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "cluster not found", nil)
 	}
 
 	includeTags := shouldIncludeTags(in.Include)
 	ids := utility.FromStringPtrSlice(in.Tasks)
 
-	var tasks []*ecs.Task
-	var failures []*ecs.Failure
+	var tasks []*awsECS.Task
+	var failures []*awsECS.Failure
 	for _, id := range ids {
 		task, ok := cluster[id]
 		if !ok {
-			failures = append(failures, &ecs.Failure{
+			failures = append(failures, &awsECS.Failure{
 				Arn: utility.ToStringPtr(id),
 				// This reason specifically matches the one returned by ECS when
 				// it cannot find the task.
@@ -669,7 +659,7 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInpu
 		tasks = append(tasks, task.export(includeTags))
 	}
 
-	return &ecs.DescribeTasksOutput{
+	return &awsECS.DescribeTasksOutput{
 		Tasks:    tasks,
 		Failures: failures,
 	}, nil
@@ -691,7 +681,7 @@ func shouldIncludeTags(includes []*string) bool {
 // ListTasks saves the input and lists all matching tasks. The mock output can
 // be customized. By default, it will list all cached task definitions that
 // match the input filters.
-func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
+func (c *ECSClient) ListTasks(ctx context.Context, in *awsECS.ListTasksInput) (*awsECS.ListTasksOutput, error) {
 	c.ListTasksInput = in
 
 	if c.ListTasksOutput != nil || c.ListTasksError != nil {
@@ -700,7 +690,7 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
 	if !ok {
-		return &ecs.ListTasksOutput{}, nil
+		return &awsECS.ListTasksOutput{}, nil
 	}
 
 	var arns []string
@@ -720,7 +710,7 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 		arns = append(arns, arn)
 	}
 
-	return &ecs.ListTasksOutput{
+	return &awsECS.ListTasksOutput{
 		TaskArns: utility.ToStringPtrSlice(arns),
 	}, nil
 }
@@ -728,7 +718,7 @@ func (c *ECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs
 // StopTask saves the input and stops a mock task. The mock output can be
 // customized. By default, it will mark a cached task as stopped if it exists
 // and is running.
-func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
+func (c *ECSClient) StopTask(ctx context.Context, in *awsECS.StopTaskInput) (*awsECS.StopTaskOutput, error) {
 	c.StopTaskInput = in
 
 	if c.StopTaskOutput != nil || c.StopTaskError != nil {
@@ -737,7 +727,7 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 
 	cluster, ok := GlobalECSService.Clusters[c.getOrDefaultCluster(in.Cluster)]
 	if !ok {
-		return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "cluster not found", nil)
+		return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "cluster not found", nil)
 	}
 
 	task, ok := cluster[utility.FromStringPtr(in.Task)]
@@ -745,18 +735,18 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 		return nil, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
 	}
 
-	task.Status = utility.ToStringPtr(ecs.DesiredStatusStopped)
-	task.GoalStatus = utility.ToStringPtr(ecs.DesiredStatusStopped)
-	task.StopCode = utility.ToStringPtr(ecs.TaskStopCodeUserInitiated)
+	task.Status = utility.ToStringPtr(awsECS.DesiredStatusStopped)
+	task.GoalStatus = utility.ToStringPtr(awsECS.DesiredStatusStopped)
+	task.StopCode = utility.ToStringPtr(awsECS.TaskStopCodeUserInitiated)
 	task.StopReason = in.Reason
 	task.Stopped = utility.ToTimePtr(time.Now())
 	for i := range task.Containers {
-		task.Containers[i].Status = utility.ToStringPtr(ecs.DesiredStatusStopped)
+		task.Containers[i].Status = utility.ToStringPtr(awsECS.DesiredStatusStopped)
 	}
 
 	cluster[utility.FromStringPtr(in.Task)] = task
 
-	return &ecs.StopTaskOutput{
+	return &awsECS.StopTaskOutput{
 		Task: task.export(true),
 	}, nil
 }
@@ -764,7 +754,7 @@ func (c *ECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.S
 // TagResource saves the input and tags a mock task or task definition. The mock
 // output can be customized. By default, it will add the tag to the resource if
 // it exists.
-func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error) {
+func (c *ECSClient) TagResource(ctx context.Context, in *awsECS.TagResourceInput) (*awsECS.TagResourceOutput, error) {
 	c.TagResourceInput = in
 
 	if c.TagResourceOutput != nil || c.TagResourceError != nil {
@@ -775,13 +765,10 @@ func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (
 
 	taskDef, err := GlobalECSService.getTaskDefinition(id)
 	if err == nil {
-		for _, t := range in.Tags {
-			if t == nil {
-				continue
-			}
-			taskDef.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		for k, v := range newECSTags(in.Tags) {
+			taskDef.Tags[k] = v
 		}
-		return &ecs.TagResourceOutput{}, nil
+		return &awsECS.TagResourceOutput{}, nil
 	}
 
 	for _, cluster := range GlobalECSService.Clusters {
@@ -789,17 +776,14 @@ func (c *ECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (
 		if !ok {
 			continue
 		}
-		for _, t := range in.Tags {
-			if t == nil {
-				continue
-			}
-			task.Tags[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
+		for k, v := range newECSTags(in.Tags) {
+			task.Tags[k] = v
 		}
 		cluster[id] = task
-		return &ecs.TagResourceOutput{}, nil
+		return &awsECS.TagResourceOutput{}, nil
 	}
 
-	return nil, awserr.New(ecs.ErrCodeResourceNotFoundException, "task or task definition not found", nil)
+	return nil, awserr.New(awsECS.ErrCodeResourceNotFoundException, "task or task definition not found", nil)
 }
 
 // Close closes the mock client. The mock output can be customized. By default,

@@ -39,7 +39,9 @@ func TestECSPodDefinitionManager(t *testing.T) {
 				assert.NoError(t, sm.Close(tctx))
 			}()
 
-			v := NewVault(secret.NewBasicSecretsManager(sm))
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
+			require.NoError(t, err)
+			mv := NewVault(v)
 
 			pdc := NewECSPodDefinitionCache(&testutil.NoopECSPodDefinitionCache{})
 
@@ -47,7 +49,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 
 			pdm, err := ecs.NewBasicPodDefinitionManager(*ecs.NewBasicPodDefinitionManagerOptions().
 				SetClient(c).
-				SetVault(v).
+				SetVault(mv).
 				SetCache(pdc).
 				SetCacheTag(cacheTag))
 			require.NoError(t, err)
@@ -98,11 +100,13 @@ func TestECSPodDefinitionManager(t *testing.T) {
 				assert.NoError(t, smc.Close(ctx))
 			}()
 
-			v := NewVault(secret.NewBasicSecretsManager(smc))
+			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
+			require.NoError(t, err)
+			mv := NewVault(v)
 
 			opts := ecs.NewBasicPodDefinitionManagerOptions().
 				SetClient(c).
-				SetVault(v)
+				SetVault(mv)
 
 			pdm, err := ecs.NewBasicPodDefinitionManager(*opts)
 			require.NoError(t, err)
@@ -131,6 +135,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 				SetCPU(256).
 				AddEnvironmentVariables(*envVar)
 			opts := cocoa.NewECSPodDefinitionOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				SetMemoryMB(512).
 				SetCPU(1024).
 				SetTaskRole("task_role").
@@ -202,6 +207,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 				SetCPU(256).
 				AddEnvironmentVariables(*envVar)
 			opts := cocoa.NewECSPodDefinitionOptions().
+				SetName(testutil.NewTaskDefinitionFamily(t)).
 				SetMemoryMB(512).
 				SetCPU(1024).
 				SetTaskRole("task_role").
@@ -277,7 +283,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			assert.NoError(t, opts.Validate())
 
 			pdi, err := pdm.CreatePodDefinition(ctx, *opts)
-			assert.Error(t, err, "should have failed to put into cache")
+			assert.Error(t, err, "should have failed to register task definition")
 			assert.Zero(t, pdi)
 
 			assert.NotZero(t, c.RegisterTaskDefinitionInput, "should have attempted to register a task definition")

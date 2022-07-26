@@ -13,6 +13,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const projectName = "cocoa"
@@ -82,4 +83,14 @@ func cleanupSecretsWithToken(ctx context.Context, t *testing.T, c cocoa.SecretsM
 	}
 
 	return out.NextToken
+}
+
+// CreateSecret is a convenience function for creating a Secrets Manager secret
+// and verifying that the result is successful and populates the secret ARN.
+func CreateSecret(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient, in secretsmanager.CreateSecretInput) secretsmanager.CreateSecretOutput {
+	out, err := c.CreateSecret(ctx, &in)
+	require.NoError(t, err)
+	require.NotZero(t, out)
+	require.NotZero(t, out.ARN)
+	return *out
 }
