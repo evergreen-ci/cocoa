@@ -26,6 +26,7 @@ type ECSTaskDefinition struct {
 	MemoryMB      *string
 	CPU           *string
 	TaskRole      *string
+	ExecutionRole *string
 	Tags          map[string]string
 	Status        *string
 	Registered    *time.Time
@@ -40,14 +41,15 @@ func newECSTaskDefinition(def *awsECS.RegisterTaskDefinitionInput, rev int) ECST
 	}
 
 	taskDef := ECSTaskDefinition{
-		ARN:        utility.ToStringPtr(id.String()),
-		Family:     def.Family,
-		Revision:   utility.ToInt64Ptr(int64(rev)),
-		CPU:        def.Cpu,
-		MemoryMB:   def.Memory,
-		TaskRole:   def.TaskRoleArn,
-		Status:     utility.ToStringPtr(awsECS.TaskDefinitionStatusActive),
-		Registered: utility.ToTimePtr(time.Now()),
+		ARN:           utility.ToStringPtr(id.String()),
+		Family:        def.Family,
+		Revision:      utility.ToInt64Ptr(int64(rev)),
+		CPU:           def.Cpu,
+		MemoryMB:      def.Memory,
+		TaskRole:      def.TaskRoleArn,
+		ExecutionRole: def.ExecutionRoleArn,
+		Status:        utility.ToStringPtr(awsECS.TaskDefinitionStatusActive),
+		Registered:    utility.ToTimePtr(time.Now()),
 	}
 
 	taskDef.Tags = newECSTags(def.Tags)
@@ -75,6 +77,7 @@ func (d *ECSTaskDefinition) export() *awsECS.TaskDefinition {
 		Cpu:                  d.CPU,
 		Memory:               d.MemoryMB,
 		TaskRoleArn:          d.TaskRole,
+		ExecutionRoleArn:     d.ExecutionRole,
 		Status:               d.Status,
 		ContainerDefinitions: containerDefs,
 		RegisteredAt:         d.Registered,
