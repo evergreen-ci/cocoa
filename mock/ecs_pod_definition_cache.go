@@ -14,6 +14,9 @@ type ECSPodDefinitionCache struct {
 
 	PutInput *cocoa.ECSPodDefinitionItem
 	PutError error
+
+	DeleteInput *string
+	DeleteError error
 }
 
 // NewECSPodDefinitionCache creates a mock ECS pod definition cache backed
@@ -35,4 +38,18 @@ func (c *ECSPodDefinitionCache) Put(ctx context.Context, item cocoa.ECSPodDefini
 	}
 
 	return c.ECSPodDefinitionCache.Put(ctx, item)
+}
+
+// Delete deletes the pod definition matching the identifier from the mock
+// cache. The mock output can be customized. By default, it will return the
+// result of deleting the pod definition from the backing ECS pod definition
+// cache.
+func (c *ECSPodDefinitionCache) Delete(ctx context.Context, id string) error {
+	c.DeleteInput = &id
+
+	if c.DeleteError != nil {
+		return c.DeleteError
+	}
+
+	return c.ECSPodDefinitionCache.Delete(ctx, id)
 }
