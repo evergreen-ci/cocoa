@@ -14,3 +14,8 @@ type NoopECSPodDefinitionCache struct{}
 func (c *NoopECSPodDefinitionCache) Put(context.Context, cocoa.ECSPodDefinitionItem) error {
 	return nil
 }
+
+// Delete is a no-op.
+func (c *NoopECSPodDefinitionCache) Delete(context.Context, string) error {
+	return nil
+}

@@ -103,7 +103,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 	if err := mergedOpts.Validate(); err != nil {
 		return nil, errors.Wrap(err, "invalid pod definition options")
 	}
-	if m.shouldCache() {
+	if m.usesCache() {
 		// If the definition needs to be cached, we could successfully create a
 		// cloud pod definition but fail to cache it. Adding a tag makes it
 		// possible to track whether the pod definition has been created but
@@ -127,7 +127,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 		DefinitionOpts: mergedOpts,
 	}
 
-	if !m.shouldCache() {
+	if !m.usesCache() {
 		return &item, nil
 	}
 
@@ -147,6 +147,22 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 	return &item, nil
 }
 
-func (m *BasicPodDefinitionManager) shouldCache() bool {
+// DeletePodDefinition deletes a pod definition and deletes it from the cache if
+// it is using a cache.
+func (m *BasicPodDefinitionManager) DeletePodDefinition(ctx context.Context, id string) error {
+	if _, err := m.client.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+		TaskDefinition: aws.String(id),
+	}); err != nil {
+		return errors.Wrapf(err, "deregistering task definition '%s'", id)
+	}
+
+	if m.usesCache() {
+		return errors.Wrapf(m.cache.Delete(ctx, id), "deleting pod definition '%s' from cache", id)
+	}
+
+	return nil
+}
+
+func (m *BasicPodDefinitionManager) usesCache() bool {
 	return m.cache != nil
 }
