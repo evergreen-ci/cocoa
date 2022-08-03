@@ -157,9 +157,7 @@ func (m *BasicPodDefinitionManager) DeletePodDefinition(ctx context.Context, id 
 	}
 
 	if m.usesCache() {
-		if err := m.cache.Delete(ctx, id); err != nil {
-			return errors.Wrapf(err, "deleting pod definition '%s' from cache", id)
-		}
+		return errors.Wrapf(m.cache.Delete(ctx, id), "deleting pod definition '%s' from cache", id)
 	}
 
 	return nil
