@@ -14,3 +14,8 @@ type NoopSecretCache struct{}
 func (c *NoopSecretCache) Put(context.Context, cocoa.SecretCacheItem) error {
 	return nil
 }
+
+// Delete is a no-op.
+func (c *NoopSecretCache) Delete(context.Context, string) error {
+	return nil
+}

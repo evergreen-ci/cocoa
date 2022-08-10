@@ -77,13 +77,16 @@ func TestVaultWithSecretsManager(t *testing.T) {
 
 // secretsManagerVaultTests are mock-specific tests for the Secrets Manager
 // vault with a cache.
-func secretsManagerVaultTests() map[string]func(ctx context.Context, t *testing.T, v cocoa.Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
-	return map[string]func(ctx context.Context, t *testing.T, v cocoa.Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string){
-		"CreateSecretSucceedsAndCaches": func(ctx context.Context, t *testing.T, v cocoa.Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
-			ns := cocoa.NewNamedSecret().
-				SetName(testutil.NewSecretName(t)).
-				SetValue("value")
-			id, err := v.CreateSecret(ctx, *ns)
+func secretsManagerVaultTests() map[string]func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+	getValidNamedSecret := func(t *testing.T) cocoa.NamedSecret {
+		return *cocoa.NewNamedSecret().
+			SetName(testutil.NewSecretName(t)).
+			SetValue("value")
+	}
+	return map[string]func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string){
+		"CreateSecretSucceedsAndCaches": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+			ns := getValidNamedSecret(t)
+			id, err := v.CreateSecret(ctx, ns)
 			require.NoError(t, err)
 			require.NotZero(t, id)
 
@@ -95,7 +98,7 @@ func secretsManagerVaultTests() map[string]func(ctx context.Context, t *testing.
 			assert.Equal(t, cacheTag, utility.FromStringPtr(c.CreateSecretInput.Tags[0].Key))
 			assert.Equal(t, "false", utility.FromStringPtr(c.CreateSecretInput.Tags[0].Value), "cache tag should initially mark secret as uncached before caching")
 
-			require.NotZero(t, sc.PutInput, "should have cache the secret")
+			require.NotZero(t, sc.PutInput, "should have cached the secret")
 			assert.Equal(t, id, sc.PutInput.ID)
 			assert.Equal(t, utility.FromStringPtr(ns.Name), sc.PutInput.Name)
 
@@ -105,13 +108,11 @@ func secretsManagerVaultTests() map[string]func(ctx context.Context, t *testing.
 			assert.Equal(t, cacheTag, utility.FromStringPtr(c.TagResourceInput.Tags[0].Key))
 			assert.Equal(t, "true", utility.FromStringPtr(c.TagResourceInput.Tags[0].Value), "cache tag should be marked as cached")
 		},
-		"CreateSecretTagsStrandedSecretAsUncachedWhenCachingFails": func(ctx context.Context, t *testing.T, v cocoa.Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+		"CreateSecretTagsStrandedSecretAsUncachedWhenCachingFails": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
 			sc.PutError = errors.New("fake error")
 
-			ns := cocoa.NewNamedSecret().
-				SetName(testutil.NewSecretName(t)).
-				SetValue("value")
-			id, err := v.CreateSecret(ctx, *ns)
+			ns := getValidNamedSecret(t)
+			id, err := v.CreateSecret(ctx, ns)
 			assert.Error(t, err, "should have failed to cache the secret")
 			assert.Zero(t, id)
 
@@ -126,20 +127,58 @@ func secretsManagerVaultTests() map[string]func(ctx context.Context, t *testing.
 			assert.NotZero(t, sc.PutInput, "should have attempted to cache the secret")
 			assert.Zero(t, c.TagResourceInput, "should not have re-tagged secret because it is not cached")
 		},
-		"CreateSecretDoesNotCacheWhenCreatingSecretFails": func(ctx context.Context, t *testing.T, v cocoa.Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+		"CreateSecretDoesNotCacheWhenCreatingSecretFails": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
 			c.CreateSecretError = errors.New("fake error")
 
-			ns := cocoa.NewNamedSecret().
-				SetName(testutil.NewSecretName(t)).
-				SetValue("value")
-
-			id, err := v.CreateSecret(ctx, *ns)
+			id, err := v.CreateSecret(ctx, getValidNamedSecret(t))
 			assert.Error(t, err, "shoud have failed to register task definition")
 			assert.Zero(t, id)
 
 			assert.NotZero(t, c.CreateSecretInput, "should have attempted to create a secret")
-
 			assert.Zero(t, sc.PutInput, "should not have attempted to cache the secret after secret creation failed")
+		},
+		"DeleteSecretDeletesAndUncachesWithValidID": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+			id, err := v.CreateSecret(ctx, getValidNamedSecret(t))
+			require.NoError(t, err)
+			require.NotZero(t, id)
+
+			assert.NotZero(t, c.CreateSecretInput, "should have created a secret")
+			assert.Zero(t, c.DeleteSecretInput, "should not have deleted the secret")
+			require.NotZero(t, sc.PutInput, "should have cached the secret")
+			assert.Equal(t, id, sc.PutInput.ID)
+			assert.Zero(t, sc.DeleteInput, "should not have deleted the cached secret")
+
+			require.NoError(t, v.DeleteSecret(ctx, id))
+			assert.NotZero(t, c.DeleteSecretInput, "should have deleted the secret")
+			assert.NotZero(t, sc.DeleteInput, "should have deleted the cached secret")
+		},
+		"DeleteSecretSucceedsAndUncacheWithNonexistentID": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+			assert.NoError(t, v.DeleteSecret(ctx, "foo"))
+			assert.NotZero(t, sc.DeleteInput, "should have uncached the nonexistent pod definition")
+		},
+		"DeleteSecretDoesNotUncacheWhenDeletingSecretFails": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+			c.DeleteSecretError = errors.New("fake error")
+
+			id, err := v.CreateSecret(ctx, getValidNamedSecret(t))
+			require.NoError(t, err)
+			require.NotZero(t, id)
+
+			assert.Error(t, v.DeleteSecret(ctx, id))
+
+			assert.NotZero(t, c.DeleteSecretInput, "should have attempted to delete the secret")
+			assert.Zero(t, sc.DeleteInput, "should not have attempted to delete  the cached secret")
+		},
+		"DeleteSecretIsIdempotent": func(ctx context.Context, t *testing.T, v *Vault, sc *SecretCache, c *SecretsManagerClient, cacheTag string) {
+			id, err := v.CreateSecret(ctx, getValidNamedSecret(t))
+			require.NoError(t, err)
+
+			for i := 0; i < 3; i++ {
+				assert.NoError(t, v.DeleteSecret(ctx, id))
+
+				assert.NotZero(t, c.DeleteSecretInput, "should have deleted the secret")
+				assert.NotZero(t, sc.DeleteInput, "should have deleted the cached secret")
+				assert.Equal(t, id, utility.FromStringPtr(sc.DeleteInput))
+			}
 		},
 	}
 }

@@ -13,6 +13,9 @@ type SecretCache struct {
 
 	PutInput *cocoa.SecretCacheItem
 	PutError error
+
+	DeleteInput *string
+	DeleteError error
 }
 
 // NewSecretCache creates a mock secret cache backed by the given secret cache.
@@ -33,4 +36,17 @@ func (c *SecretCache) Put(ctx context.Context, item cocoa.SecretCacheItem) error
 	}
 
 	return c.SecretCache.Put(ctx, item)
+}
+
+// Delete removes the secret from the mock cache. The mock output can be
+// customized. By default, it will return the result of deleting the secret from
+// the backing secret cache.
+func (c *SecretCache) Delete(ctx context.Context, id string) error {
+	c.DeleteInput = &id
+
+	if c.DeleteError != nil {
+		return c.DeleteError
+	}
+
+	return c.SecretCache.Delete(ctx, id)
 }

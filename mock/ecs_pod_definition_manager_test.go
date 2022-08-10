@@ -120,7 +120,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 
 // ecsPodDefinitionManagerTests are mock-specific tests for ECS and Secrets
 // Manager with the ECS pod definition manager.
-func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 	getValidPodDefOpts := func(t *testing.T) cocoa.ECSPodDefinitionOptions {
 		containerDef := cocoa.NewECSContainerDefinition().
 			SetName("name").
@@ -141,8 +141,8 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 		require.NoError(t, opts.Validate())
 		return *opts
 	}
-	return map[string]func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string){
-		"CreatePodDefinitionRegistersTaskDefinitionAndCachesWithAllFieldsSet": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+	return map[string]func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string){
+		"CreatePodDefinitionRegistersTaskDefinitionAndCachesWithAllFieldsSet": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetValue("env_var_value")
@@ -198,7 +198,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			assert.Equal(t, cacheTag, utility.FromStringPtr(c.TagResourceInput.Tags[0].Key))
 			assert.Equal(t, "true", utility.FromStringPtr(c.TagResourceInput.Tags[0].Value), "cache tag should be marked as cached")
 		},
-		"CreatePodDefinitionFailsWithInvalidPodDefinition": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"CreatePodDefinitionFailsWithInvalidPodDefinition": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			opts := cocoa.NewECSPodDefinitionOptions()
 			assert.Error(t, opts.Validate())
 
@@ -209,7 +209,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			assert.Zero(t, c.RegisterTaskDefinitionInput, "should not have tried to register a task definition that's known to be invalid")
 			assert.Zero(t, pdc.PutInput, "should not have tried to cache the pod definition when it's known to be invalid")
 		},
-		"CreatePodDefinitionTagsStrandedPodDefinitionAsUncachedWhenCachingFails": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"CreatePodDefinitionTagsStrandedPodDefinitionAsUncachedWhenCachingFails": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			pdc.PutError = errors.New("fake error")
 
 			opts := getValidPodDefOpts(t)
@@ -253,7 +253,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 
 			assert.Zero(t, c.TagResourceInput, "should not have re-tagged resource because it is not cached")
 		},
-		"CreatePodDefinitionDoesNotCacheWhenRegisteringTaskDefinitionFails": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"CreatePodDefinitionDoesNotCacheWhenRegisteringTaskDefinitionFails": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			c.RegisterTaskDefinitionError = errors.New("fake error")
 
 			pdi, err := pdm.CreatePodDefinition(ctx, getValidPodDefOpts(t))
@@ -264,25 +264,25 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 
 			assert.Zero(t, pdc.PutInput, "should not have attempted to cache the pod definition after registration failed")
 		},
-		"DeletePodDefinitionDeletesAndUncachesWithValidID": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"DeletePodDefinitionDeletesAndUncachesWithValidID": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			pdi, err := pdm.CreatePodDefinition(ctx, getValidPodDefOpts(t))
 			require.NoError(t, err)
 
 			assert.NotZero(t, c.RegisterTaskDefinitionInput, "should have attempted registered a task definition")
 			assert.Zero(t, c.DeregisterTaskDefinitionInput, "should not have deregistered the task definition")
-			assert.NotZero(t, pdc.PutInput, "should have cached the pod definition")
-			assert.Zero(t, pdc.DeleteInput, "should not have deleted the cached pod definition")
+			require.NotZero(t, pdc.PutInput, "should have cached the pod definition")
 			assert.Equal(t, pdi.ID, pdc.PutInput.ID)
+			assert.Zero(t, pdc.DeleteInput, "should not have deleted the cached pod definition")
 
 			require.NoError(t, pdm.DeletePodDefinition(ctx, pdi.ID))
 			assert.NotZero(t, c.DeregisterTaskDefinitionInput, "should have deregistered the task definition")
 			assert.NotZero(t, pdc.DeleteInput, "should have deleted the cached pod definition")
 		},
-		"DeletePodDefinitionFailsWithNonexistentID": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"DeletePodDefinitionFailsWithNonexistentID": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			assert.Error(t, pdm.DeletePodDefinition(ctx, "foo"))
 			assert.Zero(t, pdc.PutInput, "should not have attempted to uncache a nonexistent pod definition")
 		},
-		"DeletePodDefinitionDoesNotDeleteFromCacheWhenDeregisteringTaskDefinitionFails": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"DeletePodDefinitionDoesNotDeleteFromCacheWhenDeregisteringTaskDefinitionFails": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			c.DeregisterTaskDefinitionError = errors.New("fake error")
 
 			pdi, err := pdm.CreatePodDefinition(ctx, getValidPodDefOpts(t))
@@ -293,7 +293,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			assert.NotZero(t, c.DeregisterTaskDefinitionInput, "should have attempted to deregister the task definition")
 			assert.Zero(t, pdc.DeleteInput, "should not have attempted to delete the cached pod definition")
 		},
-		"DeletePodDefinitionIsIdempotent": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
+		"DeletePodDefinitionIsIdempotent": func(ctx context.Context, t *testing.T, pdm *ECSPodDefinitionManager, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient, cacheTag string) {
 			opts := getValidPodDefOpts(t)
 
 			pdi, err := pdm.CreatePodDefinition(ctx, opts)
@@ -302,8 +302,8 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			for i := 0; i < 3; i++ {
 				assert.NoError(t, pdm.DeletePodDefinition(ctx, pdi.ID))
 
-				assert.NotZero(t, c.DeregisterTaskDefinitionInput, "should not have deregistered the task definition")
-				assert.NotZero(t, pdc.DeleteInput, "should not have deleted the cached pod definition")
+				assert.NotZero(t, c.DeregisterTaskDefinitionInput, "should have deregistered the task definition")
+				assert.NotZero(t, pdc.DeleteInput, "should have deleted the cached pod definition")
 				assert.Equal(t, pdi.ID, utility.FromStringPtr(pdc.DeleteInput))
 			}
 		},

@@ -7,6 +7,9 @@ type SecretCache interface {
 	// Put adds a new secret with the given name and external resource
 	// identifier in the cache.
 	Put(ctx context.Context, item SecretCacheItem) error
+	// Delete deletes an existing secret with the given external resource
+	// identifier from the cache.
+	Delete(ctx context.Context, id string) error
 }
 
 // SecretCacheItem represents an item that can be cached in a SecretCache.
