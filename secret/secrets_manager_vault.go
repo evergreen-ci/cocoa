@@ -88,9 +88,9 @@ func NewBasicSecretsManager(opts BasicSecretsManagerOptions) (*BasicSecretsManag
 	}, nil
 }
 
-// CreateSecret creates a new secret. If the secret already exists, it will
-// return the secret ID without modifying the secret value. To update an
-// existing secret, see UpdateValue.
+// CreateSecret creates a new secret and adds it to the cache if it is using
+// one. If the secret already exists, it will return the secret ID without
+// modifying the secret value. To update an existing secret, see UpdateValue.
 func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSecret) (id string, err error) {
 	if err := s.Validate(); err != nil {
 		return "", errors.Wrap(err, "invalid secret")
@@ -99,7 +99,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		Name:         s.Name,
 		SecretString: s.Value,
 	}
-	if m.shouldCache() {
+	if m.usesCache() {
 		// If the secret needs to be cached, we could successfully create a
 		// cloud secret but fail to cache it. Adding a tag makes it possible to
 		// track whether the secret has been created but has not been
@@ -129,7 +129,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 
 	arn := utility.FromStringPtr(out.ARN)
 
-	if !m.shouldCache() {
+	if !m.usesCache() {
 		return arn, nil
 	}
 
@@ -182,8 +182,8 @@ func (m *BasicSecretsManager) UpdateValue(ctx context.Context, s cocoa.NamedSecr
 	return err
 }
 
-// DeleteSecret deletes an existing secret.
-// If the secret does not exist, this will perform no operation.
+// DeleteSecret deletes an existing secret and deletes it from the cache if it
+// is using one.
 func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("must specify a non-empty ID")
@@ -192,10 +192,22 @@ func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error
 		ForceDeleteWithoutRecovery: aws.Bool(true),
 		SecretId:                   &id,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	if !m.usesCache() {
+		return nil
+	}
+
+	if err := m.cache.Delete(ctx, id); err != nil {
+		return errors.Wrapf(err, "deleting secret '%s' from cache", id)
+	}
+
+	return nil
 }
 
-func (m *BasicSecretsManager) shouldCache() bool {
+func (m *BasicSecretsManager) usesCache() bool {
 	return m.cache != nil
 }
 
