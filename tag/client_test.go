@@ -15,7 +15,7 @@ import (
 )
 
 // defaultTestTimeout is the standard timeout for integration tests against
-// Secrets Manager.
+// the Resource Groups Tagging API.
 const defaultTestTimeout = time.Minute
 
 func TestBasicTagClient(t *testing.T) {

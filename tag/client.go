@@ -49,6 +49,7 @@ func (c *BasicTagClient) setup() error {
 	return nil
 }
 
+// GetResources finds arbitrary AWS resources that match the input filters.
 func (c *BasicTagClient) GetResources(ctx context.Context, in *resourcegroupstaggingapi.GetResourcesInput) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")

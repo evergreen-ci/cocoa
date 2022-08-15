@@ -23,6 +23,17 @@ func TagClientTests() map[string]TagClientTestCase {
 	return map[string]TagClientTestCase{
 		"GetResourcesFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.TagClient) {
 			out, err := c.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
+				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+					{
+						Values: []*string{aws.String("")},
+					},
+				},
+			})
+			assert.Error(t, err)
+			assert.Zero(t, out)
+		},
+		"GetResourcesFailsWithInvalidResourceType": func(ctx context.Context, t *testing.T, c cocoa.TagClient) {
+			out, err := c.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
 				ResourceTypeFilters: []*string{aws.String("nonexistent")},
 			})
 			assert.Error(t, err)
@@ -301,9 +312,5 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			require.NotZero(t, getResourcesOut)
 			assert.Empty(t, getResourcesOut.ResourceTagMappingList)
 		},
-		// "": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {},
-		// "": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {},
-		// "": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {},
-		// "": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {},
 	}
 }

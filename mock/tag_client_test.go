@@ -6,14 +6,11 @@ import (
 
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
-	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTagClient(t *testing.T) {
 	assert.Implements(t, (*cocoa.TagClient)(nil), &TagClient{})
-
-	testutil.CheckAWSEnvVarsForSecretsManager(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
