@@ -39,8 +39,8 @@ func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 		SetRegion(AWSRegion())
 }
 
-// ValidNonIntegrationAWSOpts returns valid options to create an AWS client that
-// doesn't make any actual requests to AWS.
+// ValidNonIntegrationAWSOptions returns valid options to create an AWS client
+// that doesn't make any actual requests to AWS.
 func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
 		SetCredentials(credentials.NewEnvCredentials()).

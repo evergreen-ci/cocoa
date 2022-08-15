@@ -256,7 +256,7 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 				continue
 			}
 
-			matchingValues := map[string]StoredSecret{}
+			var matchingValues map[string]StoredSecret
 			switch utility.FromStringPtr(f.Key) {
 			case "name":
 				matchingValues = c.secretsMatchingAnyNameValue(utility.FromStringPtrSlice(f.Values))

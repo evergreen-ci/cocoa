@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	awsECS "github.com/aws/aws-sdk-go/service/ecs"
@@ -48,9 +47,9 @@ type TagClient struct {
 	CloseError error
 }
 
-// RegisterTaskDefinition saves the input and filters for the resources matching
-// the input filters. The mock output can be customized. By default, it will
-// search for matching resources in ECS or Secrets Manager.
+// GetResources saves the input and filters for the resources matching the input
+// filters. The mock output can be customized. By default, it will search for
+// matching secrets in Secrets Manager and task definitions in ECS.
 func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstaggingapi.GetResourcesInput) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
 	c.GetResourcesInput = in
 
@@ -58,113 +57,101 @@ func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstagginga
 		return c.GetResourcesOutput, c.GetResourcesError
 	}
 
-	serviceToResourceType := map[string]string{
-		"secretsmanager": "secretsmanager:secret",
-		"ecs":            "ecs:task-definition",
+	finders, err := c.getResourceFindersMatchingTypeFilters(in.ResourceTypeFilters)
+	if err != nil {
+		return nil, err
 	}
 
-	resourceTypes := map[string][]taggedResource{}
-	if len(in.ResourceTypeFilters) != 0 {
-		for _, f := range in.ResourceTypeFilters {
-			if f == nil {
-				continue
-			}
-
-			filter := utility.FromStringPtr(f)
-			var resourceType string
-			if !strings.Contains(filter, ":") {
-				var ok bool
-				resourceType, ok = serviceToResourceType[filter]
-				if !ok {
-					return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, "unsupported service", nil)
-				}
-			} else {
-				resourceType = filter
-			}
-
-			resourceTypes[resourceType] = []taggedResource{}
+	var allMatches []taggedResource
+	for _, f := range finders {
+		matches, err := c.getResourcesMatchingTagFilters(f, in.TagFilters)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		// If no resource types are filtered, search all of them.
-		for _, resourceType := range serviceToResourceType {
-			resourceTypes[resourceType] = []taggedResource{}
-		}
-	}
-
-	for resourceType := range resourceTypes {
-		var matchingAllTags map[string]taggedResource
-
-		if len(in.TagFilters) != 0 {
-			// In order for a resource to be a match, it must match all of the
-			// tag filters. In order for a resource to match a tag filter, it
-			// must have a tag with an exact matching key and its corresponding
-			// value must match one of the possible tag values.
-			for _, f := range in.TagFilters {
-				if f == nil {
-					continue
-				}
-				key := utility.FromStringPtr(f.Key)
-				if key == "" {
-					return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, "must specify a non-empty key for tag filter", nil)
-				}
-				values := utility.FromStringPtrSlice(f.Values)
-
-				var matchingTag map[string]taggedResource
-				switch resourceType {
-				case "secretsmanager:secret":
-					matchingTag = c.secretsMatchingTag(key, values)
-				case "ecs:task-definition":
-					matchingTag = c.taskDefsMatchingTag(key, values)
-				default:
-					return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, fmt.Sprintf("unsupported resource type '%s'", resourceType), nil)
-				}
-
-				if matchingAllTags == nil {
-					// Initialize the candidate set of matching resources for
-					// this resource type.
-					matchingAllTags = matchingTag
-				} else {
-					// Each matching resource must match all the given tag
-					// filters.
-					matchingAllTags = c.getSetIntersection(matchingAllTags, matchingTag)
-				}
-			}
-		} else {
-			// Since there are no tag filters, include all resources of the
-			// given resource type.
-			matchingAllTags = map[string]taggedResource{}
-
-			switch resourceType {
-			case "secretsmanager:secret":
-				for _, s := range GlobalSecretCache {
-					matchingAllTags[s.Name] = c.exportSecretTaggedResource(s)
-				}
-			case "ecs:task-definition":
-				for _, family := range GlobalECSService.TaskDefs {
-					for _, revision := range family {
-						matchingAllTags[revision.ARN] = c.exportTaskDefinitionTaggedResource(revision)
-					}
-				}
-			default:
-				return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, fmt.Sprintf("unsupported resource type '%s'", resourceType), nil)
-			}
-		}
-
-		for _, res := range matchingAllTags {
-			resourceTypes[resourceType] = append(resourceTypes[resourceType], res)
-		}
+		allMatches = append(allMatches, matches...)
 	}
 
 	var converted []*resourcegroupstaggingapi.ResourceTagMapping
-	for _, res := range resourceTypes {
-		for _, tags := range res {
-			converted = append(converted, exportTagMapping(tags))
-		}
+	for _, match := range allMatches {
+		converted = append(converted, exportTagMapping(match))
 	}
 
 	return &resourcegroupstaggingapi.GetResourcesOutput{
 		ResourceTagMappingList: converted,
 	}, nil
+}
+
+func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*string) ([]taggedResourceFinder, error) {
+	var matchingAnyResourceType []taggedResourceFinder
+
+	// In order for a resource to be a match, it must match at least one
+	// resource type filter.
+	for _, rt := range resourceTypes {
+		resourceType := utility.FromStringPtr(rt)
+		matchingResourceType := c.getResourceFinders(resourceType)
+		if len(matchingResourceType) == 0 {
+			return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, fmt.Sprintf("unsupported resource type '%s'", resourceType), nil)
+		}
+
+		matchingAnyResourceType = append(matchingAnyResourceType, matchingResourceType...)
+	}
+
+	if len(resourceTypes) == 0 {
+		// If no resource types are filtered, search all resources.
+		for _, resourceFinders := range serviceToResourceFinders {
+			matchingAnyResourceType = append(matchingAnyResourceType, resourceFinders...)
+		}
+	}
+
+	return matchingAnyResourceType, nil
+}
+
+func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFilters []*resourcegroupstaggingapi.TagFilter) ([]taggedResource, error) {
+	var matchingAllTags map[string]taggedResource
+
+	if len(tagFilters) != 0 {
+		// In order for a resource to be a match, it must match all of the
+		// tag filters. In order for a resource to match a tag filter, it
+		// must have a tag with an exact matching key and its corresponding
+		// value must match one of the possible tag values.
+		for _, tf := range tagFilters {
+			if tf == nil {
+				continue
+			}
+
+			key := utility.FromStringPtr(tf.Key)
+			if key == "" {
+				return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, "must specify a non-empty key for tag filter", nil)
+			}
+			values := utility.FromStringPtrSlice(tf.Values)
+			matchingTag := f.getTaggedResources(key, values)
+
+			if matchingAllTags == nil {
+				// Initialize the candidate set of matching resources for
+				// this resource type.
+				matchingAllTags = matchingTag
+			} else {
+				// Each matching resource must match all the given tag
+				// filters.
+				matchingAllTags = c.getSetIntersection(matchingAllTags, matchingTag)
+			}
+		}
+	} else {
+		// If there are no tag filters, include all resources of the given
+		// resource type.
+		matchingAllTags = map[string]taggedResource{}
+
+		for id, res := range f.getAllResources() {
+			matchingAllTags[id] = res
+		}
+	}
+
+	var matches []taggedResource
+	for _, res := range matchingAllTags {
+		matches = append(matches, res)
+	}
+
+	return matches, nil
 }
 
 func (c *TagClient) getSetIntersection(a, b map[string]taggedResource) map[string]taggedResource {
@@ -177,39 +164,53 @@ func (c *TagClient) getSetIntersection(a, b map[string]taggedResource) map[strin
 	return intersection
 }
 
-// secretsMatchingTag returns the tagged resources for all secrets containing a
-// matching tag key whose value matches one of the tag values.
-func (c *TagClient) secretsMatchingTag(key string, values []string) map[string]taggedResource {
-	res := map[string]taggedResource{}
-	for _, s := range GlobalSecretCache {
-		if s.IsDeleted {
-			continue
-		}
-
-		v, ok := s.Tags[key]
-		if !ok {
-			continue
-		}
-
-		if len(values) != 0 && !utility.StringSliceContains(values, v) {
-			continue
-		}
-
-		res[s.Name] = c.exportSecretTaggedResource(s)
+// Close closes the mock client. The mock output can be customized. By default,
+// it is a no-op that returns no error.
+func (c *TagClient) Close(ctx context.Context) error {
+	if c.CloseError != nil {
+		return c.CloseError
 	}
-	return res
+
+	return nil
 }
 
-func (c *TagClient) exportSecretTaggedResource(s StoredSecret) taggedResource {
-	return taggedResource{
-		ID:   s.Name,
-		Tags: s.Tags,
-	}
+// serviceToResourceFinders maps the AWS service name to the taggable resources
+// that can be searched.
+var serviceToResourceFinders = map[string][]taggedResourceFinder{
+	"ecs":            {&ecsTaskDefinitionResourceFinder{}},
+	"secretsmanager": {&secretsManagerSecretResourceFinder{}},
 }
 
-// taskDefsMatchingTag returns the tagged resources for all secrets containing a
-// matching tag key whose value matches one of the tag values.
-func (c *TagClient) taskDefsMatchingTag(key string, values []string) map[string]taggedResource {
+func (c *TagClient) getResourceFinders(resourceType string) []taggedResourceFinder {
+	for service, resourceFinders := range serviceToResourceFinders {
+		if service == resourceType {
+			return resourceFinders
+		}
+		for _, f := range resourceFinders {
+			if f.name() == resourceType {
+				return []taggedResourceFinder{f}
+			}
+		}
+	}
+	return nil
+}
+
+// taggedResourceFinder can find resources of a particular type by tags. This
+// interface can be used to query for resources of a particular type matching
+// particular tags.
+type taggedResourceFinder interface {
+	name() string
+	getTaggedResources(key string, value []string) map[string]taggedResource
+	getAllResources() map[string]taggedResource
+}
+
+type ecsTaskDefinitionResourceFinder struct{}
+
+func (f *ecsTaskDefinitionResourceFinder) name() string {
+	return "ecs:task-definition"
+}
+
+func (f *ecsTaskDefinitionResourceFinder) getTaggedResources(key string, values []string) map[string]taggedResource {
 	res := map[string]taggedResource{}
 	for _, family := range GlobalECSService.TaskDefs {
 		for _, def := range family {
@@ -226,25 +227,67 @@ func (c *TagClient) taskDefsMatchingTag(key string, values []string) map[string]
 				continue
 			}
 
-			res[def.ARN] = c.exportTaskDefinitionTaggedResource(def)
+			res[def.ARN] = f.exportTaskDefinitionTaggedResource(def)
 		}
 	}
 	return res
 }
 
-func (c *TagClient) exportTaskDefinitionTaggedResource(def ECSTaskDefinition) taggedResource {
+func (f *ecsTaskDefinitionResourceFinder) getAllResources() map[string]taggedResource {
+	res := map[string]taggedResource{}
+	for _, family := range GlobalECSService.TaskDefs {
+		for _, revision := range family {
+			res[revision.ARN] = f.exportTaskDefinitionTaggedResource(revision)
+		}
+	}
+	return res
+}
+
+func (f *ecsTaskDefinitionResourceFinder) exportTaskDefinitionTaggedResource(def ECSTaskDefinition) taggedResource {
 	return taggedResource{
 		ID:   def.ARN,
 		Tags: def.Tags,
 	}
 }
 
-// Close closes the mock client. The mock output can be customized. By default,
-// it is a no-op that returns no error.
-func (c *TagClient) Close(ctx context.Context) error {
-	if c.CloseError != nil {
-		return c.CloseError
-	}
+type secretsManagerSecretResourceFinder struct{}
 
-	return nil
+func (f *secretsManagerSecretResourceFinder) name() string {
+	return "secretsmanager:secret"
+}
+
+func (f *secretsManagerSecretResourceFinder) getTaggedResources(key string, values []string) map[string]taggedResource {
+	res := map[string]taggedResource{}
+	for _, s := range GlobalSecretCache {
+		if s.IsDeleted {
+			continue
+		}
+
+		v, ok := s.Tags[key]
+		if !ok {
+			continue
+		}
+
+		if len(values) != 0 && !utility.StringSliceContains(values, v) {
+			continue
+		}
+
+		res[s.Name] = f.exportSecretTaggedResource(s)
+	}
+	return res
+}
+
+func (f *secretsManagerSecretResourceFinder) getAllResources() map[string]taggedResource {
+	res := map[string]taggedResource{}
+	for _, s := range GlobalSecretCache {
+		res[s.Name] = f.exportSecretTaggedResource(s)
+	}
+	return res
+}
+
+func (f *secretsManagerSecretResourceFinder) exportSecretTaggedResource(s StoredSecret) taggedResource {
+	return taggedResource{
+		ID:   s.Name,
+		Tags: s.Tags,
+	}
 }
