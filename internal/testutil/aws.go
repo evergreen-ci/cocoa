@@ -41,7 +41,6 @@ func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 
 // ValidNonIntegrationAWSOpts returns valid options to create an AWS client that
 // doesn't make any actual requests to AWS.
-// kim: TODO: remove http Client parameter.
 func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
 		SetCredentials(credentials.NewEnvCredentials()).

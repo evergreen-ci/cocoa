@@ -257,31 +257,8 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 			}
 
 			matchingValues := map[string]StoredSecret{}
-			// kim: TODO: remove
-			// for _, v := range filter.Values {
-			//     if v == nil {
-			//         continue
-			//     }
-			//
-			//     switch utility.FromStringPtr(filter.Key) {
-			//     case "name":
-			//         for arn, s := range c.secretsMatchingAnyNameValue(utility.FromStringPtr(v)) {
-			//             matchingValues[arn] = GlobalSecretCache[arn]
-			//         }
-			//     case "tag-key":
-			//         for _, arn := range c.arnsMatchingTagKeyPrefix(utility.FromStringPtr(v)) {
-			//             matchingValues[arn] = GlobalSecretCache[arn]
-			//         }
-			//     case "tag-value":
-			//         for _, arn := range c.arnsMatchingTagKeyPrefix(utility.FromStringPtr(v)) {
-			//             matchingValues[arn] = GlobalSecretCache[arn]
-			//         }
-			//     }
-			// }
 			switch utility.FromStringPtr(f.Key) {
 			case "name":
-				// kim: TODO: remove
-				// matchingValues = c.getMergedSet(matchingValues, c.secretsMatchingAnyNameValue(utility.FromStringPtrSlice(f.Values)))
 				matchingValues = c.secretsMatchingAnyNameValue(utility.FromStringPtrSlice(f.Values))
 				// This could support other filter keys, but it's not worth it
 				// unless the need arises.
@@ -322,18 +299,6 @@ func (c *SecretsManagerClient) getSetIntersection(a, b map[string]StoredSecret) 
 	return intersection
 }
 
-// kim: TODO: remove
-// func (c *SecretsManagerClient) getMergedSet(a, b map[string]StoredSecret) map[string]StoredSecret {
-//     merged := map[string]StoredSecret{}
-//     for _, s := range a {
-//         merged[s.ARN.String()] = s
-//     }
-//     for _, s := range b {
-//         merged[s.ARN.String()] = s
-//     }
-//     return merged
-// }
-
 // secretsMatchingAnyNameValue returns the ARNs of all secret names that match
 // any of the given values. If the value begins with a "!", the match is
 // negated.
@@ -355,72 +320,6 @@ func (c *SecretsManagerClient) secretsMatchingAnyNameValue(vals []string) map[st
 	}
 	return secrets
 }
-
-// kim: TODO: remove
-// arnsMatchingNameValue returns the ARNs of all secret names that match the
-// given value. If the value begins with a "!", the match is negated.
-// func (c *SecretsManagerClient) arnsMatchingNameValue(val string) []string {
-//     var arns []string
-//     for _, s := range GlobalSecretCache {
-//         if s.IsDeleted {
-//             continue
-//         }
-//
-//         if strings.HasPrefix(val, "!") && s.Name != val[1:] {
-//             arns = append(arns, s.ARN.String())
-//         }
-//         if !strings.HasPrefix(val, "!") && s.Name == val {
-//             arns = append(arns, s.ARN.String())
-//         }
-//     }
-//     return arns
-// }
-
-// kim: TODO: remove
-// arnsMatchingTagKeyPrefix returns the ARNs of all secrets containing tag keys
-// that match the given prefix. If the prefix begins with a "!", the match is
-// negated.
-// func (c *SecretsManagerClient) arnsMatchingTagKeyPrefix(prefix string) []string {
-//     var arns []string
-//     for _, s := range GlobalSecretCache {
-//         if s.IsDeleted {
-//             continue
-//         }
-//
-//         for k := range s.Tags {
-//             if strings.HasPrefix(prefix, "!") && !strings.HasPrefix(k, prefix[1:]) {
-//                 arns = append(arns, s.ARN.String())
-//             }
-//             if !strings.HasPrefix(prefix, "!") && strings.HasPrefix(k, prefix) {
-//                 arns = append(arns, s.ARN.String())
-//             }
-//         }
-//     }
-//     return arns
-// }
-
-// kim: TODO: remove
-// arnsMatchingTagValuePrefix returns the ARNs of all secrets containing tag
-// values that match the given prefix. If the prefix begins with a "!", the
-// match is negated.
-// func (c *SecretsManagerClient) arnsMatchingTagValuePrefix(prefix string) []string {
-//     var arns []string
-//     for _, s := range GlobalSecretCache {
-//         if s.IsDeleted {
-//             continue
-//         }
-//
-//         for _, v := range s.Tags {
-//             if strings.HasPrefix(prefix, "!") && !strings.HasPrefix(v, prefix[1:]) {
-//                 arns = append(arns, s.ARN.String())
-//             }
-//             if !strings.HasPrefix(prefix, "!") && strings.HasPrefix(v, prefix) {
-//                 arns = append(arns, s.ARN.String())
-//             }
-//         }
-//     }
-//     return arns
-// }
 
 // UpdateSecretValue saves the input options and returns an updated mock secret
 // value. The mock output can be customized. By default, it will update a cached
