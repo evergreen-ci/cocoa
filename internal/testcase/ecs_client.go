@@ -245,9 +245,9 @@ func ECSClientTests() map[string]ECSClientTestCase {
 // cocoa.ECSClient with a task definition already registered.
 type ECSClientRegisteredTaskDefinitionTestCase func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition)
 
-// ECSClientRegisteredTaskDefinitionTests returns common test cases that a
-// cocoa.ECSClient should support that rely on an already-registered task
-// definition.
+// ECSClientRegisteredTaskDefinitionTests returns common test cases which rely
+// on an already-registered task definition that a cocoa.ECSClient should
+// support.
 func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTaskDefinitionTestCase {
 	return map[string]ECSClientRegisteredTaskDefinitionTestCase{
 		"RunAndStopTaskSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {

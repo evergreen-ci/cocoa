@@ -3,6 +3,7 @@ package awsutil
 import (
 	"context"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -180,8 +181,8 @@ func TestClientOptionsGetCredentials(t *testing.T) {
 
 	opts := NewClientOptions().
 		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(testutil.AWSRole()).
-		SetRegion(testutil.AWSRegion()).
+		SetRole(os.Getenv("AWS_REGION")).
+		SetRegion(os.Getenv("AWS_ROLE")).
 		SetHTTPClient(hc)
 
 	require.NoError(t, opts.Validate())

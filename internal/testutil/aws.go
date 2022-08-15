@@ -1,8 +1,11 @@
 package testutil
 
 import (
+	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
 )
 
@@ -24,4 +27,23 @@ func AWSRegion() string {
 // AWSRole returns the AWS IAM role from the environment variable.
 func AWSRole() string {
 	return os.Getenv("AWS_ROLE")
+}
+
+// ValidIntegrationAWSOptions returns valid options to create an AWS client that
+// can make actual requests to AWS for integration testing.
+func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
+	return *awsutil.NewClientOptions().
+		SetHTTPClient(hc).
+		SetCredentials(credentials.NewEnvCredentials()).
+		SetRole(AWSRole()).
+		SetRegion(AWSRegion())
+}
+
+// ValidNonIntegrationAWSOpts returns valid options to create an AWS client that
+// doesn't make any actual requests to AWS.
+// kim: TODO: remove http Client parameter.
+func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
+	return *awsutil.NewClientOptions().
+		SetCredentials(credentials.NewEnvCredentials()).
+		SetRegion("us-east-1")
 }

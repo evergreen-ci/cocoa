@@ -254,7 +254,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetDefinitionOptions(*defOpts).
 				SetExecutionOptions(*execOpts)
 
-			_, err := pc.CreatePod(ctx, *opts)
+			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
@@ -270,7 +270,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].Name))
-			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].ValueFrom))
+			res := p.Resources()
+			require.Len(t, res.Containers, 1)
+			require.Len(t, res.Containers[0].Secrets, 1)
+			secretID := res.Containers[0].Secrets[0].ID
+			assert.Equal(t, utility.FromStringPtr(secretID), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].ValueFrom))
 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
@@ -365,10 +369,11 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
-			require.Len(t, p.Resources().Containers, 1)
-			require.Len(t, p.Resources().Containers[0].Secrets, 1)
+			res := p.Resources()
+			require.Len(t, res.Containers, 1)
+			require.Len(t, res.Containers[0].Secrets, 1)
 
-			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: p.Resources().Containers[0].Secrets[0].ID})
+			getSecretOut, err := sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: res.Containers[0].Secrets[0].ID})
 			require.NoError(t, err)
 			require.NotZero(t, getSecretOut)
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
