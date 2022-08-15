@@ -1,9 +1,7 @@
 package awsutil
 
 import (
-	"context"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -170,37 +168,4 @@ func TestClientOptions(t *testing.T) {
 			assert.True(t, opts.ownsHTTPClient)
 		})
 	})
-}
-
-func TestClientOptionsGetCredentials(t *testing.T) {
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	if val := os.Getenv("AWS_REGION"); val == "" {
-		require.FailNow(t, "missing required AWS_REGION environment variable")
-	}
-	if val := os.Getenv("AWS_ROLE"); val == "" {
-		require.FailNow(t, "missing required AWS_ROLE environment variable")
-	}
-
-	opts := NewClientOptions().
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(os.Getenv("AWS_REGION")).
-		SetRegion(os.Getenv("AWS_ROLE")).
-		SetHTTPClient(hc)
-
-	require.NoError(t, opts.Validate())
-
-	creds, err := opts.GetCredentials()
-	require.NoError(t, err)
-	require.NotZero(t, creds)
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
-	defer cancel()
-
-	resolved, err := creds.GetWithContext(ctx)
-	require.NoError(t, err)
-	assert.NotZero(t, resolved.AccessKeyID)
-	assert.NotZero(t, resolved.SecretAccessKey)
-	assert.NotZero(t, resolved.SessionToken)
 }
