@@ -51,7 +51,7 @@ func TestBasicECSPodCreator(t *testing.T) {
 			hc := utility.GetHTTPClient()
 			defer utility.PutHTTPClient(hc)
 
-			awsOpts := validNonIntegrationAWSOpts(hc)
+			awsOpts := testutil.ValidNonIntegrationAWSOptions()
 
 			c, err := NewBasicECSClient(awsOpts)
 			require.NoError(t, err)

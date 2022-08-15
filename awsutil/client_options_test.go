@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -174,10 +173,15 @@ func TestClientOptions(t *testing.T) {
 }
 
 func TestClientOptionsGetCredentials(t *testing.T) {
-	testutil.CheckAWSEnvVars(t)
-
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
+
+	if val := os.Getenv("AWS_REGION"); val == "" {
+		require.FailNow(t, "missing required AWS_REGION environment variable")
+	}
+	if val := os.Getenv("AWS_ROLE"); val == "" {
+		require.FailNow(t, "missing required AWS_ROLE environment variable")
+	}
 
 	opts := NewClientOptions().
 		SetCredentials(credentials.NewEnvCredentials()).
