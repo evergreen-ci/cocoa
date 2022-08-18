@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 )
 
 // ECSPodDefinitionManager provides a mock implementation of a
@@ -15,6 +16,9 @@ type ECSPodDefinitionManager struct {
 	CreatePodDefinitionInput  []cocoa.ECSPodDefinitionOptions
 	CreatePodDefinitionOutput *cocoa.ECSPodDefinitionItem
 	CreatePodDefinitionError  error
+
+	DeletePodDefinitionInput *string
+	DeletePodDefinitionError error
 }
 
 // NewECSPodDefinitionManager creates a mock ECS pod definition manager backed
@@ -39,4 +43,17 @@ func (m *ECSPodDefinitionManager) CreatePodDefinition(ctx context.Context, opts 
 	}
 
 	return m.ECSPodDefinitionManager.CreatePodDefinition(ctx, opts...)
+}
+
+// DeletePodDefinition saves the input and deletes the mock pod definition. The
+// mock output can be customized. By default, it will return the result of
+// deleting the pod definition from the backing ECS pod definition manager.
+func (m *ECSPodDefinitionManager) DeletePodDefinition(ctx context.Context, id string) error {
+	m.DeletePodDefinitionInput = utility.ToStringPtr(id)
+
+	if m.DeletePodDefinitionError != nil {
+		return m.DeletePodDefinitionError
+	}
+
+	return m.ECSPodDefinitionManager.DeletePodDefinition(ctx, id)
 }
