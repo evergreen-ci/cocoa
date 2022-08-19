@@ -62,13 +62,15 @@ func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstagginga
 		return nil, err
 	}
 
-	var allMatches []taggedResource
+	allMatches := map[string]taggedResource{}
 	for _, f := range finders {
 		matches, err := c.getResourcesMatchingTagFilters(f, in.TagFilters)
 		if err != nil {
 			return nil, err
 		}
-		allMatches = append(allMatches, matches...)
+		for id, match := range matches {
+			allMatches[id] = match
+		}
 	}
 
 	var converted []*resourcegroupstaggingapi.ResourceTagMapping
@@ -84,6 +86,14 @@ func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstagginga
 func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*string) ([]taggedResourceFinder, error) {
 	var matchingAnyResourceType []taggedResourceFinder
 
+	if len(resourceTypes) == 0 {
+		// If no resource types are filtered, search all resources.
+		for _, resourceFinders := range serviceToResourceFinders {
+			matchingAnyResourceType = append(matchingAnyResourceType, resourceFinders...)
+		}
+		return matchingAnyResourceType, nil
+	}
+
 	// In order for a resource to be a match, it must match at least one
 	// resource type filter.
 	for _, rt := range resourceTypes {
@@ -96,17 +106,10 @@ func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*strin
 		matchingAnyResourceType = append(matchingAnyResourceType, matchingResourceType...)
 	}
 
-	if len(resourceTypes) == 0 {
-		// If no resource types are filtered, search all resources.
-		for _, resourceFinders := range serviceToResourceFinders {
-			matchingAnyResourceType = append(matchingAnyResourceType, resourceFinders...)
-		}
-	}
-
 	return matchingAnyResourceType, nil
 }
 
-func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFilters []*resourcegroupstaggingapi.TagFilter) ([]taggedResource, error) {
+func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFilters []*resourcegroupstaggingapi.TagFilter) (map[string]taggedResource, error) {
 	var matchingAllTags map[string]taggedResource
 
 	if len(tagFilters) != 0 {
@@ -146,12 +149,7 @@ func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFi
 		}
 	}
 
-	var matches []taggedResource
-	for _, res := range matchingAllTags {
-		matches = append(matches, res)
-	}
-
-	return matches, nil
+	return matchingAllTags, nil
 }
 
 func (c *TagClient) getSetIntersection(a, b map[string]taggedResource) map[string]taggedResource {
