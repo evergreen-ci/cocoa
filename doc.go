@@ -27,5 +27,9 @@ secrets in an external cache.
 The SecretsManagerClient provides a convenience wrapper around the AWS Secrets
 Manager API. If the Vault does not fulfill your needs, you can instead make
 calls directly to the Secrets Manager API using this client.
+
+The TagClient provides a wrapper around the AWS Resource Groups Tagging API.
+This can be useful for managing tagged resources across different services, such
+as secrets, pod definitions, and pods.
 */
 package cocoa

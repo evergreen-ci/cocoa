@@ -1,20 +1,15 @@
 package awsutil
 
 import (
-	"context"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// defaultTestTimeout is the default test timeout for AWS utility tests.
-const defaultTestTimeout = time.Second
 
 func TestClientOptions(t *testing.T) {
 	t.Run("SetCredentials", func(t *testing.T) {
@@ -170,32 +165,4 @@ func TestClientOptions(t *testing.T) {
 			assert.True(t, opts.ownsHTTPClient)
 		})
 	})
-}
-
-func TestClientOptionsGetCredentials(t *testing.T) {
-	testutil.CheckAWSEnvVars(t)
-
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	opts := NewClientOptions().
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(testutil.AWSRole()).
-		SetRegion(testutil.AWSRegion()).
-		SetHTTPClient(hc)
-
-	require.NoError(t, opts.Validate())
-
-	creds, err := opts.GetCredentials()
-	require.NoError(t, err)
-	require.NotZero(t, creds)
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
-	defer cancel()
-
-	resolved, err := creds.GetWithContext(ctx)
-	require.NoError(t, err)
-	assert.NotZero(t, resolved.AccessKeyID)
-	assert.NotZero(t, resolved.SecretAccessKey)
-	assert.NotZero(t, resolved.SessionToken)
 }

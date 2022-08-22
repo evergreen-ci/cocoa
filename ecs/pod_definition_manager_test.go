@@ -23,7 +23,7 @@ func TestBasicPodDefinitionManager(t *testing.T) {
 	defer utility.PutHTTPClient(hc)
 
 	t.Run("NewPodDefinitionManager", func(t *testing.T) {
-		c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
+		c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, c.Close(ctx))
@@ -50,7 +50,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts := validIntegrationAWSOpts(hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
 
 	c, err := NewBasicECSClient(awsOpts)
 	require.NoError(t, err)
@@ -113,13 +113,13 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetClient", func(t *testing.T) {
-		c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
+		c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		opts := NewBasicPodDefinitionManagerOptions().SetClient(c)
 		assert.Equal(t, c, opts.Client)
 	})
 	t.Run("SetVault", func(t *testing.T) {
-		c, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
+		c, err := secret.NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(c))
 		require.NoError(t, err)
@@ -143,9 +143,9 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
+			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
+			smClient, err := secret.NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
 			require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutClient", func(t *testing.T) {
-			smClient, err := secret.NewBasicSecretsManagerClient(validNonIntegrationAWSOpts(hc))
+			smClient, err := secret.NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
 			require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithCacheTagButNoCache", func(t *testing.T) {
-			c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
+			c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetClient(c).
@@ -176,7 +176,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("DefaultsCacheTagWithCache", func(t *testing.T) {
-			c, err := NewBasicECSClient(validNonIntegrationAWSOpts(hc))
+			c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetClient(c).

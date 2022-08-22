@@ -13,7 +13,9 @@ import (
 // StoredSecret is a representation of a secret kept in the global secret
 // storage cache.
 type StoredSecret struct {
-	ARN          string
+	// For the sake of simplicity, the secret ARN is synonymous with the secret
+	// name.
+	Name         string
 	Value        string
 	BinaryValue  []byte
 	IsDeleted    bool
@@ -26,7 +28,7 @@ type StoredSecret struct {
 
 func newStoredSecret(in *secretsmanager.CreateSecretInput, ts time.Time) StoredSecret {
 	s := StoredSecret{
-		ARN:          utility.FromStringPtr(in.Name),
+		Name:         utility.FromStringPtr(in.Name),
 		Value:        utility.FromStringPtr(in.SecretString),
 		BinaryValue:  in.SecretBinary,
 		Created:      ts,
@@ -34,6 +36,18 @@ func newStoredSecret(in *secretsmanager.CreateSecretInput, ts time.Time) StoredS
 		Tags:         newSecretsManagerTags(in.Tags),
 	}
 	return s
+}
+
+func exportSecretListEntry(s StoredSecret) *secretsmanager.SecretListEntry {
+	return &secretsmanager.SecretListEntry{
+		ARN:              utility.ToStringPtr(s.Name),
+		Name:             utility.ToStringPtr(s.Name),
+		CreatedDate:      utility.ToTimePtr(s.Created),
+		LastAccessedDate: utility.ToTimePtr(s.LastAccessed),
+		LastChangedDate:  utility.ToTimePtr(s.LastUpdated),
+		DeletedDate:      utility.ToTimePtr(s.Deleted),
+		Tags:             exportSecretsManagerTags(s.Tags),
+	}
 }
 
 func newSecretsManagerTags(tags []*secretsmanager.Tag) map[string]string {
@@ -75,9 +89,10 @@ func ResetGlobalSecretCache() {
 }
 
 // SecretsManagerClient provides a mock implementation of a
-// cocoa.SecretsManagerClient. This makes it possible to introspect on inputs
-// to the client and control the client's output. It provides some default
-// implementations where possible.
+// cocoa.SecretsManagerClient. This makes it possible to introspect on inputs to
+// the client and control the client's output. It provides some default
+// implementations where possible. By default, it will issue the API calls to
+// the fake GlobalSecretCache.
 type SecretsManagerClient struct {
 	CreateSecretInput  *secretsmanager.CreateSecretInput
 	CreateSecretOutput *secretsmanager.CreateSecretOutput
@@ -106,6 +121,8 @@ type SecretsManagerClient struct {
 	TagResourceInput  *secretsmanager.TagResourceInput
 	TagResourceOutput *secretsmanager.TagResourceOutput
 	TagResourceError  error
+
+	CloseError error
 }
 
 // CreateSecret saves the input options and returns a new mock secret. The mock
@@ -129,15 +146,16 @@ func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmana
 	}
 
 	name := utility.FromStringPtr(in.Name)
-	if _, ok := GlobalSecretCache[name]; ok {
+	if s, ok := GlobalSecretCache[name]; ok && !s.IsDeleted {
 		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret already exists", nil)
 	}
 
-	GlobalSecretCache[name] = newStoredSecret(in, time.Now())
+	newSecret := newStoredSecret(in, time.Now())
+	GlobalSecretCache[newSecret.Name] = newSecret
 
 	return &secretsmanager.CreateSecretOutput{
-		ARN:  in.Name,
-		Name: in.Name,
+		ARN:  utility.ToStringPtr(newSecret.Name),
+		Name: utility.ToStringPtr(newSecret.Name),
 	}, nil
 }
 
@@ -155,8 +173,9 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret ID", nil)
 	}
 
-	s, ok := GlobalSecretCache[*in.SecretId]
-	if !ok {
+	id := utility.FromStringPtr(in.SecretId)
+	s := c.getSecret(id)
+	if s == nil {
 		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
 	}
 
@@ -165,15 +184,27 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 	}
 
 	s.LastAccessed = time.Now()
-	GlobalSecretCache[*in.SecretId] = s
+	GlobalSecretCache[id] = *s
 
 	return &secretsmanager.GetSecretValueOutput{
-		Name:         in.SecretId,
-		ARN:          in.SecretId,
+		ARN:          utility.ToStringPtr(s.Name),
+		Name:         utility.ToStringPtr(s.Name),
 		SecretString: utility.ToStringPtr(s.Value),
 		SecretBinary: s.BinaryValue,
 		CreatedDate:  utility.ToTimePtr(s.Created),
 	}, nil
+}
+
+func (c *SecretsManagerClient) getSecret(id string) *StoredSecret {
+	if s, ok := GlobalSecretCache[id]; ok {
+		return &s
+	}
+	for _, s := range GlobalSecretCache {
+		if s.Name == id {
+			return &s
+		}
+	}
+	return nil
 }
 
 // DescribeSecret saves the input options and returns an existing mock secret's
@@ -197,8 +228,8 @@ func (c *SecretsManagerClient) DescribeSecret(ctx context.Context, in *secretsma
 	}
 
 	return &secretsmanager.DescribeSecretOutput{
-		ARN:              in.SecretId,
-		Name:             in.SecretId,
+		ARN:              utility.ToStringPtr(s.Name),
+		Name:             utility.ToStringPtr(s.Name),
 		CreatedDate:      utility.ToTimePtr(s.Created),
 		LastAccessedDate: utility.ToTimePtr(s.LastAccessed),
 		LastChangedDate:  utility.ToTimePtr(s.LastUpdated),
@@ -217,44 +248,40 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 		return c.ListSecretsOutput, c.ListSecretsError
 	}
 
-	matched := map[string]StoredSecret{}
-	for _, filter := range in.Filters {
-		if filter == nil {
-			continue
-		}
-
-		if filter.Key != nil {
-			name := utility.FromStringPtr(filter.Key)
-			s, ok := GlobalSecretCache[name]
-			if !ok {
+	// Get the subset of secrets that match each and every one of the filters.
+	var matchingAllFilters map[string]StoredSecret
+	if len(in.Filters) != 0 {
+		for _, f := range in.Filters {
+			if f == nil {
 				continue
 			}
 
-			matched[name] = s
-		}
-
-		for _, v := range filter.Values {
-			if v == nil {
-				continue
+			var matchingValues map[string]StoredSecret
+			switch utility.FromStringPtr(f.Key) {
+			case "name":
+				matchingValues = c.secretsMatchingAnyNameValue(utility.FromStringPtrSlice(f.Values))
+				// This could support other filter keys, but it's not worth it
+				// unless the need arises.
+			default:
+				return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "unsupported filter", nil)
 			}
 
-			for _, name := range c.namesMatchingValue(utility.FromStringPtr(v)) {
-				matched[name] = GlobalSecretCache[name]
+			if matchingAllFilters == nil {
+				// Initialize the candidate set of matching secrets.
+				matchingAllFilters = matchingValues
+			} else {
+				// Each matching secret must match all the given filters.
+				matchingAllFilters = c.getSetIntersection(matchingAllFilters, matchingValues)
 			}
 		}
+	} else {
+		// If no filters are given, return all the secrets.
+		matchingAllFilters = GlobalSecretCache
 	}
 
 	var converted []*secretsmanager.SecretListEntry
-	for name, s := range matched {
-		converted = append(converted, &secretsmanager.SecretListEntry{
-			ARN:              utility.ToStringPtr(s.ARN),
-			Name:             utility.ToStringPtr(name),
-			CreatedDate:      utility.ToTimePtr(s.Created),
-			LastAccessedDate: utility.ToTimePtr(s.LastAccessed),
-			LastChangedDate:  utility.ToTimePtr(s.LastUpdated),
-			DeletedDate:      utility.ToTimePtr(s.Deleted),
-			Tags:             exportSecretsManagerTags(s.Tags),
-		})
+	for _, s := range matchingAllFilters {
+		converted = append(converted, exportSecretListEntry(s))
 	}
 
 	return &secretsmanager.ListSecretsOutput{
@@ -262,19 +289,36 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 	}, nil
 }
 
-// namesMatchingValue returns the names of all secrets that match the given
-// value. If the value begins with a "!", the match is negated.
-func (c *SecretsManagerClient) namesMatchingValue(val string) []string {
-	var names []string
-	for name, s := range GlobalSecretCache {
-		if strings.HasPrefix(val, "!") && s.Value != val[1:] {
-			names = append(names, name)
-		}
-		if !strings.HasPrefix(val, "!") && s.Value == val {
-			names = append(names, name)
+func (c *SecretsManagerClient) getSetIntersection(a, b map[string]StoredSecret) map[string]StoredSecret {
+	intersection := map[string]StoredSecret{}
+	for id, s := range a {
+		if _, ok := b[id]; ok {
+			intersection[id] = s
 		}
 	}
-	return names
+	return intersection
+}
+
+// secretsMatchingAnyNameValue returns the ARNs of all secret names that match
+// any of the given values. If the value begins with a "!", the match is
+// negated.
+func (c *SecretsManagerClient) secretsMatchingAnyNameValue(vals []string) map[string]StoredSecret {
+	secrets := map[string]StoredSecret{}
+	for _, s := range GlobalSecretCache {
+		if s.IsDeleted {
+			continue
+		}
+
+		for _, val := range vals {
+			if strings.HasPrefix(val, "!") && s.Name != val[1:] {
+				secrets[s.Name] = s
+			}
+			if !strings.HasPrefix(val, "!") && s.Name == val {
+				secrets[s.Name] = s
+			}
+		}
+	}
+	return secrets
 }
 
 // UpdateSecretValue saves the input options and returns an updated mock secret
@@ -297,9 +341,14 @@ func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secret
 		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "must specify either secret binary or secret string", nil)
 	}
 
-	s, ok := GlobalSecretCache[*in.SecretId]
+	id := utility.FromStringPtr(in.SecretId)
+	s, ok := GlobalSecretCache[id]
 	if !ok {
 		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
+	}
+
+	if s.IsDeleted {
+		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
 	}
 
 	if in.SecretBinary != nil {
@@ -313,11 +362,11 @@ func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secret
 	s.LastAccessed = ts
 	s.LastUpdated = ts
 
-	GlobalSecretCache[*in.SecretId] = s
+	GlobalSecretCache[id] = s
 
 	return &secretsmanager.UpdateSecretOutput{
-		ARN:  in.SecretId,
-		Name: in.SecretId,
+		ARN:  utility.ToStringPtr(s.Name),
+		Name: utility.ToStringPtr(s.Name),
 	}, nil
 }
 
@@ -347,7 +396,8 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 		window = 30
 	}
 
-	s, ok := GlobalSecretCache[*in.SecretId]
+	id := utility.FromStringPtr(in.SecretId)
+	s, ok := GlobalSecretCache[id]
 	if !utility.FromBoolPtr(in.ForceDeleteWithoutRecovery) && !ok {
 		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
 	}
@@ -359,11 +409,11 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 		s.Deleted = ts.AddDate(0, 0, window)
 	}
 	s.IsDeleted = true
-	GlobalSecretCache[*in.SecretId] = s
+	GlobalSecretCache[id] = s
 
 	return &secretsmanager.DeleteSecretOutput{
-		ARN:          in.SecretId,
-		Name:         in.SecretId,
+		ARN:          utility.ToStringPtr(s.Name),
+		Name:         utility.ToStringPtr(s.Name),
 		DeletionDate: utility.ToTimePtr(s.Deleted),
 	}, nil
 }
@@ -384,6 +434,11 @@ func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanag
 	if !ok {
 		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret not found", nil)
 	}
+
+	if s.IsDeleted {
+		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
+	}
+
 	for k, v := range newSecretsManagerTags(in.Tags) {
 		s.Tags[k] = v
 	}
@@ -393,5 +448,8 @@ func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanag
 // Close closes the mock client. The mock output can be customized. By default,
 // it is a no-op that returns no error.
 func (c *SecretsManagerClient) Close(ctx context.Context) error {
+	if c.CloseError != nil {
+		return c.CloseError
+	}
 	return nil
 }

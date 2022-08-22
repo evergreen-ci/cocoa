@@ -7,10 +7,8 @@ import (
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
@@ -20,16 +18,15 @@ import (
 // implementation that wraps the AWS Secrets Manager API. It supports
 // retrying requests using exponential backoff and jitter.
 type BasicSecretsManagerClient struct {
-	sm      *secretsmanager.SecretsManager
-	opts    awsutil.ClientOptions
-	session *session.Session
+	awsutil.BaseClient
+	sm *secretsmanager.SecretsManager
 }
 
 // NewBasicSecretsManagerClient creates a new AWS Secrets Manager client from
 // the given options.
 func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsManagerClient, error) {
 	c := &BasicSecretsManagerClient{
-		opts: opts,
+		BaseClient: awsutil.NewBaseClient(opts),
 	}
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
@@ -39,42 +36,16 @@ func NewBasicSecretsManagerClient(opts awsutil.ClientOptions) (*BasicSecretsMana
 }
 
 func (c *BasicSecretsManagerClient) setup() error {
-	if err := c.opts.Validate(); err != nil {
-		return errors.Wrap(err, "invalid options")
-	}
-
 	if c.sm != nil {
 		return nil
 	}
 
-	if err := c.setupSession(); err != nil {
-		return errors.Wrap(err, "setting up session")
-	}
-
-	c.sm = secretsmanager.New(c.session)
-
-	return nil
-}
-
-func (c *BasicSecretsManagerClient) setupSession() error {
-	if c.session != nil {
-		return nil
-	}
-
-	creds, err := c.opts.GetCredentials()
+	sess, err := c.GetSession()
 	if err != nil {
-		return errors.Wrap(err, "getting credentials")
-	}
-	sess, err := session.NewSession(&aws.Config{
-		HTTPClient:  c.opts.HTTPClient,
-		Region:      c.opts.Region,
-		Credentials: creds,
-	})
-	if err != nil {
-		return errors.Wrap(err, "creating session")
+		return errors.Wrap(err, "initializing session")
 	}
 
-	c.session = sess
+	c.sm = secretsmanager.New(sess)
 
 	return nil
 }
@@ -87,19 +58,17 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 
 	var out *secretsmanager.CreateSecretOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("CreateSecret", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.CreateSecretWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("CreateSecret", in)
+		out, err = c.sm.CreateSecretWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -113,19 +82,17 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 
 	var out *secretsmanager.GetSecretValueOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("GetSecretValue", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.GetSecretValueWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("GetSecretValue", in)
+		out, err = c.sm.GetSecretValueWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -139,19 +106,17 @@ func (c *BasicSecretsManagerClient) DescribeSecret(ctx context.Context, in *secr
 
 	var out *secretsmanager.DescribeSecretOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("DescribeSecret", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.DescribeSecretWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("DescribeSecret", in)
+		out, err = c.sm.DescribeSecretWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 
@@ -166,19 +131,17 @@ func (c *BasicSecretsManagerClient) ListSecrets(ctx context.Context, in *secrets
 
 	var out *secretsmanager.ListSecretsOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("ListSecrets", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.ListSecretsWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("ListSecrets", in)
+		out, err = c.sm.ListSecretsWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 
@@ -193,19 +156,17 @@ func (c *BasicSecretsManagerClient) UpdateSecretValue(ctx context.Context, in *s
 
 	var out *secretsmanager.UpdateSecretOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("UpdateSecret", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.UpdateSecretWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("UpdateSecret", in)
+		out, err = c.sm.UpdateSecretWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -219,19 +180,17 @@ func (c *BasicSecretsManagerClient) TagResource(ctx context.Context, in *secrets
 
 	var out *secretsmanager.TagResourceOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("TagResource", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.TagResourceWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("TagResource", in)
+		out, err = c.sm.TagResourceWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -245,28 +204,25 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 
 	var out *secretsmanager.DeleteSecretOutput
 	var err error
-	msg := awsutil.MakeAPILogMessage("DeleteSecret", in)
-	if err := utility.Retry(
-		ctx,
-		func() (bool, error) {
-			out, err = c.sm.DeleteSecretWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("DeleteSecret", in)
+		out, err = c.sm.DeleteSecretWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Close closes the client.
+// Close cleans up all resources owned by the client.
 func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
-	c.opts.Close()
-	return nil
+	return c.BaseClient.Close(ctx)
 }
 
 // isNonRetryableErrorCode returns whether or not the error code from Secrets

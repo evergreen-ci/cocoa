@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/awsutil"
@@ -21,15 +19,14 @@ import (
 // BasicECSClient provides a cocoa.ECSClient implementation that wraps the AWS
 // ECS API. It supports retrying requests using exponential backoff and jitter.
 type BasicECSClient struct {
-	ecs     *ecs.ECS
-	opts    *awsutil.ClientOptions
-	session *session.Session
+	awsutil.BaseClient
+	ecs *ecs.ECS
 }
 
 // NewBasicECSClient creates a new AWS ECS client from the given options.
 func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
 	c := &BasicECSClient{
-		opts: &opts,
+		BaseClient: awsutil.NewBaseClient(opts),
 	}
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
@@ -39,42 +36,16 @@ func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
 }
 
 func (c *BasicECSClient) setup() error {
-	if err := c.opts.Validate(); err != nil {
-		return errors.Wrap(err, "invalid options")
-	}
-
 	if c.ecs != nil {
 		return nil
 	}
 
-	if err := c.setupSession(); err != nil {
-		return errors.Wrap(err, "setting up session")
-	}
-
-	c.ecs = ecs.New(c.session)
-
-	return nil
-}
-
-func (c *BasicECSClient) setupSession() error {
-	if c.session != nil {
-		return nil
-	}
-
-	creds, err := c.opts.GetCredentials()
+	sess, err := c.GetSession()
 	if err != nil {
-		return errors.Wrap(err, "getting credentials")
-	}
-	sess, err := session.NewSession(&aws.Config{
-		HTTPClient:  c.opts.HTTPClient,
-		Region:      c.opts.Region,
-		Credentials: creds,
-	})
-	if err != nil {
-		return errors.Wrap(err, "creating session")
+		return errors.Wrap(err, "initializing session")
 	}
 
-	c.session = sess
+	c.ecs = ecs.New(sess)
 
 	return nil
 }
@@ -87,18 +58,17 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 
 	var out *ecs.RegisterTaskDefinitionOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
-			out, err = c.ecs.RegisterTaskDefinitionWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
+		out, err = c.ecs.RegisterTaskDefinitionWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 
@@ -113,18 +83,17 @@ func (c *BasicECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Des
 
 	var out *ecs.DescribeTaskDefinitionOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("DescribeTaskDefinition", in)
-			out, err = c.ecs.DescribeTaskDefinitionWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("DescribeTaskDefinition", in)
+		out, err = c.ecs.DescribeTaskDefinitionWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -139,18 +108,17 @@ func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTa
 
 	var out *ecs.ListTaskDefinitionsOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
-			out, err = c.ecs.ListTaskDefinitionsWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
+		out, err = c.ecs.ListTaskDefinitionsWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -164,18 +132,17 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 
 	var out *ecs.DeregisterTaskDefinitionOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("DeregisterTaskDefinition", in)
-			out, err = c.ecs.DeregisterTaskDefinitionWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("DeregisterTaskDefinition", in)
+		out, err = c.ecs.DeregisterTaskDefinitionWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 
@@ -190,18 +157,17 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 
 	var out *ecs.RunTaskOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("RunTask", in)
-			out, err = c.ecs.RunTaskWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("RunTask", in)
+		out, err = c.ecs.RunTaskWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -215,18 +181,17 @@ func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTask
 
 	var out *ecs.DescribeTasksOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("DescribeTasks", in)
-			out, err = c.ecs.DescribeTasksWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("DescribeTasks", in)
+		out, err = c.ecs.DescribeTasksWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -240,18 +205,17 @@ func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) 
 
 	var out *ecs.ListTasksOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("ListTasks", in)
-			out, err = c.ecs.ListTasksWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("ListTasks", in)
+		out, err = c.ecs.ListTasksWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -265,21 +229,20 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 
 	var out *ecs.StopTaskOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("StopTask", in)
-			out, err = c.ecs.StopTaskWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if isTaskNotFoundError(awsErr) {
-					return false, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
-				}
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("StopTask", in)
+		out, err = c.ecs.StopTaskWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if isTaskNotFoundError(awsErr) {
+				return false, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
+			}
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -293,27 +256,25 @@ func (c *BasicECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInp
 
 	var out *ecs.TagResourceOutput
 	var err error
-	if err := utility.Retry(ctx,
-		func() (bool, error) {
-			msg := awsutil.MakeAPILogMessage("TagResource", in)
-			out, err = c.ecs.TagResourceWithContext(ctx, in)
-			if awsErr, ok := err.(awserr.Error); ok {
-				grip.Debug(message.WrapError(awsErr, msg))
-				if c.isNonRetryableErrorCode(awsErr.Code()) {
-					return false, err
-				}
+	if err := utility.Retry(ctx, func() (bool, error) {
+		msg := awsutil.MakeAPILogMessage("TagResource", in)
+		out, err = c.ecs.TagResourceWithContext(ctx, in)
+		if awsErr, ok := err.(awserr.Error); ok {
+			grip.Debug(message.WrapError(awsErr, msg))
+			if c.isNonRetryableErrorCode(awsErr.Code()) {
+				return false, err
 			}
-			return true, err
-		}, *c.opts.RetryOpts); err != nil {
+		}
+		return true, err
+	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Close closes the client and cleans up its resources.
+// Close cleans up all resources owned by the client.
 func (c *BasicECSClient) Close(ctx context.Context) error {
-	c.opts.Close()
-	return nil
+	return c.BaseClient.Close(ctx)
 }
 
 // isNonRetryableErrorCode returns whether or not the error code from ECS is

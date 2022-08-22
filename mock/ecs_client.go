@@ -19,7 +19,7 @@ import (
 
 // ECSTaskDefinition represents a mock ECS task definition in the global ECS service.
 type ECSTaskDefinition struct {
-	ARN           *string
+	ARN           string
 	Family        *string
 	Revision      *int64
 	ContainerDefs []ECSContainerDefinition
@@ -41,7 +41,7 @@ func newECSTaskDefinition(def *awsECS.RegisterTaskDefinitionInput, rev int) ECST
 	}
 
 	taskDef := ECSTaskDefinition{
-		ARN:           utility.ToStringPtr(id.String()),
+		ARN:           id.String(),
 		Family:        def.Family,
 		Revision:      utility.ToInt64Ptr(int64(rev)),
 		CPU:           def.Cpu,
@@ -71,7 +71,7 @@ func (d *ECSTaskDefinition) export() *awsECS.TaskDefinition {
 	}
 
 	return &awsECS.TaskDefinition{
-		TaskDefinitionArn:    d.ARN,
+		TaskDefinitionArn:    utility.ToStringPtr(d.ARN),
 		Family:               d.Family,
 		Revision:             d.Revision,
 		Cpu:                  d.CPU,
@@ -127,7 +127,7 @@ type ECSCluster map[string]ECSTask
 
 // ECSTask represents a mock running ECS task within a cluster.
 type ECSTask struct {
-	ARN               *string
+	ARN               string
 	TaskDef           ECSTaskDefinition
 	Cluster           *string
 	CapacityProvider  *string
@@ -152,7 +152,7 @@ func newECSTask(in *awsECS.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 	}
 
 	t := ECSTask{
-		ARN:              utility.ToStringPtr(id.String()),
+		ARN:              id.String(),
 		Cluster:          in.Cluster,
 		CapacityProvider: newCapacityProvider(in.CapacityProviderStrategy),
 		ExecEnabled:      in.EnableExecuteCommand,
@@ -173,12 +173,12 @@ func newECSTask(in *awsECS.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 
 func (t *ECSTask) export(includeTags bool) *awsECS.Task {
 	exported := awsECS.Task{
-		TaskArn:              t.ARN,
+		TaskArn:              utility.ToStringPtr(t.ARN),
 		ClusterArn:           t.Cluster,
 		CapacityProviderName: t.CapacityProvider,
 		EnableExecuteCommand: t.ExecEnabled,
 		Group:                t.Group,
-		TaskDefinitionArn:    t.TaskDef.ARN,
+		TaskDefinitionArn:    utility.ToStringPtr(t.TaskDef.ARN),
 		Cpu:                  t.TaskDef.CPU,
 		Memory:               t.TaskDef.MemoryMB,
 		LastStatus:           t.Status,
@@ -201,7 +201,7 @@ func (t *ECSTask) export(includeTags bool) *awsECS.Task {
 
 // ECSContainer represents a mock running ECS container within a task.
 type ECSContainer struct {
-	ARN        *string
+	ARN        string
 	TaskARN    *string
 	Name       *string
 	Image      *string
@@ -223,8 +223,8 @@ func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
 	}
 
 	return ECSContainer{
-		ARN:        utility.ToStringPtr(id.String()),
-		TaskARN:    task.ARN,
+		ARN:        id.String(),
+		TaskARN:    utility.ToStringPtr(task.ARN),
 		Name:       def.Name,
 		Image:      def.Image,
 		CPU:        def.CPU,
@@ -236,7 +236,7 @@ func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
 
 func (c *ECSContainer) export() *awsECS.Container {
 	exported := &awsECS.Container{
-		ContainerArn: c.ARN,
+		ContainerArn: utility.ToStringPtr(c.ARN),
 		TaskArn:      c.TaskARN,
 		Name:         c.Name,
 		Image:        c.Image,
@@ -419,7 +419,7 @@ func parseFamilyAndRevision(taskDef string) (family string, revNum int, err erro
 func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int, found bool) {
 	for family, revisions := range GlobalECSService.TaskDefs {
 		for revIdx, def := range revisions {
-			if utility.FromStringPtr(def.ARN) == arn {
+			if def.ARN == arn {
 				return family, revIdx + 1, true
 			}
 		}
@@ -429,8 +429,8 @@ func (s *ECSService) taskDefIndexFromARN(arn string) (family string, revNum int,
 
 // ECSClient provides a mock implementation of a cocoa.ECSClient. This makes
 // it possible to introspect on inputs to the client and control the client's
-// output. It provides some default implementations where possible. For unmocked
-// methods, it will issue the API calls to the fake GlobalECSService.
+// output. It provides some default implementations where possible. By default,
+// it will issue the API calls to the fake GlobalECSService.
 type ECSClient struct {
 	RegisterTaskDefinitionInput  *awsECS.RegisterTaskDefinitionInput
 	RegisterTaskDefinitionOutput *awsECS.RegisterTaskDefinitionOutput
@@ -535,7 +535,7 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *awsECS.ListTask
 		return c.ListTaskDefinitionsOutput, c.ListTaskDefinitionsError
 	}
 
-	var arns []*string
+	var arns []string
 	for _, revisions := range GlobalECSService.TaskDefs {
 		for _, def := range revisions {
 			if in.FamilyPrefix != nil && utility.FromStringPtr(def.Family) != *in.FamilyPrefix {
@@ -550,7 +550,7 @@ func (c *ECSClient) ListTaskDefinitions(ctx context.Context, in *awsECS.ListTask
 	}
 
 	return &awsECS.ListTaskDefinitionsOutput{
-		TaskDefinitionArns: arns,
+		TaskDefinitionArns: utility.ToStringPtrSlice(arns),
 	}, nil
 }
 
@@ -613,7 +613,7 @@ func (c *ECSClient) RunTask(ctx context.Context, in *awsECS.RunTaskInput) (*awsE
 
 	task := newECSTask(in, *def)
 
-	cluster[utility.FromStringPtr(task.ARN)] = task
+	cluster[task.ARN] = task
 
 	return &awsECS.RunTaskOutput{
 		Tasks: []*awsECS.Task{task.export(true)},
