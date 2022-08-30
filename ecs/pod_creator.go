@@ -177,10 +177,7 @@ func (pc *BasicECSPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) erro
 	if len(out.Failures) > 0 {
 		catcher := grip.NewBasicCatcher()
 		for _, f := range out.Failures {
-			if f == nil {
-				continue
-			}
-			catcher.Add(ConvertFailureToError(*f))
+			catcher.Add(ConvertFailureToError(f))
 		}
 		return errors.Wrap(catcher.Resolve(), "running task")
 	}

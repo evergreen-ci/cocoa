@@ -75,7 +75,7 @@ func TestConvertFailureToError(t *testing.T) {
 			reason = "some reason"
 			detail = "some detail"
 		)
-		err := ConvertFailureToError(ecs.Failure{
+		err := ConvertFailureToError(&ecs.Failure{
 			Arn:    aws.String(arn),
 			Reason: aws.String(reason),
 			Detail: aws.String(detail),
@@ -86,7 +86,7 @@ func TestConvertFailureToError(t *testing.T) {
 		assert.Contains(t, err.Error(), detail)
 	})
 	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
-		err := ConvertFailureToError(ecs.Failure{
+		err := ConvertFailureToError(&ecs.Failure{
 			Arn:    aws.String("arn"),
 			Reason: aws.String("MISSING"),
 		})

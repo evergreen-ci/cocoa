@@ -162,14 +162,45 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 		out, err = c.ecs.RunTaskWithContext(ctx, in)
 		if awsErr, ok := err.(awserr.Error); ok {
 			grip.Debug(message.WrapError(awsErr, msg))
+			if strings.Contains(awsErr.Error(), "provisioning capacity limit exceeded") {
+				// The ECS cluster has exceeded its maximum limit for number of
+				// tasks in the PROVISIONING state. This is a service-side issue
+				// and is supposed to be transient until it can free up more
+				// space for PROVISIONING tasks.
+				return true, err
+			}
 			if c.isNonRetryableErrorCode(awsErr.Code()) {
 				return false, err
 			}
 		}
-		return true, err
+		if err != nil {
+			return true, err
+		}
+
+		if utility.FromInt64Ptr(in.Count) == 1 && len(out.Tasks) == 0 && len(out.Failures) > 0 {
+			// As a special case, if it's a single task that failed to run due
+			// to insufficient resources, the cluster should eventually scale
+			// out to provide more resources. Therefore, this should still retry
+			// as it is a transient issue. This is not done for multiple tasks
+			// since it may have partially succeeded in running some of them or
+			// may have failed for other reasons.
+			catcher := grip.NewBasicCatcher()
+			for _, f := range out.Failures {
+				if f == nil {
+					continue
+				}
+				if utility.StringSliceContains([]string{"RESOURCE:CPU", "RESOURCE:MEMORY"}, utility.FromStringPtr(f.Reason)) {
+					catcher.Add(ConvertFailureToError(f))
+				}
+			}
+			return catcher.HasErrors(), errors.Wrap(catcher.Resolve(), "cluster has insufficient resources")
+		}
+
+		return false, nil
 	}, c.GetRetryOptions()); err != nil {
 		return nil, err
 	}
+
 	return out, nil
 }
 
@@ -307,8 +338,12 @@ func isTaskNotFoundError(err error) bool {
 // If the failure is due to being unable to find the task, it will return a
 // cocoa.ECSTaskNotFound error.
 // Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/api_failures_messages.html
-func ConvertFailureToError(f ecs.Failure) error {
-	if isTaskNotFoundFailure(f) {
+func ConvertFailureToError(f *ecs.Failure) error {
+	if f == nil {
+		return nil
+	}
+
+	if isTaskNotFoundFailure(*f) {
 		return cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(f.Arn))
 	}
 	var parts []string
