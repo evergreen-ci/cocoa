@@ -30,7 +30,6 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				AddPortMappings(*cocoa.NewPortMapping().SetContainerPort(1337)).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -40,7 +39,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.NoError(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -72,7 +71,6 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				AddEnvironmentVariables(*envVar).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -81,8 +79,9 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetTaskRole(testutil.ECSTaskRole()).
 				SetExecutionRole(testutil.ECSExecutionRole())
 
-			opts := cocoa.NewECSPodCreationOptions().SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+			opts := cocoa.NewECSPodCreationOptions().
+				SetDefinitionOptions(*defOpts).
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.NoError(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -101,7 +100,6 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 				SetRepositoryCredentials(*creds).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -112,7 +110,7 @@ func ECSPodCreatorTests() map[string]ECSPodCreatorTestCase {
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.NoError(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -148,9 +146,6 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCPU(128).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
-
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -161,7 +156,7 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.NoError(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -194,9 +189,6 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCPU(128).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
-
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -207,7 +199,7 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.NoError(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -235,9 +227,6 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 				SetCPU(128).
 				SetName("container")
 
-			execOpts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName())
-
 			defOpts := cocoa.NewECSPodDefinitionOptions().
 				SetName(testutil.NewTaskDefinitionFamily(t)).
 				AddContainerDefinitions(*containerDef).
@@ -247,7 +236,7 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 
 			opts := cocoa.NewECSPodCreationOptions().
 				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*execOpts)
+				SetExecutionOptions(*validECSPodExecutionOptions())
 			assert.Error(t, opts.Validate())
 
 			p, err := c.CreatePod(ctx, *opts)
@@ -268,9 +257,8 @@ func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Co
 	return map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition){
 		"CreatePodFromExistingDefinitionSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
-			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
-			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *validECSPodExecutionOptions())
 			require.NoError(t, err)
 			require.NotZero(t, p)
 
@@ -288,7 +276,7 @@ func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Co
 		},
 		"CreatePodFromExistingDefinitionFailsWithNonexistentCluster": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(utility.FromStringPtr(def.TaskDefinitionArn))
-			opts := cocoa.NewECSPodExecutionOptions().SetCluster("foo")
+			opts := validECSPodExecutionOptions().SetCluster("foo")
 
 			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
 			require.Error(t, err)
@@ -296,9 +284,8 @@ func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Co
 		},
 		"CreatePodFromExistingDefinitionFailsWithNonexistentTaskDefinition": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator, def ecs.TaskDefinition) {
 			taskDef := cocoa.NewECSTaskDefinition().SetID(testutil.NewTaskDefinitionFamily(t) + ":1")
-			opts := cocoa.NewECSPodExecutionOptions().SetCluster(testutil.ECSClusterName())
 
-			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
+			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *validECSPodExecutionOptions())
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -307,13 +294,17 @@ func ECSPodCreatorRegisteredTaskDefinitionTests() map[string]func(ctx context.Co
 			require.NoError(t, taskDef.Validate())
 			placementOpts := cocoa.NewECSPodPlacementOptions().SetStrategy("foo")
 			require.Error(t, placementOpts.Validate())
-			opts := cocoa.NewECSPodExecutionOptions().
-				SetCluster(testutil.ECSClusterName()).
-				SetPlacementOptions(*placementOpts)
+			opts := validECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
 
 			p, err := c.CreatePodFromExistingDefinition(ctx, *taskDef, *opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
 	}
+}
+
+func validECSPodExecutionOptions() *cocoa.ECSPodExecutionOptions {
+	return cocoa.NewECSPodExecutionOptions().
+		SetCluster(testutil.ECSClusterName()).
+		SetCapacityProvider(testutil.ECSCapacityProvider())
 }

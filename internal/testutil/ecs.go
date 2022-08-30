@@ -38,6 +38,12 @@ func ECSClusterName() string {
 	return os.Getenv("AWS_ECS_CLUSTER")
 }
 
+// ECSCapacityProvider returns the ECS capacity provider from the environment
+// variable.
+func ECSCapacityProvider() string {
+	return os.Getenv("AWS_ECS_CAPACITY_PROVIDER")
+}
+
 // ECSTaskRole returns the ECS task role from the environment variable.
 func ECSTaskRole() string {
 	return os.Getenv("AWS_ECS_TASK_ROLE")

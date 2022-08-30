@@ -56,7 +56,8 @@ func ECSPodTests() map[string]ECSPodTestCase {
 			SetTaskRole(testutil.ECSTaskRole()).
 			SetExecutionRole(testutil.ECSExecutionRole())
 		execOpts := cocoa.NewECSPodExecutionOptions().
-			SetCluster(testutil.ECSClusterName())
+			SetCluster(testutil.ECSClusterName()).
+			SetCapacityProvider(testutil.ECSCapacityProvider())
 		return cocoa.NewECSPodCreationOptions().
 			SetDefinitionOptions(*defOpts).
 			SetExecutionOptions(*execOpts)

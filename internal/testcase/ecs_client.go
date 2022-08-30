@@ -64,7 +64,10 @@ func ECSClientTests() map[string]ECSClientTestCase {
 		},
 		"RunTaskFailsWithValidButNonexistentInput": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
 			out, err := c.RunTask(ctx, &awsECS.RunTaskInput{
-				Cluster:        aws.String(testutil.ECSClusterName()),
+				Cluster: aws.String(testutil.ECSClusterName()),
+				CapacityProviderStrategy: []*awsECS.CapacityProviderStrategyItem{
+					{CapacityProvider: aws.String(testutil.ECSCapacityProvider())},
+				},
 				TaskDefinition: aws.String(testutil.NewTaskDefinitionFamily(t) + ":1"),
 			})
 			assert.Error(t, err)
@@ -255,7 +258,10 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			assert.Equal(t, awsECS.TaskDefinitionStatusActive, utility.FromStringPtr(def.Status))
 
 			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
-				Cluster:        aws.String(testutil.ECSClusterName()),
+				Cluster: aws.String(testutil.ECSClusterName()),
+				CapacityProviderStrategy: []*awsECS.CapacityProviderStrategyItem{
+					{CapacityProvider: aws.String(testutil.ECSCapacityProvider())},
+				},
 				TaskDefinition: def.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
@@ -278,7 +284,10 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 			assert.Equal(t, awsECS.TaskDefinitionStatusActive, *def.Status)
 
 			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
-				Cluster:        aws.String(testutil.ECSClusterName()),
+				Cluster: aws.String(testutil.ECSClusterName()),
+				CapacityProviderStrategy: []*awsECS.CapacityProviderStrategyItem{
+					{CapacityProvider: aws.String(testutil.ECSCapacityProvider())},
+				},
 				TaskDefinition: def.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
@@ -326,7 +335,10 @@ func ECSClientRegisteredTaskDefinitionTests() map[string]ECSClientRegisteredTask
 		},
 		"ListTasksSucceeds": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, def awsECS.TaskDefinition) {
 			runOut, err := c.RunTask(ctx, &awsECS.RunTaskInput{
-				Cluster:        aws.String(testutil.ECSClusterName()),
+				Cluster: aws.String(testutil.ECSClusterName()),
+				CapacityProviderStrategy: []*awsECS.CapacityProviderStrategyItem{
+					{CapacityProvider: aws.String(testutil.ECSCapacityProvider())},
+				},
 				TaskDefinition: def.TaskDefinitionArn,
 			})
 			require.NoError(t, err)
