@@ -31,6 +31,7 @@ func CheckAWSEnvVarsForECS(t *testing.T) {
 		"AWS_ECS_TASK_DEFINITION_PREFIX",
 		"AWS_ECS_TASK_ROLE",
 		"AWS_ECS_EXECUTION_ROLE",
+		"AWS_ECS_CAPACITY_PROVIDER",
 	)
 }
 
@@ -59,6 +60,7 @@ func CheckAWSEnvVarsForECSAndSecretsManager(t *testing.T) {
 		"AWS_ECS_TASK_DEFINITION_PREFIX",
 		"AWS_ECS_TASK_ROLE",
 		"AWS_ECS_EXECUTION_ROLE",
+		"AWS_ECS_CAPACITY_PROVIDER",
 	)
 }
 

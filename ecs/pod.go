@@ -141,10 +141,7 @@ func (p *BasicECSPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatus
 	if len(out.Failures) != 0 {
 		catcher := grip.NewBasicCatcher()
 		for _, f := range out.Failures {
-			if f == nil {
-				continue
-			}
-			catcher.Add(ConvertFailureToError(*f))
+			catcher.Add(ConvertFailureToError(f))
 		}
 		return nil, errors.Wrap(catcher.Resolve(), "describing task")
 	}
