@@ -18,7 +18,7 @@ import (
 const defaultTestTimeout = time.Minute
 
 func TestBasicECSClient(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicECSClient{})
+	assert.Implements(t, (*cocoa.ECSClient)(nil), &BasicClient{})
 
 	testutil.CheckAWSEnvVarsForECS(t)
 
@@ -28,7 +28,7 @@ func TestBasicECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicECSClient(testutil.ValidIntegrationAWSOptions(hc))
+	c, err := NewBasicClient(testutil.ValidIntegrationAWSOptions(hc))
 	require.NoError(t, err)
 	require.NotNil(t, c)
 

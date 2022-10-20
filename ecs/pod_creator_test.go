@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicECSPodCreator(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &BasicECSPodCreator{})
+func TestBasicPodCreator(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSPodCreator)(nil), &BasicPodCreator{})
 
 	testutil.CheckAWSEnvVarsForECSAndSecretsManager(t)
 
@@ -24,22 +24,22 @@ func TestBasicECSPodCreator(t *testing.T) {
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault){
 		"NewPodCreatorFailsWithMissingClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicECSPodCreator(nil, nil)
+			podCreator, err := NewBasicPodCreator(nil, nil)
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
 		"NewPodCreatorFailsWithMissingClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicECSPodCreator(nil, v)
+			podCreator, err := NewBasicPodCreator(nil, v)
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
 		"NewPodCreatorSucceedsWithNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicECSPodCreator(c, nil)
+			podCreator, err := NewBasicPodCreator(c, nil)
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
 		"NewPodCreatorSucceedsWithClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicECSPodCreator(c, v)
+			podCreator, err := NewBasicPodCreator(c, v)
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
@@ -53,7 +53,7 @@ func TestBasicECSPodCreator(t *testing.T) {
 
 			awsOpts := testutil.ValidNonIntegrationAWSOptions()
 
-			c, err := NewBasicECSClient(awsOpts)
+			c, err := NewBasicClient(awsOpts)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
@@ -86,7 +86,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
 
-	c, err := NewBasicECSClient(awsOpts)
+	c, err := NewBasicClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -100,7 +100,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicECSPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(c, nil)
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -124,7 +124,7 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, m)
 
-			pc, err := NewBasicECSPodCreator(c, m)
+			pc, err := NewBasicPodCreator(c, m)
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -144,7 +144,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicECSPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(c, nil)
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc, *registerOut.TaskDefinition)
