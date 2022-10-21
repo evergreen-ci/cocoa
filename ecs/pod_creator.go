@@ -12,26 +12,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BasicECSPodCreator provides an cocoa.ECSPodCreator implementation to create
+// BasicPodCreator provides an cocoa.ECSPodCreator implementation to create
 // AWS ECS pods.
-type BasicECSPodCreator struct {
+type BasicPodCreator struct {
 	client cocoa.ECSClient
 	vault  cocoa.Vault
 }
 
-// NewBasicECSPodCreator creates a helper to create pods backed by AWS ECS.
-func NewBasicECSPodCreator(c cocoa.ECSClient, v cocoa.Vault) (*BasicECSPodCreator, error) {
+// NewBasicPodCreator creates a helper to create pods backed by AWS ECS.
+func NewBasicPodCreator(c cocoa.ECSClient, v cocoa.Vault) (*BasicPodCreator, error) {
 	if c == nil {
 		return nil, errors.New("missing client")
 	}
-	return &BasicECSPodCreator{
+	return &BasicPodCreator{
 		client: c,
 		vault:  v,
 	}, nil
 }
 
 // CreatePod creates a new pod backed by AWS ECS.
-func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
+func (pc *BasicPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCreationOptions) (cocoa.ECSPod, error) {
 	mergedPodCreationOpts := cocoa.MergeECSPodCreationOptions(opts...)
 	var mergedPodExecutionOpts cocoa.ECSPodExecutionOptions
 	if mergedPodCreationOpts.ExecutionOpts != nil {
@@ -78,7 +78,7 @@ func (pc *BasicECSPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPo
 
 // CreatePodFromExistingDefinition creates a new pod backed by AWS ECS from an
 // existing definition.
-func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
+func (pc *BasicPodCreator) CreatePodFromExistingDefinition(ctx context.Context, def cocoa.ECSTaskDefinition, opts ...cocoa.ECSPodExecutionOptions) (cocoa.ECSPod, error) {
 	if err := def.Validate(); err != nil {
 		return nil, errors.Wrap(err, "invalid task definition")
 	}
@@ -106,20 +106,20 @@ func (pc *BasicECSPodCreator) CreatePodFromExistingDefinition(ctx context.Contex
 }
 
 // createPod creates the basic ECS pod after its ECS task has been requested.
-func (pc *BasicECSPodCreator) createPod(cluster string, task ecs.Task, def cocoa.ECSTaskDefinition, containerDefs []cocoa.ECSContainerDefinition) (*BasicECSPod, error) {
+func (pc *BasicPodCreator) createPod(cluster string, task ecs.Task, def cocoa.ECSTaskDefinition, containerDefs []cocoa.ECSContainerDefinition) (*BasicPod, error) {
 	resources := cocoa.NewECSPodResources().
 		SetCluster(cluster).
 		SetContainers(pc.translateContainerResources(task.Containers, containerDefs)).
 		SetTaskDefinition(def).
 		SetTaskID(utility.FromStringPtr(task.TaskArn))
 
-	podOpts := NewBasicECSPodOptions().
+	podOpts := NewBasicPodOptions().
 		SetClient(pc.client).
 		SetVault(pc.vault).
 		SetStatusInfo(translatePodStatusInfo(task)).
 		SetResources(*resources)
 
-	p, err := NewBasicECSPod(podOpts)
+	p, err := NewBasicPod(podOpts)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating basic pod")
 	}
@@ -157,7 +157,7 @@ func validateRegisterTaskDefinitionOutput(out *ecs.RegisterTaskDefinitionOutput)
 
 // runTask makes the request to run an ECS task from the execution options and
 // task definition and checks that it returns a valid task.
-func (pc *BasicECSPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExecutionOptions, def cocoa.ECSTaskDefinition) (*ecs.Task, error) {
+func (pc *BasicPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExecutionOptions, def cocoa.ECSTaskDefinition) (*ecs.Task, error) {
 	in := pc.exportTaskExecutionOptions(opts, def)
 	out, err := pc.client.RunTask(ctx, in)
 	if err != nil {
@@ -173,7 +173,7 @@ func (pc *BasicECSPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExec
 
 // validateRunTaskOutput checks that the output from running a task contains no
 // errors and includes the necessary information for the expected tasks.
-func (pc *BasicECSPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) error {
+func (pc *BasicPodCreator) validateRunTaskOutput(out *ecs.RunTaskOutput) error {
 	if len(out.Failures) > 0 {
 		catcher := grip.NewBasicCatcher()
 		for _, f := range out.Failures {
@@ -283,7 +283,7 @@ func ExportTags(tags map[string]string) []*ecs.Tag {
 
 // exportStrategy converts the strategy and parameter into an ECS placement
 // strategy.
-func (pc *BasicECSPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementStrategy {
+func (pc *BasicPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementStrategy {
 	var placementStrat ecs.PlacementStrategy
 	placementStrat.SetType(string(*opts.Strategy)).SetField(utility.FromStringPtr(opts.StrategyParameter))
 	return []*ecs.PlacementStrategy{&placementStrat}
@@ -291,7 +291,7 @@ func (pc *BasicECSPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions)
 
 // exportPlacementConstraints converts the placement options into ECS placement
 // constraints.
-func (pc *BasicECSPodCreator) exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
+func (pc *BasicPodCreator) exportPlacementConstraints(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementConstraint {
 	var constraints []*ecs.PlacementConstraint
 
 	for _, filter := range opts.InstanceFilters {
@@ -345,7 +345,7 @@ func exportSecrets(envVars []cocoa.EnvironmentVariable) []*ecs.Secret {
 
 // translateContainerResources translates the containers and stored secrets
 // into the resources associated with each container.
-func (pc *BasicECSPodCreator) translateContainerResources(containers []*ecs.Container, defs []cocoa.ECSContainerDefinition) []cocoa.ECSContainerResources {
+func (pc *BasicPodCreator) translateContainerResources(containers []*ecs.Container, defs []cocoa.ECSContainerDefinition) []cocoa.ECSContainerResources {
 	var resources []cocoa.ECSContainerResources
 
 	for _, container := range containers {
@@ -366,7 +366,7 @@ func (pc *BasicECSPodCreator) translateContainerResources(containers []*ecs.Cont
 
 // translateContainerSecrets translates the given secrets for a container into
 // a slice of container secrets.
-func (pc *BasicECSPodCreator) translateContainerSecrets(defs []cocoa.ECSContainerDefinition) []cocoa.ContainerSecret {
+func (pc *BasicPodCreator) translateContainerSecrets(defs []cocoa.ECSContainerDefinition) []cocoa.ContainerSecret {
 	var translated []cocoa.ContainerSecret
 
 	for _, def := range defs {
@@ -495,7 +495,7 @@ func exportRepoCreds(creds *cocoa.RepositoryCredentials) *ecs.RepositoryCredenti
 
 // exportTaskExecutionOptions converts execution options and a task definition
 // into an ECS task execution input.
-func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
+func (pc *BasicPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
 	var runTask ecs.RunTaskInput
 	runTask.SetCluster(utility.FromStringPtr(opts.Cluster)).
 		SetCapacityProviderStrategy(pc.exportCapacityProvider(opts.CapacityProvider)).
@@ -513,7 +513,7 @@ func (pc *BasicECSPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecut
 
 // exportCapacityProvider converts the capacity provider name into an ECS
 // capacity provider strategy.
-func (pc *BasicECSPodCreator) exportCapacityProvider(provider *string) []*ecs.CapacityProviderStrategyItem {
+func (pc *BasicPodCreator) exportCapacityProvider(provider *string) []*ecs.CapacityProviderStrategyItem {
 	if provider == nil {
 		return nil
 	}
@@ -539,7 +539,7 @@ func exportPortMappings(mappings []cocoa.PortMapping) []*ecs.PortMapping {
 }
 
 // exportAWSVPCOptions converts AWSVPC options into ECS AWSVPC options.
-func (pc *BasicECSPodCreator) exportAWSVPCOptions(opts *cocoa.AWSVPCOptions) *ecs.NetworkConfiguration {
+func (pc *BasicPodCreator) exportAWSVPCOptions(opts *cocoa.AWSVPCOptions) *ecs.NetworkConfiguration {
 	if opts == nil {
 		return nil
 	}

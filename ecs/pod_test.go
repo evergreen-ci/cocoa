@@ -13,16 +13,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicECSPod(t *testing.T) {
-	assert.Implements(t, (*cocoa.ECSPod)(nil), &BasicECSPod{})
+func TestBasicPod(t *testing.T) {
+	assert.Implements(t, (*cocoa.ECSPod)(nil), &BasicPod{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient){
 		"InvalidPodOptions": func(ctx context.Context, t *testing.T, c cocoa.ECSClient) {
-			opts := NewBasicECSPodOptions()
-			p, err := NewBasicECSPod(opts)
+			opts := NewBasicPodOptions()
+			p, err := NewBasicPod(opts)
 			require.Error(t, err)
 			require.Zero(t, p)
 		},
@@ -34,9 +34,9 @@ func TestBasicECSPod(t *testing.T) {
 					SetContainerID("container_id").
 					SetName("name").
 					SetStatus(cocoa.StatusRunning))
-			opts := NewBasicECSPodOptions().SetClient(c).SetResources(*res).SetStatusInfo(*ps)
+			opts := NewBasicPodOptions().SetClient(c).SetResources(*res).SetStatusInfo(*ps)
 
-			p, err := NewBasicECSPod(opts)
+			p, err := NewBasicPod(opts)
 			require.NoError(t, err)
 
 			podRes := p.Resources()
@@ -48,7 +48,7 @@ func TestBasicECSPod(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
@@ -70,7 +70,7 @@ func TestECSPod(t *testing.T) {
 
 	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
 
-	c, err := NewBasicECSClient(awsOpts)
+	c, err := NewBasicClient(awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -95,7 +95,7 @@ func TestECSPod(t *testing.T) {
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
 
-			pc, err := NewBasicECSPodCreator(c, v)
+			pc, err := NewBasicPodCreator(c, v)
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc, c, v)
@@ -103,21 +103,21 @@ func TestECSPod(t *testing.T) {
 	}
 }
 
-func TestBasicECSPodOptions(t *testing.T) {
+func TestBasicPodOptions(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
-	t.Run("NewBasicECSPodOptions", func(t *testing.T) {
-		opts := NewBasicECSPodOptions()
+	t.Run("NewBasicPodOptions", func(t *testing.T) {
+		opts := NewBasicPodOptions()
 		require.NotZero(t, opts)
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetClient", func(t *testing.T) {
-		c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+		c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, err)
 		}()
-		opts := NewBasicECSPodOptions().SetClient(c)
+		opts := NewBasicPodOptions().SetClient(c)
 		assert.Equal(t, c, opts.Client)
 	})
 	t.Run("SetVault", func(t *testing.T) {
@@ -125,18 +125,18 @@ func TestBasicECSPodOptions(t *testing.T) {
 		require.NoError(t, err)
 		v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(c))
 		require.NoError(t, err)
-		opts := NewBasicECSPodOptions().SetVault(v)
+		opts := NewBasicPodOptions().SetVault(v)
 		assert.Equal(t, v, opts.Vault)
 	})
 	t.Run("SetResources", func(t *testing.T) {
 		res := cocoa.NewECSPodResources().SetTaskID("id")
-		opts := NewBasicECSPodOptions().SetResources(*res)
+		opts := NewBasicPodOptions().SetResources(*res)
 		require.NotZero(t, opts.Resources)
 		assert.Equal(t, *res, *opts.Resources)
 	})
 	t.Run("SetStatusInfo", func(t *testing.T) {
 		ps := cocoa.NewECSPodStatusInfo().SetStatus(cocoa.StatusRunning)
-		opts := NewBasicECSPodOptions().SetStatusInfo(*ps)
+		opts := NewBasicPodOptions().SetStatusInfo(*ps)
 		require.NotNil(t, opts.StatusInfo)
 		assert.Equal(t, *ps, *opts.StatusInfo)
 	})
@@ -158,17 +158,17 @@ func TestBasicECSPodOptions(t *testing.T) {
 					SetStatus(cocoa.StatusRunning))
 		}
 		t.Run("FailsWithEmpty", func(t *testing.T) {
-			opts := NewBasicECSPodOptions()
+			opts := NewBasicPodOptions()
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			smClient, err := secret.NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetVault(v).
 				SetResources(validResources()).
@@ -180,50 +180,50 @@ func TestBasicECSPodOptions(t *testing.T) {
 			require.NoError(t, err)
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smClient))
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetVault(v).
 				SetResources(validResources()).
 				SetStatusInfo(validStatusInfo())
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithoutVault", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetResources(validResources()).
 				SetStatusInfo(validStatusInfo())
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutResources", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetStatusInfo(validStatusInfo())
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithBadResources", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetResources(*cocoa.NewECSPodResources()).
 				SetStatusInfo(validStatusInfo())
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithoutStatus", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetResources(validResources())
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithBadStatus", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			opts := NewBasicECSPodOptions().
+			opts := NewBasicPodOptions().
 				SetClient(ecsClient).
 				SetResources(validResources()).
 				SetStatusInfo(*cocoa.NewECSPodStatusInfo())

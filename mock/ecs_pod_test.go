@@ -47,7 +47,7 @@ func TestECSPod(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicECSPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(c, mv)
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 
@@ -76,7 +76,7 @@ func TestECSPod(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicECSPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(c, mv)
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 
@@ -120,8 +120,8 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			SetExecutionOptions(*execOpts)
 	}
 
-	makePod := func(opts *ecs.BasicECSPodOptions) (*ECSPod, error) {
-		p, err := ecs.NewBasicECSPod(opts)
+	makePod := func(opts *ecs.BasicPodOptions) (*ECSPod, error) {
+		p, err := ecs.NewBasicPod(opts)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +177,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			res.Containers = nil
 			ps := p.StatusInfo()
 			ps.Containers = nil
-			podOpts := ecs.NewBasicECSPodOptions().
+			podOpts := ecs.NewBasicPodOptions().
 				SetClient(c).
 				SetResources(res).
 				SetStatusInfo(ps)
@@ -224,7 +224,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 			res := p.Resources()
 			res.TaskDefinition = nil
-			podOpts := ecs.NewBasicECSPodOptions().
+			podOpts := ecs.NewBasicPodOptions().
 				SetClient(c).
 				SetResources(res).
 				SetStatusInfo(p.StatusInfo())
@@ -316,7 +316,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			p, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
-			podOpts := ecs.NewBasicECSPodOptions().
+			podOpts := ecs.NewBasicPodOptions().
 				SetClient(c).
 				SetResources(p.Resources()).
 				SetStatusInfo(p.StatusInfo())
@@ -347,7 +347,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			res.Containers = nil
 			ps := p.StatusInfo()
 			ps.Containers = nil
-			podOpts := ecs.NewBasicECSPodOptions().
+			podOpts := ecs.NewBasicPodOptions().
 				SetClient(c).
 				SetResources(res).
 				SetStatusInfo(ps)

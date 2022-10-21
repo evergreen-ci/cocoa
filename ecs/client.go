@@ -16,16 +16,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BasicECSClient provides a cocoa.ECSClient implementation that wraps the AWS
+// BasicClient provides a cocoa.ECSClient implementation that wraps the AWS
 // ECS API. It supports retrying requests using exponential backoff and jitter.
-type BasicECSClient struct {
+type BasicClient struct {
 	awsutil.BaseClient
 	ecs *ecs.ECS
 }
 
-// NewBasicECSClient creates a new AWS ECS client from the given options.
-func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
-	c := &BasicECSClient{
+// NewBasicClient creates a new AWS ECS client from the given options.
+func NewBasicClient(opts awsutil.ClientOptions) (*BasicClient, error) {
+	c := &BasicClient{
 		BaseClient: awsutil.NewBaseClient(opts),
 	}
 	if err := c.setup(); err != nil {
@@ -35,7 +35,7 @@ func NewBasicECSClient(opts awsutil.ClientOptions) (*BasicECSClient, error) {
 	return c, nil
 }
 
-func (c *BasicECSClient) setup() error {
+func (c *BasicClient) setup() error {
 	if c.ecs != nil {
 		return nil
 	}
@@ -51,7 +51,7 @@ func (c *BasicECSClient) setup() error {
 }
 
 // RegisterTaskDefinition registers a new task definition.
-func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
+func (c *BasicClient) RegisterTaskDefinition(ctx context.Context, in *ecs.RegisterTaskDefinitionInput) (*ecs.RegisterTaskDefinitionOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -76,7 +76,7 @@ func (c *BasicECSClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Reg
 }
 
 // DescribeTaskDefinition describes an existing task definition.
-func (c *BasicECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
+func (c *BasicClient) DescribeTaskDefinition(ctx context.Context, in *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -101,7 +101,7 @@ func (c *BasicECSClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Des
 
 // ListTaskDefinitions returns the ARNs for the task definitions that match the
 // input filters.
-func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
+func (c *BasicClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskDefinitionsInput) (*ecs.ListTaskDefinitionsOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -125,7 +125,7 @@ func (c *BasicECSClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTa
 }
 
 // DeregisterTaskDefinition deregisters an existing task definition.
-func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
+func (c *BasicClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.DeregisterTaskDefinitionInput) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -150,7 +150,7 @@ func (c *BasicECSClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.D
 }
 
 // RunTask runs a new task.
-func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
+func (c *BasicClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.RunTaskOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -205,7 +205,7 @@ func (c *BasicECSClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ec
 }
 
 // DescribeTasks describes one or more existing tasks.
-func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
+func (c *BasicClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksInput) (*ecs.DescribeTasksOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -229,7 +229,7 @@ func (c *BasicECSClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTask
 }
 
 // ListTasks returns the ARNs for the task that match the input filters.
-func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
+func (c *BasicClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*ecs.ListTasksOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -253,7 +253,7 @@ func (c *BasicECSClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) 
 }
 
 // StopTask stops a running task.
-func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
+func (c *BasicClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs.StopTaskOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -280,7 +280,7 @@ func (c *BasicECSClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*
 }
 
 // TagResource adds tags to an existing resource in ECS.
-func (c *BasicECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error) {
+func (c *BasicClient) TagResource(ctx context.Context, in *ecs.TagResourceInput) (*ecs.TagResourceOutput, error) {
 	if err := c.setup(); err != nil {
 		return nil, errors.Wrap(err, "setting up client")
 	}
@@ -304,13 +304,13 @@ func (c *BasicECSClient) TagResource(ctx context.Context, in *ecs.TagResourceInp
 }
 
 // Close cleans up all resources owned by the client.
-func (c *BasicECSClient) Close(ctx context.Context) error {
+func (c *BasicClient) Close(ctx context.Context) error {
 	return c.BaseClient.Close(ctx)
 }
 
 // isNonRetryableErrorCode returns whether or not the error code from ECS is
 // known to be not retryable.
-func (c *BasicECSClient) isNonRetryableErrorCode(code string) bool {
+func (c *BasicClient) isNonRetryableErrorCode(code string) bool {
 	switch code {
 	case ecs.ErrCodeAccessDeniedException,
 		ecs.ErrCodeClientException,

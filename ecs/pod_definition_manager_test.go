@@ -23,7 +23,7 @@ func TestBasicPodDefinitionManager(t *testing.T) {
 	defer utility.PutHTTPClient(hc)
 
 	t.Run("NewPodDefinitionManager", func(t *testing.T) {
-		c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+		c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, c.Close(ctx))
@@ -52,7 +52,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 
 	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
 
-	c, err := NewBasicECSClient(awsOpts)
+	c, err := NewBasicClient(awsOpts)
 	require.NoError(t, err)
 	require.NotZero(t, c)
 	defer func() {
@@ -113,7 +113,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetClient", func(t *testing.T) {
-		c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+		c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		opts := NewBasicPodDefinitionManagerOptions().SetClient(c)
 		assert.Equal(t, c, opts.Client)
@@ -143,7 +143,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
-			ecsClient, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			ecsClient, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			smClient, err := secret.NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithCacheTagButNoCache", func(t *testing.T) {
-			c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetClient(c).
@@ -176,7 +176,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("DefaultsCacheTagWithCache", func(t *testing.T) {
-			c, err := NewBasicECSClient(testutil.ValidNonIntegrationAWSOptions())
+			c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetClient(c).
