@@ -17,17 +17,15 @@ import (
 // BasicSecretsManager provides a cocoa.Vault implementation backed by AWS
 // Secrets Manager.
 type BasicSecretsManager struct {
-	client   cocoa.SecretsManagerClient
-	cache    cocoa.SecretCache
-	cacheTag string
+	client cocoa.SecretsManagerClient
+	cache  cocoa.SecretCache
 }
 
 // BasicSecretsManagerOptions are options to create a basic Secrets Manager
 // vault that's optionally backed by a cache.
 type BasicSecretsManagerOptions struct {
-	Client   cocoa.SecretsManagerClient
-	Cache    cocoa.SecretCache
-	CacheTag *string
+	Client cocoa.SecretsManagerClient
+	Cache  cocoa.SecretCache
 }
 
 // NewBasicSecretsManagerOptions returns new uninitialized options to create a
@@ -49,12 +47,6 @@ func (o *BasicSecretsManagerOptions) SetCache(sc cocoa.SecretCache) *BasicSecret
 	return o
 }
 
-// SetCacheTag sets the tag used to track pod definitions in the cloud.
-func (o *BasicSecretsManagerOptions) SetCacheTag(tag string) *BasicSecretsManagerOptions {
-	o.CacheTag = &tag
-	return o
-}
-
 var (
 	defaultCacheTrackingTag = "cocoa-tracked"
 )
@@ -64,13 +56,8 @@ var (
 func (o *BasicSecretsManagerOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(o.Client == nil, "must specify a client")
-	catcher.NewWhen(o.CacheTag != nil && o.Cache == nil, "cannot specify a cache tracking tag when there is no cache")
 	if catcher.HasErrors() {
 		return catcher.Resolve()
-	}
-
-	if o.CacheTag == nil {
-		o.CacheTag = &defaultCacheTrackingTag
 	}
 
 	return nil
@@ -82,9 +69,8 @@ func NewBasicSecretsManager(opts BasicSecretsManagerOptions) (*BasicSecretsManag
 		return nil, errors.Wrap(err, "invalid options")
 	}
 	return &BasicSecretsManager{
-		client:   opts.Client,
-		cache:    opts.Cache,
-		cacheTag: utility.FromStringPtr(opts.CacheTag),
+		client: opts.Client,
+		cache:  opts.Cache,
 	}, nil
 }
 
@@ -105,7 +91,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 		// track whether the secret has been created but has not been
 		// successfully cached. In that case, the application can query Secrets
 		// Manager for secrets that are tagged as untracked to clean them up.
-		in.Tags = ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(false)})
+		in.Tags = ExportTags(map[string]string{m.getCacheTag(): strconv.FormatBool(false)})
 	}
 
 	out, err := m.client.CreateSecret(ctx, in)
@@ -146,7 +132,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 	// that it's being tracked.
 	if _, err := m.client.TagResource(ctx, &secretsmanager.TagResourceInput{
 		SecretId: aws.String(arn),
-		Tags:     ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
+		Tags:     ExportTags(map[string]string{m.getCacheTag(): strconv.FormatBool(true)}),
 	}); err != nil {
 		return "", errors.Wrapf(err, "re-tagging secret cache item '%s' named '%s' to indicate that it is tracked", item.ID, item.Name)
 	}
@@ -209,6 +195,18 @@ func (m *BasicSecretsManager) DeleteSecret(ctx context.Context, id string) error
 
 func (m *BasicSecretsManager) usesCache() bool {
 	return m.cache != nil
+}
+
+// getCacheTag returns the configured or default cache tracking tag if it is
+// using a cache. if it is not caching, this returns the empty string.
+func (m *BasicSecretsManager) getCacheTag() string {
+	if !m.usesCache() {
+		return ""
+	}
+	if t := m.cache.GetTag(); t != "" {
+		return t
+	}
+	return defaultCacheTrackingTag
 }
 
 // ExportTags converts a mapping of tag names to values into Secrets Manager

@@ -2,16 +2,6 @@ package cocoa
 
 import "context"
 
-// ECSPodDefinitionCache represents an external cache that tracks pod
-// definitions.
-type ECSPodDefinitionCache interface {
-	// Put adds a new pod definition item or or updates an existing pod
-	// definition item.
-	Put(ctx context.Context, item ECSPodDefinitionItem) error
-	// Delete deletes by its unique identifier in ECS.
-	Delete(ctx context.Context, id string) error
-}
-
 // ECSPodDefinitionItem represents an item that can be cached in a
 // ECSPodDefinitionCache.
 type ECSPodDefinitionItem struct {

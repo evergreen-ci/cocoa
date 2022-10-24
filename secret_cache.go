@@ -10,6 +10,9 @@ type SecretCache interface {
 	// Delete deletes an existing secret with the given external resource
 	// identifier from the cache.
 	Delete(ctx context.Context, id string) error
+	// GetTag returns the name of the tracking tag to use for the secret.
+	// Implementations are allowed to return an empty string.
+	GetTag() string
 }
 
 // SecretCacheItem represents an item that can be cached in a SecretCache.

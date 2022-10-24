@@ -132,11 +132,6 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 		require.NotZero(t, opts.Cache)
 		assert.Equal(t, pdc, opts.Cache)
 	})
-	t.Run("SetCacheTag", func(t *testing.T) {
-		tag := "tag"
-		opts := NewBasicPodDefinitionManagerOptions().SetCacheTag(tag)
-		assert.Equal(t, tag, utility.FromStringPtr(opts.CacheTag))
-	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("FailsWithEmpty", func(t *testing.T) {
 			opts := NewBasicPodDefinitionManagerOptions()
@@ -152,8 +147,7 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetClient(ecsClient).
 				SetVault(v).
-				SetCache(&testutil.NoopECSPodDefinitionCache{}).
-				SetCacheTag("tag")
+				SetCache(&testutil.NoopECSPodDefinitionCache{Tag: "tag"})
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutClient", func(t *testing.T) {
@@ -163,26 +157,8 @@ func TestBasicPodDefinitionManagerOptions(t *testing.T) {
 			require.NoError(t, err)
 			opts := NewBasicPodDefinitionManagerOptions().
 				SetVault(v).
-				SetCache(&testutil.NoopECSPodDefinitionCache{}).
-				SetCacheTag("tag")
+				SetCache(&testutil.NoopECSPodDefinitionCache{Tag: "tag"})
 			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithCacheTagButNoCache", func(t *testing.T) {
-			c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
-			require.NoError(t, err)
-			opts := NewBasicPodDefinitionManagerOptions().
-				SetClient(c).
-				SetCacheTag("tag")
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("DefaultsCacheTagWithCache", func(t *testing.T) {
-			c, err := NewBasicClient(testutil.ValidNonIntegrationAWSOptions())
-			require.NoError(t, err)
-			opts := NewBasicPodDefinitionManagerOptions().
-				SetClient(c).
-				SetCache(&testutil.NoopECSPodDefinitionCache{})
-			assert.NoError(t, opts.Validate())
-			assert.Equal(t, defaultCacheTrackingTag, utility.FromStringPtr(opts.CacheTag))
 		})
 	})
 }
