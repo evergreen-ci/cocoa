@@ -7,8 +7,10 @@ import (
 )
 
 // NoopSecretCache is an implementation of cocoa.SecretCache that no-ops for all
-// operations.
-type NoopSecretCache struct{}
+// cache modification operations.
+type NoopSecretCache struct {
+	Tag string
+}
 
 // Put is a no-op.
 func (c *NoopSecretCache) Put(context.Context, cocoa.SecretCacheItem) error {
@@ -18,4 +20,9 @@ func (c *NoopSecretCache) Put(context.Context, cocoa.SecretCacheItem) error {
 // Delete is a no-op.
 func (c *NoopSecretCache) Delete(context.Context, string) error {
 	return nil
+}
+
+// GetTag returns the cache tag field.
+func (c *NoopSecretCache) GetTag() string {
+	return c.Tag
 }

@@ -16,19 +16,17 @@ import (
 // templates used to run pods. It can be optionally backed by an external
 // cache to keep track of the pod definitions.
 type BasicPodDefinitionManager struct {
-	client   cocoa.ECSClient
-	vault    cocoa.Vault
-	cache    cocoa.ECSPodDefinitionCache
-	cacheTag string
+	client cocoa.ECSClient
+	vault  cocoa.Vault
+	cache  cocoa.ECSPodDefinitionCache
 }
 
 // BasicPodDefinitionManagerOptions are options to create a basic ECS pod
 // definition manager that's optionally backed by a cache.
 type BasicPodDefinitionManagerOptions struct {
-	Client   cocoa.ECSClient
-	Vault    cocoa.Vault
-	Cache    cocoa.ECSPodDefinitionCache
-	CacheTag *string
+	Client cocoa.ECSClient
+	Vault  cocoa.Vault
+	Cache  cocoa.ECSPodDefinitionCache
 }
 
 // NewBasicPodDefinitionManagerOptions returns new uninitialized options to
@@ -55,12 +53,6 @@ func (o *BasicPodDefinitionManagerOptions) SetCache(pdc cocoa.ECSPodDefinitionCa
 	return o
 }
 
-// SetCacheTag sets the tag used to track pod definitions in the cloud.
-func (o *BasicPodDefinitionManagerOptions) SetCacheTag(tag string) *BasicPodDefinitionManagerOptions {
-	o.CacheTag = &tag
-	return o
-}
-
 var (
 	defaultCacheTrackingTag = "cocoa-tracked"
 )
@@ -70,13 +62,8 @@ var (
 func (o *BasicPodDefinitionManagerOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(o.Client == nil, "must specify a client")
-	catcher.NewWhen(o.CacheTag != nil && o.Cache == nil, "cannot specify a cache tracking tag when there is no cache")
 	if catcher.HasErrors() {
 		return catcher.Resolve()
-	}
-
-	if o.CacheTag == nil {
-		o.CacheTag = &defaultCacheTrackingTag
 	}
 
 	return nil
@@ -89,10 +76,9 @@ func NewBasicPodDefinitionManager(opts BasicPodDefinitionManagerOptions) (*Basic
 		return nil, errors.Wrap(err, "invalid options")
 	}
 	return &BasicPodDefinitionManager{
-		client:   opts.Client,
-		vault:    opts.Vault,
-		cache:    opts.Cache,
-		cacheTag: utility.FromStringPtr(opts.CacheTag),
+		client: opts.Client,
+		vault:  opts.Vault,
+		cache:  opts.Cache,
 	}, nil
 }
 
@@ -110,7 +96,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 		// has not been successfully cached. In that case, the application can
 		// query ECS for pod definitions that are tagged as untracked to clean
 		// them up.
-		mergedOpts.AddTags(map[string]string{m.cacheTag: strconv.FormatBool(false)})
+		mergedOpts.AddTags(map[string]string{m.getCacheTag(): strconv.FormatBool(false)})
 	}
 
 	if err := createSecrets(ctx, m.vault, &mergedOpts); err != nil {
@@ -139,7 +125,7 @@ func (m *BasicPodDefinitionManager) CreatePodDefinition(ctx context.Context, opt
 	// it to indicate that it's being tracked.
 	if _, err := m.client.TagResource(ctx, &ecs.TagResourceInput{
 		ResourceArn: aws.String(item.ID),
-		Tags:        ExportTags(map[string]string{m.cacheTag: strconv.FormatBool(true)}),
+		Tags:        ExportTags(map[string]string{m.getCacheTag(): strconv.FormatBool(true)}),
 	}); err != nil {
 		return nil, errors.Wrapf(err, "re-tagging pod definition item '%s' named '%s' to indicate that it is tracked", item.ID, utility.FromStringPtr(item.DefinitionOpts.Name))
 	}
@@ -165,4 +151,16 @@ func (m *BasicPodDefinitionManager) DeletePodDefinition(ctx context.Context, id 
 
 func (m *BasicPodDefinitionManager) usesCache() bool {
 	return m.cache != nil
+}
+
+// getCacheTag returns the configured or default cache tracking tag if it is
+// using a cache. If it is not caching, this returns the empty string.
+func (m *BasicPodDefinitionManager) getCacheTag() string {
+	if !m.usesCache() {
+		return ""
+	}
+	if t := m.cache.GetTag(); t != "" {
+		return t
+	}
+	return defaultCacheTrackingTag
 }

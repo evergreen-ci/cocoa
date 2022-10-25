@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 )
 
 // SecretCache provides a mock implementation of a cocoa.SecretCache backed by
@@ -16,6 +17,8 @@ type SecretCache struct {
 
 	DeleteInput *string
 	DeleteError error
+
+	Tag *string
 }
 
 // NewSecretCache creates a mock secret cache backed by the given secret cache.
@@ -49,4 +52,14 @@ func (c *SecretCache) Delete(ctx context.Context, id string) error {
 	}
 
 	return c.SecretCache.Delete(ctx, id)
+}
+
+// GetTag returns the cache tracking tag. The mock output can be customized. By
+// default, it will return the tag from the backing secret cache.
+func (c *SecretCache) GetTag() string {
+	if c.Tag != nil {
+		return utility.FromStringPtr(c.Tag)
+	}
+
+	return c.SecretCache.GetTag()
 }

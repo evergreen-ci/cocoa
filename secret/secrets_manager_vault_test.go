@@ -98,11 +98,6 @@ func TestBasicSecretsManagerOptions(t *testing.T) {
 		require.NotZero(t, opts.Cache)
 		assert.Equal(t, sc, opts.Cache)
 	})
-	t.Run("SetCacheTag", func(t *testing.T) {
-		tag := "tag"
-		opts := NewBasicSecretsManagerOptions().SetCacheTag(tag)
-		assert.Equal(t, tag, utility.FromStringPtr(opts.CacheTag))
-	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("FailsWithEmpty", func(t *testing.T) {
 			opts := NewBasicSecretsManagerOptions()
@@ -113,32 +108,13 @@ func TestBasicSecretsManagerOptions(t *testing.T) {
 			require.NoError(t, err)
 			opts := NewBasicSecretsManagerOptions().
 				SetClient(smClient).
-				SetCache(&testutil.NoopSecretCache{}).
-				SetCacheTag("tag")
+				SetCache(&testutil.NoopSecretCache{Tag: "tag"})
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("FailsWithoutClient", func(t *testing.T) {
 			opts := NewBasicSecretsManagerOptions().
-				SetCache(&testutil.NoopSecretCache{}).
-				SetCacheTag("tag")
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithCacheTagButNoCache", func(t *testing.T) {
-			c, err := NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
-			require.NoError(t, err)
-			opts := NewBasicSecretsManagerOptions().
-				SetClient(c).
-				SetCacheTag("tag")
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("DefaultsCacheTagWithCache", func(t *testing.T) {
-			c, err := NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
-			require.NoError(t, err)
-			opts := NewBasicSecretsManagerOptions().
-				SetClient(c).
 				SetCache(&testutil.NoopSecretCache{})
-			assert.NoError(t, opts.Validate())
-			assert.Equal(t, defaultCacheTrackingTag, utility.FromStringPtr(opts.CacheTag))
+			assert.Error(t, opts.Validate())
 		})
 	})
 }

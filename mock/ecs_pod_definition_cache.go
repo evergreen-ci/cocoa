@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/evergreen-ci/cocoa"
+	"github.com/evergreen-ci/utility"
 )
 
 // ECSPodDefinitionCache provides a mock implementation of a
@@ -17,6 +18,8 @@ type ECSPodDefinitionCache struct {
 
 	DeleteInput *string
 	DeleteError error
+
+	Tag *string
 }
 
 // NewECSPodDefinitionCache creates a mock ECS pod definition cache backed
@@ -52,4 +55,14 @@ func (c *ECSPodDefinitionCache) Delete(ctx context.Context, id string) error {
 	}
 
 	return c.ECSPodDefinitionCache.Delete(ctx, id)
+}
+
+// GetTag returns the cache tracking tag. The mock output can be customized. By
+// default, it will return the tag from the backing ECS pod definition cache.
+func (c *ECSPodDefinitionCache) GetTag() string {
+	if c.Tag != nil {
+		return utility.FromStringPtr(c.Tag)
+	}
+
+	return c.ECSPodDefinitionCache.GetTag()
 }
