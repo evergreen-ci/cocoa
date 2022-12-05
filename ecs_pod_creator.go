@@ -114,12 +114,6 @@ type ECSPodDefinitionOptions struct {
 	// specified, then each container is required to specify its own CPU.
 	// This is ignored for pods running Windows containers.
 	CPU *int
-	// NetworkMode describes the networking capabilities of the pod's
-	// containers. If the NetworkMode is unspecified for a pod running Linux
-	// containers, the default value is NetworkModeBridge. If the NetworkMode is
-	// unspecified for a pod running Windows containers, the default network
-	// mode is to use the Windows NAT network.
-	NetworkMode *ECSNetworkMode
 	// TaskRole is the role that the pod can use. Depending on the
 	// configuration, this may be required if
 	// (ECSPodExecutionOptions).SupportsDebugMode is true.
@@ -127,6 +121,12 @@ type ECSPodDefinitionOptions struct {
 	// ExecutionRole is the role that ECS container agent can use. Depending on
 	// the configuration, this may be required if the container uses secrets.
 	ExecutionRole *string
+	// NetworkMode describes the networking capabilities of the pod's
+	// containers. If the NetworkMode is unspecified for a pod running Linux
+	// containers, the default value is NetworkModeBridge. If the NetworkMode is
+	// unspecified for a pod running Windows containers, the default network
+	// mode is to use the Windows NAT network.
+	NetworkMode *ECSNetworkMode
 	// Tags are resource tags to apply to the pod definition.
 	Tags map[string]string
 }
@@ -160,14 +160,26 @@ func (o *ECSPodDefinitionOptions) AddContainerDefinitions(defs ...ECSContainerDe
 // SetMemoryMB sets the memory limit (in MB) that applies across the entire
 // pod's containers.
 func (o *ECSPodDefinitionOptions) SetMemoryMB(mem int) *ECSPodDefinitionOptions {
-	o.MemoryMB = &mem
+	o.MemoryMB = utility.ToIntPtr(mem)
 	return o
 }
 
 // SetCPU sets the CPU limit (in CPU units) that applies across the entire pod's
 // containers.
 func (o *ECSPodDefinitionOptions) SetCPU(cpu int) *ECSPodDefinitionOptions {
-	o.CPU = &cpu
+	o.CPU = utility.ToIntPtr(cpu)
+	return o
+}
+
+// SetTaskRole sets the task role that the pod can use.
+func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOptions {
+	o.TaskRole = utility.ToStringPtr(role)
+	return o
+}
+
+// SetExecutionRole sets the execution role that the pod can use.
+func (o *ECSPodDefinitionOptions) SetExecutionRole(role string) *ECSPodDefinitionOptions {
+	o.ExecutionRole = utility.ToStringPtr(role)
 	return o
 }
 
@@ -175,18 +187,6 @@ func (o *ECSPodDefinitionOptions) SetCPU(cpu int) *ECSPodDefinitionOptions {
 // containers.
 func (o *ECSPodDefinitionOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodDefinitionOptions {
 	o.NetworkMode = &mode
-	return o
-}
-
-// SetTaskRole sets the task role that the pod can use.
-func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOptions {
-	o.TaskRole = &role
-	return o
-}
-
-// SetExecutionRole sets the execution role that the pod can use.
-func (o *ECSPodDefinitionOptions) SetExecutionRole(role string) *ECSPodDefinitionOptions {
-	o.ExecutionRole = &role
 	return o
 }
 
@@ -440,26 +440,26 @@ type ECSContainerDefinition struct {
 	// Name is the friendly name of the container. By default, this is a random
 	// string.
 	Name *string
+	// MemoryMB is the amount of memory (in MB) to allocate. This must be set if
+	// a pod-level memory limit is not given.
+	MemoryMB *int
+	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
+	// to 1 vCPU on a machine. This must be set if a pod-level CPU limit is not
+	// given.
+	CPU *int
 	// Image is the Docker image to use. This is required.
 	Image *string
+	// RepoCreds are private repository credentials for using images that
+	// require authentication.
+	RepoCreds *RepositoryCredentials
 	// Command is the command to run, separated into individual arguments. By
 	// default, there is no command.
 	Command []string
 	// WorkingDir is the container working directory in which commands will be
 	// run.
 	WorkingDir *string
-	// MemoryMB is the amount of memory (in MB) to allocate. This must be
-	// set if a pod-level memory limit is not given.
-	MemoryMB *int
-	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
-	// to 1 vCPU on a machine. This must be set if a pod-level CPU limit is not
-	// given.
-	CPU *int
 	// EnvVars are environment variables to make available in the container.
 	EnvVars []EnvironmentVariable
-	// RepoCreds are private repository credentials for using images that
-	// require authentication.
-	RepoCreds *RepositoryCredentials
 	// PortMappings are mappings between the ports within the container to
 	// allow network traffic.
 	PortMappings []PortMapping
@@ -660,7 +660,7 @@ func (hcd hashableECSContainerDefinitions) hash() string {
 type EnvironmentVariable struct {
 	// Name is the name of the environment variable.
 	Name *string
-	// Value is the environment variable's non-secret value. This is required if
+	// Value is the environment variable's plaintext value. This is required if
 	// SecretOpts is not given.
 	Value *string
 	// SecretOpts are options to define a stored secret that the environment
@@ -1097,6 +1097,9 @@ type ECSPodExecutionOptions struct {
 	// use, which in turn determines the infrastructure that the pod will run
 	// on. If none is specified, this will run in the default capacity provider.
 	CapacityProvider *string
+	// OverridableOpts specify options that override the settings in the pod's
+	// definition.
+	OverridableOpts *ECSOverridablePodDefinitionOptions
 	// PlacementOptions specify options that determine how a pod is assigned to
 	// a container instance.
 	PlacementOpts *ECSPodPlacementOptions
@@ -1127,6 +1130,13 @@ func (o *ECSPodExecutionOptions) SetCluster(cluster string) *ECSPodExecutionOpti
 // use.
 func (o *ECSPodExecutionOptions) SetCapacityProvider(provider string) *ECSPodExecutionOptions {
 	o.CapacityProvider = &provider
+	return o
+}
+
+// SetOverridableOptions sets the options that override the pod definition.
+// kim: TODO: test
+func (o *ECSPodExecutionOptions) SetOverridableOptions(opts ECSOverridablePodDefinitionOptions) *ECSPodExecutionOptions {
+	o.OverridableOpts = &opts
 	return o
 }
 
@@ -1223,6 +1233,95 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 
 	return merged
 }
+
+// ECSPodExecutionOverridableOptions are options that can be specified when
+// starting a pod that override those in the pod's definition.
+type ECSOverridablePodDefinitionOptions struct {
+	// ContainerDefinitions defines settings that apply to individual containers
+	// within the pod.
+	ContainerDefinitions []ECSOverridableContainerDefinition
+	// MemoryMB is the hard memory limit (in MB) across all containers in the
+	// pod. If this is not specified, then each container is required to specify
+	// its own memory. This is ignored for pods running Windows containers.
+	MemoryMB *int
+	// CPU is the hard CPU limit (in CPU units) across all containers in the
+	// pod. 1024 CPU units is equivalent to 1 vCPU on a machine. If this is not
+	// specified, then each container is required to specify its own CPU.
+	// This is ignored for pods running Windows containers.
+	CPU *int
+	// TaskRole is the role that the pod can use. Depending on the
+	// configuration, this may be required if
+	// (ECSPodExecutionOptions).SupportsDebugMode is true.
+	TaskRole *string
+	// ExecutionRole is the role that ECS container agent can use. Depending on
+	// the configuration, this may be required if the container uses secrets.
+	ExecutionRole *string
+}
+
+// kim: TODO: test override setters.
+
+// SetContainerDefinitions sets the container definitions for the pod. This
+// overwrites any existing container definitions.
+func (o *ECSOverridablePodDefinitionOptions) SetContainerDefinitions(defs []ECSOverridableContainerDefinition) *ECSOverridablePodDefinitionOptions {
+	o.ContainerDefinitions = defs
+	return o
+}
+
+// AddContainerDefinitions add new container definitions to the existing ones
+// for the pod.
+func (o *ECSOverridablePodDefinitionOptions) AddContainerDefinitions(defs ...ECSOverridableContainerDefinition) *ECSOverridablePodDefinitionOptions {
+	o.ContainerDefinitions = append(o.ContainerDefinitions, defs...)
+	return o
+}
+
+// SetMemoryMB sets the memory limit (in MB) that applies across the entire
+// pod's containers.
+func (o *ECSOverridablePodDefinitionOptions) SetMemoryMB(mem int) *ECSOverridablePodDefinitionOptions {
+	o.MemoryMB = &mem
+	return o
+}
+
+// SetCPU sets the CPU limit (in CPU units) that applies across the entire pod's
+// containers.
+func (o *ECSOverridablePodDefinitionOptions) SetCPU(cpu int) *ECSOverridablePodDefinitionOptions {
+	o.CPU = &cpu
+	return o
+}
+
+// SetTaskRole sets the task role that the pod can use.
+func (o *ECSOverridablePodDefinitionOptions) SetTaskRole(role string) *ECSOverridablePodDefinitionOptions {
+	o.TaskRole = &role
+	return o
+}
+
+// SetExecutionRole sets the execution role that the pod can use.
+func (o *ECSOverridablePodDefinitionOptions) SetExecutionRole(role string) *ECSOverridablePodDefinitionOptions {
+	o.ExecutionRole = &role
+	return o
+}
+
+// ECSOverridableContainerDefinition are container-level options that can be
+// specified when starting a pod that override those in the pod's definition.
+// Each specified field will override the corresponding field in the pod
+// definition.
+type ECSOverridableContainerDefinition struct {
+	// Name is the friendly name of the container whose options should be
+	// overridden. This is required.
+	Name *string
+	// Command is the command to run, overriding any existing container command.
+	Command []string
+	// EnvVars are the environment variables to override for this container. If
+	// there is an existing environment variable with the same name, it is
+	// overridden; otherwise, the environment variable is appended to the
+	// existing ones.
+	EnvVars map[string]string
+	// MemoryMB is the amount of memory (in MB) to allocate.
+	MemoryMB *int
+	// CPU is the number of CPU units to allocate.
+	CPU *int
+}
+
+// kim: TODO: add setters for overridable container definition fields
 
 // ECSPodPlacementOptions represent options to control how an ECS pod is
 // assigned to a container instance.
