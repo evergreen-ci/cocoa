@@ -143,7 +143,7 @@ func TestECSPodCreator(t *testing.T) {
 // the ECS pod creator.
 func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient){
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithAllFieldsSet": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithAllFieldsSetAndSendsExpectedInput": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetValue("env_var_value")
@@ -152,17 +152,31 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				SetWorkingDir("working_dir").
-				SetMemoryMB(128).
-				SetCPU(256).
+				SetMemoryMB(100).
+				SetCPU(200).
 				AddEnvironmentVariables(*envVar)
-			defOpts := cocoa.NewECSPodDefinitionOptions().
-				SetMemoryMB(512).
-				SetCPU(1024).
+			podDefOpts := cocoa.NewECSPodDefinitionOptions().
+				SetMemoryMB(300).
+				SetCPU(400).
 				SetTaskRole("task_role").
 				SetExecutionRole("execution_role").
 				SetNetworkMode(cocoa.NetworkModeAWSVPC).
 				SetTags(map[string]string{"creation_tag": "creation_val"}).
 				AddContainerDefinitions(*containerDef)
+			overrideEnvVar := cocoa.NewKeyValue().
+				SetName("override_env_var_name").
+				SetValue("override_env_var_value")
+			overrideContainerDef := cocoa.NewECSOverrideContainerDefinition().
+				SetMemoryMB(1000).
+				SetCPU(2000).
+				SetCommand([]string{"echo", "override"}).
+				AddEnvironmentVariables(*overrideEnvVar)
+			overridePodDefOpts := cocoa.NewECSOverridePodDefinitionOptions().
+				AddContainerDefinitions(*overrideContainerDef).
+				SetMemoryMB(3000).
+				SetCPU(4000).
+				SetTaskRole("override_task_role").
+				SetExecutionRole("override_execution_role")
 			placementOpts := cocoa.NewECSPodPlacementOptions().
 				SetGroup("group").
 				SetStrategy(cocoa.StrategyBinpack).
@@ -174,32 +188,40 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			execOpts := cocoa.NewECSPodExecutionOptions().
 				SetCluster(testutil.ECSClusterName()).
 				SetCapacityProvider("capacity_provider").
+				SetOverrideOptions(*overridePodDefOpts).
 				SetPlacementOptions(*placementOpts).
 				SetAWSVPCOptions(*awsvpcOpts).
 				SetTags(map[string]string{"execution_tag": "execution_val"}).
 				SetSupportsDebugMode(true)
 			opts := cocoa.NewECSPodCreationOptions().
-				SetDefinitionOptions(*defOpts).
+				SetDefinitionOptions(*podDefOpts).
 				SetExecutionOptions(*execOpts)
 
 			_, err := pc.CreatePod(ctx, *opts)
 			require.NoError(t, err)
 
+			// Verify RegisterTaskDefinition inputs.
+
 			require.NotZero(t, c.RegisterTaskDefinitionInput)
 
 			mem, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Memory))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(defOpts.MemoryMB), mem)
+			assert.Equal(t, utility.FromIntPtr(podDefOpts.MemoryMB), mem)
+
 			cpu, err := strconv.Atoi(utility.FromStringPtr(c.RegisterTaskDefinitionInput.Cpu))
 			require.NoError(t, err)
-			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
-			require.NotZero(t, defOpts.NetworkMode)
-			assert.EqualValues(t, *defOpts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
-			assert.Equal(t, utility.FromStringPtr(defOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
-			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+			assert.Equal(t, utility.FromIntPtr(podDefOpts.CPU), cpu)
+
+			require.NotZero(t, podDefOpts.NetworkMode)
+			assert.EqualValues(t, *podDefOpts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
+
+			assert.Equal(t, utility.FromStringPtr(podDefOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
+			assert.Equal(t, utility.FromStringPtr(podDefOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
+
 			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 1)
 			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
-			assert.Equal(t, defOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
+			assert.Equal(t, podDefOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
+
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
 			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
@@ -209,10 +231,36 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(envVar.Value), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Value))
 
+			// Verify RunTask inputs.
+
 			require.NotZero(t, c.RunTaskInput)
 			assert.Equal(t, utility.FromStringPtr(execOpts.Cluster), utility.FromStringPtr(c.RunTaskInput.Cluster))
+
 			require.Len(t, c.RunTaskInput.CapacityProviderStrategy, 1)
 			assert.Equal(t, utility.FromStringPtr(execOpts.CapacityProvider), utility.FromStringPtr(c.RunTaskInput.CapacityProviderStrategy[0].CapacityProvider))
+
+			require.NotZero(t, c.RunTaskInput.Overrides)
+
+			mem, err = strconv.Atoi(utility.FromStringPtr(c.RunTaskInput.Overrides.Memory))
+			require.NoError(t, err)
+			assert.Equal(t, utility.FromIntPtr(overridePodDefOpts.MemoryMB), mem)
+
+			cpu, err = strconv.Atoi(utility.FromStringPtr(c.RunTaskInput.Overrides.Cpu))
+			require.NoError(t, err)
+			assert.Equal(t, utility.FromIntPtr(overridePodDefOpts.CPU), cpu)
+
+			assert.Equal(t, utility.FromStringPtr(overridePodDefOpts.TaskRole), utility.FromStringPtr(c.RunTaskInput.Overrides.TaskRoleArn))
+			assert.Equal(t, utility.FromStringPtr(overridePodDefOpts.ExecutionRole), utility.FromStringPtr(c.RunTaskInput.Overrides.ExecutionRoleArn))
+
+			require.Len(t, c.RunTaskInput.Overrides.ContainerOverrides, 1)
+			containerOverride := c.RunTaskInput.Overrides.ContainerOverrides[0]
+			assert.Equal(t, overrideContainerDef.Command, utility.FromStringPtrSlice(containerOverride.Command))
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.MemoryMB), utility.FromInt64Ptr(containerOverride.Memory))
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.CPU), utility.FromInt64Ptr(containerOverride.Cpu))
+			require.Len(t, containerOverride.Environment, 1)
+			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Name), utility.FromStringPtr(containerOverride.Environment[0].Name))
+			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Value), utility.FromStringPtr(containerOverride.Environment[0].Value))
+
 			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
 			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
@@ -222,13 +270,16 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, placementOpts.InstanceFilters[0], utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Expression))
 			assert.Equal(t, cocoa.ConstraintDistinctInstance, utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[1].Type))
 			assert.Zero(t, c.RunTaskInput.PlacementConstraints[1].Expression)
+
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration)
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration)
 			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets))
 			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups))
+
 			require.Len(t, c.RunTaskInput.Tags, 1)
 			assert.Equal(t, "execution_tag", utility.FromStringPtr(c.RunTaskInput.Tags[0].Key))
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
+
 			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
 		},
 		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {

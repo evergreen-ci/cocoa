@@ -283,8 +283,7 @@ func ExportTags(tags map[string]string) []*ecs.Tag {
 
 // exportOverrides converts options to override the pod definition into its
 // equivalent ECS task override options.
-// kim: TODO: test
-func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridablePodDefinitionOptions) *ecs.TaskOverride {
+func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridePodDefinitionOptions) *ecs.TaskOverride {
 	if opts == nil {
 		return nil
 	}
@@ -311,7 +310,7 @@ func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridablePodDefiniti
 
 // exportOverrideContainerDefinitions converts options to override container
 // definition into equivalent ECS container overrides.
-func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOverridableContainerDefinition) []*ecs.ContainerOverride {
+func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOverrideContainerDefinition) []*ecs.ContainerOverride {
 	var containerOverrides []*ecs.ContainerOverride
 
 	for _, def := range defs {
@@ -327,9 +326,9 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 		}
 
 		var envVars []*ecs.KeyValuePair
-		for name, value := range def.EnvVars {
+		for _, envVar := range def.EnvVars {
 			var pair ecs.KeyValuePair
-			pair.SetName(name).SetValue(value)
+			pair.SetName(utility.FromStringPtr(envVar.Name)).SetValue(utility.FromStringPtr(envVar.Value))
 			envVars = append(envVars, &pair)
 		}
 		containerOverride.SetEnvironment(envVars)
@@ -568,7 +567,7 @@ func (pc *BasicPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecution
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
 		SetTags(ExportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
-		SetOverrides(pc.exportOverrides(opts.OverridableOpts)).
+		SetOverrides(pc.exportOverrides(opts.OverrideOpts)).
 		SetPlacementStrategy(pc.exportStrategy(opts.PlacementOpts)).
 		SetPlacementConstraints(pc.exportPlacementConstraints(opts.PlacementOpts)).
 		SetNetworkConfiguration(pc.exportAWSVPCOptions(opts.AWSVPCOpts))
