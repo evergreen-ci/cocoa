@@ -114,6 +114,12 @@ type ECSPodDefinitionOptions struct {
 	// specified, then each container is required to specify its own CPU.
 	// This is ignored for pods running Windows containers.
 	CPU *int
+	// NetworkMode describes the networking capabilities of the pod's
+	// containers. If the NetworkMode is unspecified for a pod running Linux
+	// containers, the default value is NetworkModeBridge. If the NetworkMode is
+	// unspecified for a pod running Windows containers, the default network
+	// mode is to use the Windows NAT network.
+	NetworkMode *ECSNetworkMode
 	// TaskRole is the role that the pod can use. Depending on the
 	// configuration, this may be required if
 	// (ECSPodExecutionOptions).SupportsDebugMode is true.
@@ -121,12 +127,6 @@ type ECSPodDefinitionOptions struct {
 	// ExecutionRole is the role that ECS container agent can use. Depending on
 	// the configuration, this may be required if the container uses secrets.
 	ExecutionRole *string
-	// NetworkMode describes the networking capabilities of the pod's
-	// containers. If the NetworkMode is unspecified for a pod running Linux
-	// containers, the default value is NetworkModeBridge. If the NetworkMode is
-	// unspecified for a pod running Windows containers, the default network
-	// mode is to use the Windows NAT network.
-	NetworkMode *ECSNetworkMode
 	// Tags are resource tags to apply to the pod definition.
 	Tags map[string]string
 }
@@ -160,26 +160,26 @@ func (o *ECSPodDefinitionOptions) AddContainerDefinitions(defs ...ECSContainerDe
 // SetMemoryMB sets the memory limit (in MB) that applies across the entire
 // pod's containers.
 func (o *ECSPodDefinitionOptions) SetMemoryMB(mem int) *ECSPodDefinitionOptions {
-	o.MemoryMB = utility.ToIntPtr(mem)
+	o.MemoryMB = &mem
 	return o
 }
 
 // SetCPU sets the CPU limit (in CPU units) that applies across the entire pod's
 // containers.
 func (o *ECSPodDefinitionOptions) SetCPU(cpu int) *ECSPodDefinitionOptions {
-	o.CPU = utility.ToIntPtr(cpu)
+	o.CPU = &cpu
 	return o
 }
 
 // SetTaskRole sets the task role that the pod can use.
 func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOptions {
-	o.TaskRole = utility.ToStringPtr(role)
+	o.TaskRole = &role
 	return o
 }
 
 // SetExecutionRole sets the execution role that the pod can use.
 func (o *ECSPodDefinitionOptions) SetExecutionRole(role string) *ECSPodDefinitionOptions {
-	o.ExecutionRole = utility.ToStringPtr(role)
+	o.ExecutionRole = &role
 	return o
 }
 
@@ -433,6 +433,14 @@ type ECSContainerDefinition struct {
 	// Name is the friendly name of the container. By default, this is a random
 	// string.
 	Name *string
+	// Image is the Docker image to use. This is required.
+	Image *string
+	// Command is the command to run, separated into individual arguments. By
+	// default, there is no command.
+	Command []string
+	// WorkingDir is the container working directory in which commands will be
+	// run.
+	WorkingDir *string
 	// MemoryMB is the amount of memory (in MB) to allocate. This must be set if
 	// a pod-level memory limit is not given.
 	MemoryMB *int
@@ -440,19 +448,11 @@ type ECSContainerDefinition struct {
 	// to 1 vCPU on a machine. This must be set if a pod-level CPU limit is not
 	// given.
 	CPU *int
-	// Image is the Docker image to use. This is required.
-	Image *string
+	// EnvVars are environment variables to make available in the container.
+	EnvVars []EnvironmentVariable
 	// RepoCreds are private repository credentials for using images that
 	// require authentication.
 	RepoCreds *RepositoryCredentials
-	// Command is the command to run, separated into individual arguments. By
-	// default, there is no command.
-	Command []string
-	// WorkingDir is the container working directory in which commands will be
-	// run.
-	WorkingDir *string
-	// EnvVars are environment variables to make available in the container.
-	EnvVars []EnvironmentVariable
 	// PortMappings are mappings between the ports within the container to
 	// allow network traffic.
 	PortMappings []PortMapping
@@ -773,13 +773,13 @@ func NewKeyValue() *KeyValue {
 
 // SetName sets the name of the key.
 func (kv *KeyValue) SetName(name string) *KeyValue {
-	kv.Name = utility.ToStringPtr(name)
+	kv.Name = &name
 	return kv
 }
 
 // SetValue sets the value associated with the key.
 func (kv *KeyValue) SetValue(value string) *KeyValue {
-	kv.Value = utility.ToStringPtr(value)
+	kv.Value = &value
 	return kv
 }
 
@@ -1280,7 +1280,7 @@ type ECSOverridePodDefinitionOptions struct {
 	ExecutionRole *string
 }
 
-// NewECSOverridePodDefinitionOptions returns new uninitialized settings to
+// NewECSOverridePodDefinitionOptions returns new uninitialized options to
 // override a pod definition.
 func NewECSOverridePodDefinitionOptions() *ECSOverridePodDefinitionOptions {
 	return &ECSOverridePodDefinitionOptions{}
@@ -1358,7 +1358,7 @@ type ECSOverrideContainerDefinition struct {
 	EnvVars []KeyValue
 }
 
-// NewECSOverrideContainerDefinition returns new uninitialized settings to
+// NewECSOverrideContainerDefinition returns new uninitialized options to
 // override a container definition.
 func NewECSOverrideContainerDefinition() *ECSOverrideContainerDefinition {
 	return &ECSOverrideContainerDefinition{}
@@ -1366,7 +1366,7 @@ func NewECSOverrideContainerDefinition() *ECSOverrideContainerDefinition {
 
 // SetName sets the friendly name of the container to override.
 func (d *ECSOverrideContainerDefinition) SetName(name string) *ECSOverrideContainerDefinition {
-	d.Name = utility.ToStringPtr(name)
+	d.Name = &name
 	return d
 }
 
@@ -1379,13 +1379,13 @@ func (d *ECSOverrideContainerDefinition) SetCommand(cmd []string) *ECSOverrideCo
 // SetMemoryMB sets the overriding amount of memory (in MB) to allocate for the
 // container.
 func (d *ECSOverrideContainerDefinition) SetMemoryMB(mem int) *ECSOverrideContainerDefinition {
-	d.MemoryMB = utility.ToIntPtr(mem)
+	d.MemoryMB = &mem
 	return d
 }
 
 // SetCPU sets the overriding number of CPU units to allocate for the container.
 func (d *ECSOverrideContainerDefinition) SetCPU(cpu int) *ECSOverrideContainerDefinition {
-	d.CPU = utility.ToIntPtr(cpu)
+	d.CPU = &cpu
 	return d
 }
 

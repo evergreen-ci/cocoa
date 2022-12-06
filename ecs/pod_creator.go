@@ -309,7 +309,7 @@ func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridePodDefinitionO
 }
 
 // exportOverrideContainerDefinitions converts options to override container
-// definition into equivalent ECS container overrides.
+// definitions into equivalent ECS container overrides.
 func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOverrideContainerDefinition) []*ecs.ContainerOverride {
 	var containerOverrides []*ecs.ContainerOverride
 
