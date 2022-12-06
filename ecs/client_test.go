@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
-	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -89,7 +88,7 @@ func TestConvertFailureToError(t *testing.T) {
 	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
 		err := ConvertFailureToError(&awsECS.Failure{
 			Arn:    aws.String("arn"),
-			Reason: aws.String(ecs.ReasonTaskMissing),
+			Reason: aws.String(ReasonTaskMissing),
 		})
 		assert.True(t, cocoa.IsECSTaskNotFoundError(err))
 	})

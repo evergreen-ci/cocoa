@@ -148,7 +148,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetName("env_var_name").
 				SetValue("env_var_value")
 			containerDef := cocoa.NewECSContainerDefinition().
-				SetName("name").
+				SetName("container_name").
 				SetImage("image").
 				SetCommand([]string{"echo", "foo"}).
 				SetWorkingDir("working_dir").
@@ -167,6 +167,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetName("override_env_var_name").
 				SetValue("override_env_var_value")
 			overrideContainerDef := cocoa.NewECSOverrideContainerDefinition().
+				SetName("container_name").
 				SetMemoryMB(1000).
 				SetCPU(2000).
 				SetCommand([]string{"echo", "override"}).

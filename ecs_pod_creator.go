@@ -1259,7 +1259,7 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 	return merged
 }
 
-// ECSPodExecutionOverrideOptions are options that can be specified when
+// ECSOverridePodDefinitionOptions are options that can be specified when
 // starting a pod that override those in the pod's definition.
 type ECSOverridePodDefinitionOptions struct {
 	// ContainerDefinitions defines settings that apply to individual containers
@@ -1280,8 +1280,8 @@ type ECSOverridePodDefinitionOptions struct {
 	ExecutionRole *string
 }
 
-// NewECSOverrideContainerDefinitionOptions returns new uninitialized settings
-// to override a pod definition.
+// NewECSOverridePodDefinitionOptions returns new uninitialized settings to
+// override a pod definition.
 func NewECSOverridePodDefinitionOptions() *ECSOverridePodDefinitionOptions {
 	return &ECSOverridePodDefinitionOptions{}
 }
