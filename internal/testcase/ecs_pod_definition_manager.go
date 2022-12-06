@@ -176,28 +176,5 @@ func ECSPodDefinitionManagerVaultTests() map[string]ECSPodDefinitionManagerTestC
 			assert.NotZero(t, pdi.ID)
 			assert.NotZero(t, pdi.DefinitionOpts)
 		},
-		"CreatePodDefinitionFailsWithNewSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, pdm cocoa.ECSPodDefinitionManager) {
-			envVar := cocoa.NewEnvironmentVariable().SetName("envVar").
-				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName(t)).
-					SetNewValue("value"))
-			containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
-				AddEnvironmentVariables(*envVar).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetName("container")
-
-			opts := cocoa.NewECSPodDefinitionOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t)).
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetTaskRole(testutil.ECSTaskRole())
-			assert.Error(t, opts.Validate())
-
-			pdi, err := pdm.CreatePodDefinition(ctx, *opts)
-			assert.Error(t, err)
-			assert.Zero(t, pdi)
-		},
 	}
 }
