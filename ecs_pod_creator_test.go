@@ -262,14 +262,15 @@ func TestECSPodDefinition(t *testing.T) {
 		assert.Empty(t, opts.ContainerDefinitions)
 	})
 	t.Run("AddContainerDefinitions", func(t *testing.T) {
-		cDefs := []ECSContainerDefinition{
+		containerDefs := []ECSContainerDefinition{
 			*NewECSContainerDefinition().SetImage("image0"),
 			*NewECSContainerDefinition().SetImage("image1"),
 		}
-		def := NewECSPodDefinitionOptions().AddContainerDefinitions(cDefs...)
-		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
-		def.AddContainerDefinitions()
-		assert.ElementsMatch(t, cDefs, def.ContainerDefinitions)
+		opts := NewECSPodDefinitionOptions().AddContainerDefinitions(containerDefs...)
+		assert.ElementsMatch(t, containerDefs, opts.ContainerDefinitions)
+
+		opts.AddContainerDefinitions()
+		assert.ElementsMatch(t, containerDefs, opts.ContainerDefinitions)
 	})
 	t.Run("SetMemoryMB", func(t *testing.T) {
 		mem := 128
@@ -828,6 +829,7 @@ func TestECSContainerDefinition(t *testing.T) {
 		}
 		def := NewECSContainerDefinition().AddEnvironmentVariables(envVars...)
 		assert.ElementsMatch(t, envVars, def.EnvVars)
+
 		def.AddEnvironmentVariables()
 		assert.ElementsMatch(t, envVars, def.EnvVars)
 	})
@@ -1087,6 +1089,49 @@ func TestStoredRepositoryCredentials(t *testing.T) {
 	})
 }
 
+func TestKeyValue(t *testing.T) {
+	t.Run("NewKeyValue", func(t *testing.T) {
+		kv := NewKeyValue()
+		require.NotZero(t, kv)
+		assert.Zero(t, *kv)
+	})
+	t.Run("SetName", func(t *testing.T) {
+		const name = "name"
+		kv := NewKeyValue().SetName(name)
+		assert.Equal(t, name, utility.FromStringPtr(kv.Name))
+	})
+	t.Run("SetValue", func(t *testing.T) {
+		const value = "value"
+		kv := NewKeyValue().SetValue(value)
+		assert.Equal(t, value, utility.FromStringPtr(kv.Value))
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithNameAndValue", func(t *testing.T) {
+			kv := NewKeyValue().SetName("name").SetValue("value")
+			assert.NoError(t, kv.Validate())
+		})
+		t.Run("SucceedsWithJustName", func(t *testing.T) {
+			kv := NewKeyValue().SetName("name")
+			assert.NoError(t, kv.Validate())
+		})
+		t.Run("SucceedsWithEmptyValue", func(t *testing.T) {
+			kv := NewKeyValue().SetName("name").SetValue("")
+			assert.NoError(t, kv.Validate())
+		})
+		t.Run("FailsWithJustValue", func(t *testing.T) {
+			kv := NewKeyValue().SetValue("value")
+			assert.Error(t, kv.Validate())
+		})
+		t.Run("FailsWithZero", func(t *testing.T) {
+			assert.Error(t, NewKeyValue().Validate())
+		})
+		t.Run("FailsWithEmptyName", func(t *testing.T) {
+			kv := NewKeyValue().SetName("").SetValue("value")
+			assert.Error(t, kv.Validate())
+		})
+	})
+}
+
 func TestSecretOptions(t *testing.T) {
 	t.Run("NewSecretOptions", func(t *testing.T) {
 		opts := NewSecretOptions()
@@ -1216,6 +1261,16 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		opts := NewECSPodExecutionOptions().SetCapacityProvider(provider)
 		assert.Equal(t, provider, utility.FromStringPtr(opts.CapacityProvider))
 	})
+	t.Run("SetOverrideOptions", func(t *testing.T) {
+		overrideOpts := NewECSOverridePodDefinitionOptions().
+			AddContainerDefinitions(*NewECSOverrideContainerDefinition().SetCPU(512)).
+			SetMemoryMB(1024).
+			SetCPU(2048).
+			SetTaskRole("task_role").
+			SetExecutionRole("execution_role")
+		opts := NewECSPodExecutionOptions().SetOverrideOptions(*overrideOpts)
+		assert.Equal(t, *overrideOpts, *opts.OverrideOpts)
+	})
 	t.Run("SetPlacementOptions", func(t *testing.T) {
 		placementOpts := NewECSPodPlacementOptions().SetStrategy(StrategyBinpack)
 		opts := NewECSPodExecutionOptions().SetPlacementOptions(*placementOpts)
@@ -1282,6 +1337,168 @@ func TestECSPodExecutionOptions(t *testing.T) {
 		t.Run("FailsWithBadAWSVPCOptions", func(t *testing.T) {
 			opts := NewECSPodExecutionOptions().SetAWSVPCOptions(*NewAWSVPCOptions())
 			assert.Error(t, opts.Validate())
+		})
+	})
+}
+
+func TestECSOverridePodDefinitionOptions(t *testing.T) {
+	t.Run("NewECSOverridePodDefinitionOptions", func(t *testing.T) {
+		opts := NewECSOverridePodDefinitionOptions()
+		require.NotZero(t, opts)
+		assert.Zero(t, *opts)
+	})
+	t.Run("SetContainerDefinitions", func(t *testing.T) {
+		containerDef := NewECSOverrideContainerDefinition().SetName("name")
+
+		opts := NewECSOverridePodDefinitionOptions().SetContainerDefinitions([]ECSOverrideContainerDefinition{*containerDef})
+		require.Len(t, opts.ContainerDefinitions, 1)
+		assert.Equal(t, *containerDef, opts.ContainerDefinitions[0])
+
+		opts.SetContainerDefinitions(nil)
+		assert.Empty(t, opts.ContainerDefinitions)
+	})
+	t.Run("AddContainerDefinitions", func(t *testing.T) {
+		containerDefs := []ECSOverrideContainerDefinition{
+			*NewECSOverrideContainerDefinition().SetName("name0"),
+			*NewECSOverrideContainerDefinition().SetName("name1"),
+		}
+
+		opts := NewECSOverridePodDefinitionOptions().AddContainerDefinitions(containerDefs...)
+		require.Len(t, opts.ContainerDefinitions, 2)
+		assert.ElementsMatch(t, containerDefs, opts.ContainerDefinitions)
+
+		opts.AddContainerDefinitions()
+		assert.ElementsMatch(t, containerDefs, opts.ContainerDefinitions)
+	})
+	t.Run("SetMemoryMB", func(t *testing.T) {
+		const mem = 128
+		opts := NewECSOverridePodDefinitionOptions().SetMemoryMB(mem)
+		assert.Equal(t, mem, utility.FromIntPtr(opts.MemoryMB))
+	})
+	t.Run("SetCPU", func(t *testing.T) {
+		const cpu = 128
+		opts := NewECSOverridePodDefinitionOptions().SetCPU(cpu)
+		assert.Equal(t, cpu, utility.FromIntPtr(opts.CPU))
+	})
+	t.Run("SetTaskRole", func(t *testing.T) {
+		const r = "task_role"
+		opts := NewECSPodDefinitionOptions().SetTaskRole(r)
+		assert.Equal(t, r, utility.FromStringPtr(opts.TaskRole))
+	})
+	t.Run("SetExecutionRole", func(t *testing.T) {
+		const r = "execution_role"
+		opts := NewECSPodDefinitionOptions().SetExecutionRole(r)
+		assert.Equal(t, r, utility.FromStringPtr(opts.ExecutionRole))
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithZero", func(t *testing.T) {
+			assert.NoError(t, NewECSOverridePodDefinitionOptions().Validate())
+		})
+		t.Run("SucceedsWithValidMemoryMB", func(t *testing.T) {
+			assert.NoError(t, NewECSOverridePodDefinitionOptions().SetMemoryMB(1024).Validate())
+		})
+		t.Run("SucceedsWithValidCPU", func(t *testing.T) {
+			assert.NoError(t, NewECSOverridePodDefinitionOptions().SetCPU(1024).Validate())
+		})
+		t.Run("FailsWithInvalidMemoryMB", func(t *testing.T) {
+			assert.Error(t, NewECSOverridePodDefinitionOptions().SetMemoryMB(-30).Validate())
+		})
+		t.Run("FailsWithInvalidCPU", func(t *testing.T) {
+			assert.Error(t, NewECSOverridePodDefinitionOptions().SetCPU(-30).Validate())
+		})
+		t.Run("FailsWithInvalidOverrideContainerDefinition", func(t *testing.T) {
+			assert.Error(t, NewECSOverridePodDefinitionOptions().AddContainerDefinitions(*NewECSOverrideContainerDefinition()).Validate())
+		})
+	})
+}
+
+func TestECSOverrideContainerDefinition(t *testing.T) {
+	t.Run("NewECSOverrideContainerDefinition", func(t *testing.T) {
+		def := NewECSOverrideContainerDefinition()
+		require.NotZero(t, def)
+		assert.Zero(t, *def)
+	})
+	t.Run("SetName", func(t *testing.T) {
+		const name = "name"
+		def := NewECSOverrideContainerDefinition().SetName(name)
+		assert.Equal(t, name, utility.FromStringPtr(def.Name))
+	})
+	t.Run("SetCommand", func(t *testing.T) {
+		cmd := []string{"echo", "hello"}
+		def := NewECSOverrideContainerDefinition().SetCommand(cmd)
+		assert.Equal(t, cmd, def.Command)
+	})
+	t.Run("SetMemoryMB", func(t *testing.T) {
+		const mem = 128
+		def := NewECSOverrideContainerDefinition().SetMemoryMB(mem)
+		assert.Equal(t, mem, utility.FromIntPtr(def.MemoryMB))
+	})
+	t.Run("SetCPU", func(t *testing.T) {
+		const mem = 128
+		def := NewECSOverrideContainerDefinition().SetCPU(mem)
+		assert.Equal(t, mem, utility.FromIntPtr(def.CPU))
+	})
+	t.Run("SetEnvironmentVariables", func(t *testing.T) {
+		envVar := NewKeyValue().SetName("name").SetValue("value")
+		def := NewECSOverrideContainerDefinition().SetEnvironmentVariables([]KeyValue{*envVar})
+		require.Len(t, def.EnvVars, 1)
+		assert.Equal(t, *envVar, def.EnvVars[0])
+
+		def.SetEnvironmentVariables(nil)
+		assert.Empty(t, def.EnvVars)
+	})
+	t.Run("AddEnvironmentVariables", func(t *testing.T) {
+		envVars := []KeyValue{
+			*NewKeyValue().SetName("name0").SetValue("value0"),
+			*NewKeyValue().SetName("name1").SetValue("value1"),
+		}
+		def := NewECSOverrideContainerDefinition().AddEnvironmentVariables(envVars...)
+		assert.ElementsMatch(t, envVars, def.EnvVars)
+
+		def.AddEnvironmentVariables()
+		assert.ElementsMatch(t, envVars, def.EnvVars)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("SucceedsWithJustName", func(t *testing.T) {
+			assert.NoError(t, NewECSOverrideContainerDefinition().SetName("name").Validate())
+		})
+		t.Run("SucceedsWithValidMemoryMB", func(t *testing.T) {
+			def := NewECSOverrideContainerDefinition().
+				SetName("name").
+				SetMemoryMB(1024)
+			assert.NoError(t, def.Validate())
+		})
+		t.Run("SucceedsWithValidCPU", func(t *testing.T) {
+			def := NewECSOverrideContainerDefinition().
+				SetName("name").
+				SetCPU(1024)
+			assert.NoError(t, def.Validate())
+		})
+		t.Run("SucceedsWithValidEnvVars", func(t *testing.T) {
+			def := NewECSOverrideContainerDefinition().
+				SetName("name").
+				AddEnvironmentVariables(*NewKeyValue().
+					SetName("env_var_name").
+					SetValue("env_var_value"))
+			assert.NoError(t, def.Validate())
+		})
+		t.Run("FailsWithZero", func(t *testing.T) {
+			assert.Error(t, NewECSOverrideContainerDefinition().Validate())
+		})
+		t.Run("FailsWithEmptyName", func(t *testing.T) {
+			assert.Error(t, NewECSOverrideContainerDefinition().SetName("").Validate())
+		})
+		t.Run("FailsWithInvalidMemoryMB", func(t *testing.T) {
+			assert.Error(t, NewECSOverrideContainerDefinition().SetName("name").SetMemoryMB(-30).Validate())
+		})
+		t.Run("FailsWithInvalidCPU", func(t *testing.T) {
+			assert.Error(t, NewECSOverrideContainerDefinition().SetName("name").SetCPU(-30).Validate())
+		})
+		t.Run("FailsWithInvalidEnvVars", func(t *testing.T) {
+			def := NewECSOverrideContainerDefinition().
+				SetName("name").
+				AddEnvironmentVariables(*NewKeyValue())
+			assert.Error(t, def.Validate())
 		})
 	})
 }
