@@ -1122,6 +1122,9 @@ type ECSPodExecutionOptions struct {
 	CapacityProvider *string
 	// OverrideOpts specify options that override the settings in the pod's
 	// definition.
+	// Warning: the size of the options when serialized to JSON cannot exceed 8
+	// kB, so care should be taken to not rely too heavily on overriding the
+	// pod definition's settings.
 	OverrideOpts *ECSOverridePodDefinitionOptions
 	// PlacementOptions specify options that determine how a pod is assigned to
 	// a container instance.
