@@ -1262,6 +1262,23 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 	return merged
 }
 
+// Note for future maintainenace: many of fields in
+// ECSOverridePodDefinitionOptions are shared with the ECSPodDefinitionOptions
+// because the overridable fields are a subset of the options available when
+// registering a pod definition. One natural question that arises is, if they
+// share similar fields, can the overridable fields be embedded in the pod
+// definition options? It is true that the fields available are duplicate;
+// however, the possibility of an embedded struct was explicitly rejected
+// because embedding the struct would result in more issues than just having
+// some duplicated fields. For example, since only a subset of container
+// definition fields can be overridden, ContainerDefinitions is not a suitable
+// field to embed because the override and non-override container definitions
+// support different fields. In addition, the behavior of the override fields
+// (such as for validation rules) differs depending methods on whether the
+// fields are specified when registering a pod definition or starting a pod. For
+// these reasons, it's easier to maintain two separate options structs rather
+// than try to consolidate them.
+
 // ECSOverridePodDefinitionOptions are options that can be specified when
 // starting a pod that override those in the pod's definition.
 type ECSOverridePodDefinitionOptions struct {
