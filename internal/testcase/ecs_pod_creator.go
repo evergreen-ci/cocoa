@@ -216,33 +216,6 @@ func ECSPodCreatorVaultTests() map[string]ECSPodCreatorTestCase {
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
 		},
-		"CreatePodFailsWithNewSecretsButNoExecutionRole": func(ctx context.Context, t *testing.T, c cocoa.ECSPodCreator) {
-			envVar := cocoa.NewEnvironmentVariable().SetName("envVar").
-				SetSecretOptions(*cocoa.NewSecretOptions().
-					SetName(testutil.NewSecretName(t)).
-					SetNewValue("value"))
-			containerDef := cocoa.NewECSContainerDefinition().SetImage("image").
-				AddEnvironmentVariables(*envVar).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetName("container")
-
-			defOpts := cocoa.NewECSPodDefinitionOptions().
-				SetName(testutil.NewTaskDefinitionFamily(t)).
-				AddContainerDefinitions(*containerDef).
-				SetMemoryMB(128).
-				SetCPU(128).
-				SetTaskRole(testutil.ECSTaskRole())
-
-			opts := cocoa.NewECSPodCreationOptions().
-				SetDefinitionOptions(*defOpts).
-				SetExecutionOptions(*validECSPodExecutionOptions())
-			assert.Error(t, opts.Validate())
-
-			p, err := c.CreatePod(ctx, *opts)
-			require.Error(t, err)
-			require.Zero(t, p)
-		},
 	}
 }
 

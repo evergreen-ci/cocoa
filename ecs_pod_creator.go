@@ -171,13 +171,6 @@ func (o *ECSPodDefinitionOptions) SetCPU(cpu int) *ECSPodDefinitionOptions {
 	return o
 }
 
-// SetNetworkMode sets the network mode that applies for all the pod's
-// containers.
-func (o *ECSPodDefinitionOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodDefinitionOptions {
-	o.NetworkMode = &mode
-	return o
-}
-
 // SetTaskRole sets the task role that the pod can use.
 func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOptions {
 	o.TaskRole = &role
@@ -187,6 +180,13 @@ func (o *ECSPodDefinitionOptions) SetTaskRole(role string) *ECSPodDefinitionOpti
 // SetExecutionRole sets the execution role that the pod can use.
 func (o *ECSPodDefinitionOptions) SetExecutionRole(role string) *ECSPodDefinitionOptions {
 	o.ExecutionRole = &role
+	return o
+}
+
+// SetNetworkMode sets the network mode that applies for all the pod's
+// containers.
+func (o *ECSPodDefinitionOptions) SetNetworkMode(mode ECSNetworkMode) *ECSPodDefinitionOptions {
+	o.NetworkMode = &mode
 	return o
 }
 
@@ -274,13 +274,6 @@ func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 			totalContainerCPU += *o.ContainerDefinitions[i].CPU
 		} else if o.CPU == nil {
 			catcher.Errorf("must specify container-level CPU to allocate for each container if pod-level CPU is not specified")
-		}
-
-		for _, envVar := range def.EnvVars {
-			if envVar.SecretOpts != nil && o.ExecutionRole == nil {
-				catcher.Errorf("must specify execution role ARN when specifying container secrets")
-				break
-			}
 		}
 	}
 
@@ -448,8 +441,8 @@ type ECSContainerDefinition struct {
 	// WorkingDir is the container working directory in which commands will be
 	// run.
 	WorkingDir *string
-	// MemoryMB is the amount of memory (in MB) to allocate. This must be
-	// set if a pod-level memory limit is not given.
+	// MemoryMB is the amount of memory (in MB) to allocate. This must be set if
+	// a pod-level memory limit is not given.
 	MemoryMB *int
 	// CPU is the number of CPU units to allocate. 1024 CPU units is equivalent
 	// to 1 vCPU on a machine. This must be set if a pod-level CPU limit is not
@@ -658,11 +651,9 @@ func (hcd hashableECSContainerDefinitions) hash() string {
 // EnvironmentVariable represents an environment variable, which can be
 // optionally backed by a secret.
 type EnvironmentVariable struct {
-	// Name is the name of the environment variable.
-	Name *string
-	// Value is the environment variable's non-secret value. This is required if
-	// SecretOpts is not given.
-	Value *string
+	// KeyValue represents the environment variable's name and plaintext value.
+	// The plaintext value is required if SecretOpts is not given.
+	KeyValue
 	// SecretOpts are options to define a stored secret that the environment
 	// variable refers to. This is required if the non-secret Value is not
 	// given.
@@ -698,8 +689,7 @@ func (e *EnvironmentVariable) SetSecretOptions(opts SecretOptions) *EnvironmentV
 // the raw environment variable value or the referenced secret is given.
 func (e *EnvironmentVariable) Validate() error {
 	catcher := grip.NewBasicCatcher()
-	catcher.NewWhen(e.Name == nil, "must specify a name")
-	catcher.NewWhen(e.Name != nil && *e.Name == "", "cannot specify an empty name")
+	catcher.Add(e.KeyValue.Validate())
 	catcher.NewWhen(e.Value == nil && e.SecretOpts == nil, "must either specify a value or reference a secret")
 	catcher.NewWhen(e.Value != nil && e.SecretOpts != nil, "cannot both specify a value and reference a secret")
 	if e.SecretOpts != nil {
@@ -766,6 +756,39 @@ func (hev hashableEnvironmentVariables) hash() string {
 	}
 
 	return h.Sum()
+}
+
+// KeyValue represents a key-value pair of strings.
+type KeyValue struct {
+	// Name is the name of the key-value pair.
+	Name *string
+	// Value is the plaintext value associated with the name.
+	Value *string
+}
+
+// NewKeyValue returns a new uninitialized key-value pair.
+func NewKeyValue() *KeyValue {
+	return &KeyValue{}
+}
+
+// SetName sets the name of the key.
+func (kv *KeyValue) SetName(name string) *KeyValue {
+	kv.Name = &name
+	return kv
+}
+
+// SetValue sets the value associated with the key.
+func (kv *KeyValue) SetValue(value string) *KeyValue {
+	kv.Value = &value
+	return kv
+}
+
+// Validate checks that the key name is set.
+func (kv *KeyValue) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(kv.Name == nil, "must specify a name")
+	catcher.NewWhen(kv.Name != nil && *kv.Name == "", "cannot specify an empty name")
+	return catcher.Resolve()
 }
 
 // SecretOptions represents a secret with a name and value that may or may not
@@ -1097,6 +1120,12 @@ type ECSPodExecutionOptions struct {
 	// use, which in turn determines the infrastructure that the pod will run
 	// on. If none is specified, this will run in the default capacity provider.
 	CapacityProvider *string
+	// OverrideOpts specify options that override the settings in the pod's
+	// definition.
+	// Warning: the size of the options when serialized to JSON cannot exceed 8
+	// kB, so care should be taken to not rely too heavily on overriding the
+	// pod definition's settings.
+	OverrideOpts *ECSOverridePodDefinitionOptions
 	// PlacementOptions specify options that determine how a pod is assigned to
 	// a container instance.
 	PlacementOpts *ECSPodPlacementOptions
@@ -1127,6 +1156,12 @@ func (o *ECSPodExecutionOptions) SetCluster(cluster string) *ECSPodExecutionOpti
 // use.
 func (o *ECSPodExecutionOptions) SetCapacityProvider(provider string) *ECSPodExecutionOptions {
 	o.CapacityProvider = &provider
+	return o
+}
+
+// SetOverrideOptions sets the options that override the pod definition.
+func (o *ECSPodExecutionOptions) SetOverrideOptions(opts ECSOverridePodDefinitionOptions) *ECSPodExecutionOptions {
+	o.OverrideOpts = &opts
 	return o
 }
 
@@ -1172,6 +1207,9 @@ func (o *ECSPodExecutionOptions) AddTags(tags map[string]string) *ECSPodExecutio
 // Validate checks that the placement options are valid.
 func (o *ECSPodExecutionOptions) Validate() error {
 	catcher := grip.NewBasicCatcher()
+	if o.OverrideOpts != nil {
+		catcher.Wrap(o.OverrideOpts.Validate(), "invalid pod definition override options")
+	}
 	if o.PlacementOpts != nil {
 		catcher.Wrap(o.PlacementOpts.Validate(), "invalid placement options")
 	}
@@ -1222,6 +1260,180 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 	}
 
 	return merged
+}
+
+// Note for future maintainenace: many of fields in
+// ECSOverridePodDefinitionOptions are shared with the ECSPodDefinitionOptions
+// because the overridable fields are a subset of the options available when
+// registering a pod definition. One natural question that arises is, if they
+// share similar fields, can the overridable fields be embedded in the pod
+// definition options? It is true that the fields available are duplicate;
+// however, the possibility of an embedded struct was explicitly rejected
+// because embedding the struct would result in more issues than just having
+// some duplicated fields. For example, since only a subset of container
+// definition fields can be overridden, ContainerDefinitions is not a suitable
+// field to embed because the override and non-override container definitions
+// support different fields. In addition, the behavior of the override fields
+// (such as for validation rules) differs depending methods on whether the
+// fields are specified when registering a pod definition or starting a pod. For
+// these reasons, it's easier to maintain two separate options structs rather
+// than try to consolidate them.
+
+// ECSOverridePodDefinitionOptions are options that can be specified when
+// starting a pod that override those in the pod's definition.
+type ECSOverridePodDefinitionOptions struct {
+	// ContainerDefinitions defines settings that apply to individual containers
+	// within the pod.
+	ContainerDefinitions []ECSOverrideContainerDefinition
+	// MemoryMB overrides the pod definition's hard memory limit (in MB) across
+	// all containers in the pod. This is ignored for pods running Windows
+	// containers.
+	MemoryMB *int
+	// CPU overrides the pod definition's hard CPU limit (in CPU units) across
+	// all containers in the pod. 1024 CPU units is equivalent to 1 vCPU on a
+	// machine. This is ignored for pods running Windows containers.
+	CPU *int
+	// TaskRole overrides the task role that the pod can use.
+	TaskRole *string
+	// ExecutionRole overrides the execution role that ECS container agent can
+	// use.
+	ExecutionRole *string
+}
+
+// NewECSOverridePodDefinitionOptions returns new uninitialized options to
+// override a pod definition.
+func NewECSOverridePodDefinitionOptions() *ECSOverridePodDefinitionOptions {
+	return &ECSOverridePodDefinitionOptions{}
+}
+
+// SetContainerDefinitions sets the container definitions to override for the
+// pod. This overwrites any existing container definitions.
+func (o *ECSOverridePodDefinitionOptions) SetContainerDefinitions(defs []ECSOverrideContainerDefinition) *ECSOverridePodDefinitionOptions {
+	o.ContainerDefinitions = defs
+	return o
+}
+
+// AddContainerDefinitions adds container definitions to override the existing
+// ones for the pod.
+func (o *ECSOverridePodDefinitionOptions) AddContainerDefinitions(defs ...ECSOverrideContainerDefinition) *ECSOverridePodDefinitionOptions {
+	o.ContainerDefinitions = append(o.ContainerDefinitions, defs...)
+	return o
+}
+
+// SetMemoryMB sets the overriding memory limit (in MB) that applies across the
+// entire pod's containers.
+func (o *ECSOverridePodDefinitionOptions) SetMemoryMB(mem int) *ECSOverridePodDefinitionOptions {
+	o.MemoryMB = &mem
+	return o
+}
+
+// SetCPU sets the overriding CPU limit (in CPU units) that applies across the
+// entire pod's containers.
+func (o *ECSOverridePodDefinitionOptions) SetCPU(cpu int) *ECSOverridePodDefinitionOptions {
+	o.CPU = &cpu
+	return o
+}
+
+// SetTaskRole sets the overriding task role that the pod can use.
+func (o *ECSOverridePodDefinitionOptions) SetTaskRole(role string) *ECSOverridePodDefinitionOptions {
+	o.TaskRole = &role
+	return o
+}
+
+// SetExecutionRole sets the overriding execution role that the pod can use.
+func (o *ECSOverridePodDefinitionOptions) SetExecutionRole(role string) *ECSOverridePodDefinitionOptions {
+	o.ExecutionRole = &role
+	return o
+}
+
+// Validate checks that all specified override options are valid.
+func (o *ECSOverridePodDefinitionOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.MemoryMB != nil && *o.MemoryMB <= 0, "must have positive memory value if specified")
+	catcher.NewWhen(o.CPU != nil && *o.CPU <= 0, "must have positive CPU value if specified")
+	for i, def := range o.ContainerDefinitions {
+		catcher.Wrapf(o.ContainerDefinitions[i].Validate(), "container definition '%s'", utility.FromStringPtr(def.Name))
+	}
+	return catcher.Resolve()
+}
+
+// ECSOverrideContainerDefinition are container-level options that can be
+// specified when starting a pod that override those in the pod's definition.
+// Each specified field will override the corresponding field in the pod
+// definition.
+type ECSOverrideContainerDefinition struct {
+	// Name is the friendly name of the container whose options should be
+	// overridden. This is required.
+	Name *string
+	// Command is the command to run, overriding any existing container command.
+	Command []string
+	// MemoryMB is the amount of memory (in MB) to allocate.
+	MemoryMB *int
+	// CPU is the number of CPU units to allocate.
+	CPU *int
+	// EnvVars are the environment variables to override for this container. If
+	// there is an existing environment variable with the same name, it is
+	// overridden; otherwise, the environment variable is appended to the
+	// existing ones.
+	EnvVars []KeyValue
+}
+
+// NewECSOverrideContainerDefinition returns new uninitialized options to
+// override a container definition.
+func NewECSOverrideContainerDefinition() *ECSOverrideContainerDefinition {
+	return &ECSOverrideContainerDefinition{}
+}
+
+// SetName sets the friendly name of the container to override.
+func (d *ECSOverrideContainerDefinition) SetName(name string) *ECSOverrideContainerDefinition {
+	d.Name = &name
+	return d
+}
+
+// SetCommand sets the overriding command for the container to run.
+func (d *ECSOverrideContainerDefinition) SetCommand(cmd []string) *ECSOverrideContainerDefinition {
+	d.Command = cmd
+	return d
+}
+
+// SetMemoryMB sets the overriding amount of memory (in MB) to allocate for the
+// container.
+func (d *ECSOverrideContainerDefinition) SetMemoryMB(mem int) *ECSOverrideContainerDefinition {
+	d.MemoryMB = &mem
+	return d
+}
+
+// SetCPU sets the overriding number of CPU units to allocate for the container.
+func (d *ECSOverrideContainerDefinition) SetCPU(cpu int) *ECSOverrideContainerDefinition {
+	d.CPU = &cpu
+	return d
+}
+
+// SetEnvironmentVariables sets the environment variables to override existing
+// ones or append new ones for the container.
+func (d *ECSOverrideContainerDefinition) SetEnvironmentVariables(envVars []KeyValue) *ECSOverrideContainerDefinition {
+	d.EnvVars = envVars
+	return d
+}
+
+// AddEnvironmentVariables adds environment variables to override existing ones
+// or append new ones for the container.
+func (d *ECSOverrideContainerDefinition) AddEnvironmentVariables(envVars ...KeyValue) *ECSOverrideContainerDefinition {
+	d.EnvVars = append(d.EnvVars, envVars...)
+	return d
+}
+
+// Validate checks that all specified container definition overrides are valid.
+func (d *ECSOverrideContainerDefinition) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(d.Name == nil, "must specify a container name")
+	catcher.NewWhen(d.Name != nil && *d.Name == "", "must specify a non-empty container name")
+	catcher.NewWhen(d.MemoryMB != nil && *d.MemoryMB <= 0, "must have positive memory value if specified")
+	catcher.NewWhen(d.CPU != nil && *d.CPU <= 0, "must have positive CPU value if specified")
+	for _, ev := range d.EnvVars {
+		catcher.Wrapf(ev.Validate(), "environment variable '%s'", utility.FromStringPtr(ev.Name))
+	}
+	return catcher.Resolve()
 }
 
 // ECSPodPlacementOptions represent options to control how an ECS pod is

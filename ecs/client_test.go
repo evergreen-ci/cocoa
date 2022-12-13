@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ecs"
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -52,7 +52,7 @@ func TestBasicECSClient(t *testing.T) {
 
 	registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
 	defer func() {
-		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
+		_, err := c.DeregisterTaskDefinition(ctx, &awsECS.DeregisterTaskDefinitionInput{
 			TaskDefinition: registerOut.TaskDefinition.TaskDefinitionArn,
 		})
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestConvertFailureToError(t *testing.T) {
 			reason = "some reason"
 			detail = "some detail"
 		)
-		err := ConvertFailureToError(&ecs.Failure{
+		err := ConvertFailureToError(&awsECS.Failure{
 			Arn:    aws.String(arn),
 			Reason: aws.String(reason),
 			Detail: aws.String(detail),
@@ -86,9 +86,9 @@ func TestConvertFailureToError(t *testing.T) {
 		assert.Contains(t, err.Error(), detail)
 	})
 	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
-		err := ConvertFailureToError(&ecs.Failure{
+		err := ConvertFailureToError(&awsECS.Failure{
 			Arn:    aws.String("arn"),
-			Reason: aws.String("MISSING"),
+			Reason: aws.String(ReasonTaskMissing),
 		})
 		assert.True(t, cocoa.IsECSTaskNotFoundError(err))
 	})

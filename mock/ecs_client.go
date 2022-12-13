@@ -133,6 +133,7 @@ type ECSTask struct {
 	CapacityProvider  *string
 	ContainerInstance *string
 	Containers        []ECSContainer
+	Overrides         *awsECS.TaskOverride
 	Group             *string
 	ExecEnabled       *bool
 	Status            *string
@@ -161,6 +162,7 @@ func newECSTask(in *awsECS.RunTaskInput, taskDef ECSTaskDefinition) ECSTask {
 		GoalStatus:       utility.ToStringPtr(awsECS.DesiredStatusRunning),
 		Created:          utility.ToTimePtr(time.Now()),
 		TaskDef:          taskDef,
+		Overrides:        in.Overrides,
 		Tags:             newECSTags(in.Tags),
 	}
 
@@ -179,6 +181,7 @@ func (t *ECSTask) export(includeTags bool) *awsECS.Task {
 		EnableExecuteCommand: t.ExecEnabled,
 		Group:                t.Group,
 		TaskDefinitionArn:    utility.ToStringPtr(t.TaskDef.ARN),
+		Overrides:            t.Overrides,
 		Cpu:                  t.TaskDef.CPU,
 		Memory:               t.TaskDef.MemoryMB,
 		LastStatus:           t.Status,
@@ -654,7 +657,7 @@ func (c *ECSClient) DescribeTasks(ctx context.Context, in *awsECS.DescribeTasksI
 				Arn: utility.ToStringPtr(id),
 				// This reason specifically matches the one returned by ECS when
 				// it cannot find the task.
-				Reason: utility.ToStringPtr("MISSING"),
+				Reason: utility.ToStringPtr(ecs.ReasonTaskMissing),
 			})
 			continue
 		}

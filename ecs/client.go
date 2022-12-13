@@ -365,5 +365,10 @@ func ConvertFailureToError(f *ecs.Failure) error {
 // isTaskNotFoundFailure returns whether or not the failure reason returned from
 // ECS is because the task cannot be found.
 func isTaskNotFoundFailure(f ecs.Failure) bool {
-	return f.Arn != nil && utility.FromStringPtr(f.Reason) == "MISSING"
+	return f.Arn != nil && utility.FromStringPtr(f.Reason) == ReasonTaskMissing
 }
+
+// ReasonTaskMissing indicates that a task cannot be found because it is
+// missing. This can happen for reasons such as the task never existed, or it
+// has been stopped for a long time.
+const ReasonTaskMissing = "MISSING"

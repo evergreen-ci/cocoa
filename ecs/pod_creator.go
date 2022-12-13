@@ -281,6 +281,65 @@ func ExportTags(tags map[string]string) []*ecs.Tag {
 	return ecsTags
 }
 
+// exportOverrides converts options to override the pod definition into its
+// equivalent ECS task override options.
+func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridePodDefinitionOptions) *ecs.TaskOverride {
+	if opts == nil {
+		return nil
+	}
+
+	var overrides ecs.TaskOverride
+
+	overrides.SetContainerOverrides(pc.exportOverrideContainerDefinitions(opts.ContainerDefinitions))
+
+	if opts.MemoryMB != nil {
+		overrides.SetMemory(strconv.Itoa(*opts.MemoryMB))
+	}
+	if opts.CPU != nil {
+		overrides.SetCpu(strconv.Itoa(*opts.CPU))
+	}
+	if opts.TaskRole != nil {
+		overrides.SetTaskRoleArn(*opts.TaskRole)
+	}
+	if opts.ExecutionRole != nil {
+		overrides.SetExecutionRoleArn(*opts.ExecutionRole)
+	}
+
+	return &overrides
+}
+
+// exportOverrideContainerDefinitions converts options to override container
+// definitions into equivalent ECS container overrides.
+func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOverrideContainerDefinition) []*ecs.ContainerOverride {
+	var containerOverrides []*ecs.ContainerOverride
+
+	for _, def := range defs {
+		var containerOverride ecs.ContainerOverride
+		if def.Command != nil {
+			containerOverride.SetCommand(utility.ToStringPtrSlice(def.Command))
+		}
+		if def.MemoryMB != nil {
+			containerOverride.SetMemory(int64(*def.MemoryMB))
+		}
+		if def.CPU != nil {
+			containerOverride.SetCpu(int64(*def.CPU))
+		}
+
+		var envVars []*ecs.KeyValuePair
+		for _, envVar := range def.EnvVars {
+			var pair ecs.KeyValuePair
+			pair.SetName(utility.FromStringPtr(envVar.Name)).SetValue(utility.FromStringPtr(envVar.Value))
+			envVars = append(envVars, &pair)
+		}
+		containerOverride.SetEnvironment(envVars)
+
+		containerOverride.SetName(utility.FromStringPtr(def.Name))
+		containerOverrides = append(containerOverrides, &containerOverride)
+	}
+
+	return containerOverrides
+}
+
 // exportStrategy converts the strategy and parameter into an ECS placement
 // strategy.
 func (pc *BasicPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions) []*ecs.PlacementStrategy {
@@ -433,11 +492,9 @@ func translateContainerStatusInfo(containers []*ecs.Container) []cocoa.ECSContai
 func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.RegisterTaskDefinitionInput {
 	var taskDef ecs.RegisterTaskDefinitionInput
 
-	var containerDefs []*ecs.ContainerDefinition
-	for _, def := range opts.ContainerDefinitions {
-		containerDefs = append(containerDefs, exportContainerDefinition(def))
-	}
-	taskDef.SetContainerDefinitions(containerDefs)
+	taskDef.SetContainerDefinitions(exportContainerDefinitions(opts.ContainerDefinitions)).
+		SetFamily(utility.FromStringPtr(opts.Name)).
+		SetTags(ExportTags(opts.Tags))
 
 	if mem := utility.FromIntPtr(opts.MemoryMB); mem != 0 {
 		taskDef.SetMemory(strconv.Itoa(mem))
@@ -447,39 +504,47 @@ func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.Registe
 		taskDef.SetCpu(strconv.Itoa(cpu))
 	}
 
+	if opts.TaskRole != nil {
+		taskDef.SetTaskRoleArn(*opts.TaskRole)
+	}
+	if opts.ExecutionRole != nil {
+		taskDef.SetExecutionRoleArn(*opts.ExecutionRole)
+	}
+
 	if opts.NetworkMode != nil {
 		taskDef.SetNetworkMode(string(*opts.NetworkMode))
 	}
 
-	taskDef.SetFamily(utility.FromStringPtr(opts.Name)).
-		SetTaskRoleArn(utility.FromStringPtr(opts.TaskRole)).
-		SetExecutionRoleArn(utility.FromStringPtr(opts.ExecutionRole)).
-		SetTags(ExportTags(opts.Tags))
-
 	return &taskDef
 }
 
-// exportContainerDefinition converts a container definition into an ECS
-// container definition input.
-func exportContainerDefinition(def cocoa.ECSContainerDefinition) *ecs.ContainerDefinition {
-	var containerDef ecs.ContainerDefinition
-	if mem := utility.FromIntPtr(def.MemoryMB); mem != 0 {
-		containerDef.SetMemory(int64(mem))
+// exportContainerDefinition converts container definitions into their
+// equivalent ECS container definition.
+func exportContainerDefinitions(defs []cocoa.ECSContainerDefinition) []*ecs.ContainerDefinition {
+	var containerDefs []*ecs.ContainerDefinition
+
+	for _, def := range defs {
+		var containerDef ecs.ContainerDefinition
+		if mem := utility.FromIntPtr(def.MemoryMB); mem != 0 {
+			containerDef.SetMemory(int64(mem))
+		}
+		if cpu := utility.FromIntPtr(def.CPU); cpu != 0 {
+			containerDef.SetCpu(int64(cpu))
+		}
+		if dir := utility.FromStringPtr(def.WorkingDir); dir != "" {
+			containerDef.SetWorkingDirectory(dir)
+		}
+		containerDef.SetCommand(utility.ToStringPtrSlice(def.Command)).
+			SetImage(utility.FromStringPtr(def.Image)).
+			SetName(utility.FromStringPtr(def.Name)).
+			SetEnvironment(exportEnvVars(def.EnvVars)).
+			SetSecrets(exportSecrets(def.EnvVars)).
+			SetRepositoryCredentials(exportRepoCreds(def.RepoCreds)).
+			SetPortMappings(exportPortMappings(def.PortMappings))
+		containerDefs = append(containerDefs, &containerDef)
 	}
-	if cpu := utility.FromIntPtr(def.CPU); cpu != 0 {
-		containerDef.SetCpu(int64(cpu))
-	}
-	if dir := utility.FromStringPtr(def.WorkingDir); dir != "" {
-		containerDef.SetWorkingDirectory(dir)
-	}
-	containerDef.SetCommand(utility.ToStringPtrSlice(def.Command)).
-		SetImage(utility.FromStringPtr(def.Image)).
-		SetName(utility.FromStringPtr(def.Name)).
-		SetEnvironment(exportEnvVars(def.EnvVars)).
-		SetSecrets(exportSecrets(def.EnvVars)).
-		SetRepositoryCredentials(exportRepoCreds(def.RepoCreds)).
-		SetPortMappings(exportPortMappings(def.PortMappings))
-	return &containerDef
+
+	return containerDefs
 }
 
 // exportRepoCreds exports the repository credentials into ECS repository
@@ -502,6 +567,7 @@ func (pc *BasicPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecution
 		SetTaskDefinition(utility.FromStringPtr(taskDef.ID)).
 		SetTags(ExportTags(opts.Tags)).
 		SetEnableExecuteCommand(utility.FromBoolPtr(opts.SupportsDebugMode)).
+		SetOverrides(pc.exportOverrides(opts.OverrideOpts)).
 		SetPlacementStrategy(pc.exportStrategy(opts.PlacementOpts)).
 		SetPlacementConstraints(pc.exportPlacementConstraints(opts.PlacementOpts)).
 		SetNetworkConfiguration(pc.exportAWSVPCOptions(opts.AWSVPCOpts))
