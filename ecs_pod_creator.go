@@ -1257,6 +1257,10 @@ func MergeECSPodExecutionOptions(opts ...ECSPodExecutionOptions) ECSPodExecution
 		if opt.Tags != nil {
 			merged.Tags = opt.Tags
 		}
+
+		if opt.OverrideOpts != nil {
+			merged.OverrideOpts = opt.OverrideOpts
+		}
 	}
 
 	return merged
