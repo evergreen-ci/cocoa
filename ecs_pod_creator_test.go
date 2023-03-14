@@ -903,7 +903,7 @@ func TestECSContainerDefinition(t *testing.T) {
 			})
 
 		def := NewECSContainerDefinition().SetLogConfiguration(*lc)
-		assert.Len(t, def.LogConfiguration.Options, 3)
+		assert.Len(t, def.LogConfiguration.Options, 2)
 		assert.Equal(t, awsECS.LogDriverAwslogs, utility.FromStringPtr(def.LogConfiguration.LogDriver))
 
 		def = NewECSContainerDefinition().SetLogConfiguration(LogConfiguration{})
