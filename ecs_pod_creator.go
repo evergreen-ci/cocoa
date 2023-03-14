@@ -912,6 +912,13 @@ func (c *LogConfiguration) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(c.LogDriver == nil, "must specify a log driver")
 	catcher.NewWhen(c.Options == nil, "must specify log driver options")
+	if c.Options != nil {
+		_, groupDefined := c.Options["awslogs-group"]
+		_, regionDefined := c.Options["awslogs-region"]
+		catcher.NewWhen(!groupDefined, "must specify awslogs-group in options")
+		catcher.NewWhen(!regionDefined, "must specify awslogs-region in options")
+	}
+	catcher.NewWhen(c.Options != nil && c.Options["awslogs-group"] == nil, "must specify log driver options")
 	return catcher.Resolve()
 }
 

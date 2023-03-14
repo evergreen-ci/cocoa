@@ -2,9 +2,9 @@ package cocoa
 
 import (
 	"fmt"
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"testing"
 
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -898,9 +898,8 @@ func TestECSContainerDefinition(t *testing.T) {
 		lc := NewLogConfiguration().
 			SetLogDriver(awsECS.LogDriverAwslogs).
 			SetOptions(map[string]*string{
-				"awslogs-group":         utility.ToStringPtr("group"),
-				"awslogs-region":        utility.ToStringPtr("region"),
-				"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+				"awslogs-group":  utility.ToStringPtr("group"),
+				"awslogs-region": utility.ToStringPtr("region"),
 			})
 
 		def := NewECSContainerDefinition().SetLogConfiguration(*lc)
@@ -1308,14 +1307,12 @@ func TestLogConfiguration(t *testing.T) {
 	})
 	t.Run("SetOptions", func(t *testing.T) {
 		options := map[string]*string{
-			"awslogs-group":         utility.ToStringPtr("group"),
-			"awslogs-region":        utility.ToStringPtr("region"),
-			"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+			"awslogs-group":  utility.ToStringPtr("group"),
+			"awslogs-region": utility.ToStringPtr("region"),
 		}
 		lc := NewLogConfiguration().SetOptions(map[string]*string{
-			"awslogs-group":         utility.ToStringPtr("group"),
-			"awslogs-region":        utility.ToStringPtr("region"),
-			"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+			"awslogs-group":  utility.ToStringPtr("group"),
+			"awslogs-region": utility.ToStringPtr("region"),
 		})
 		assert.Equal(t, options, lc.Options)
 	})
@@ -1327,9 +1324,8 @@ func TestLogConfiguration(t *testing.T) {
 		t.Run("FailsWithNoDriverPopulated", func(t *testing.T) {
 			lc := NewLogConfiguration().
 				SetOptions(map[string]*string{
-					"awslogs-group":         utility.ToStringPtr("group"),
-					"awslogs-region":        utility.ToStringPtr("region"),
-					"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+					"awslogs-group":  utility.ToStringPtr("group"),
+					"awslogs-region": utility.ToStringPtr("region"),
 				})
 			assert.Error(t, lc.Validate())
 		})
@@ -1337,13 +1333,28 @@ func TestLogConfiguration(t *testing.T) {
 			lc := NewLogConfiguration().SetLogDriver(awsECS.LogDriverAwslogs)
 			assert.Error(t, lc.Validate())
 		})
+		t.Run("FailsWithNoLogGroupOption", func(t *testing.T) {
+			lc := NewLogConfiguration().
+				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetOptions(map[string]*string{
+					"awslogs-region": utility.ToStringPtr("region"),
+				})
+			assert.Error(t, lc.Validate())
+		})
+		t.Run("FailsWithNoRegionOption", func(t *testing.T) {
+			lc := NewLogConfiguration().
+				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetOptions(map[string]*string{
+					"awslogs-group": utility.ToStringPtr("group"),
+				})
+			assert.Error(t, lc.Validate())
+		})
 		t.Run("SucceedsWithDriverAndOptions", func(t *testing.T) {
 			lc := NewLogConfiguration().
 				SetLogDriver(awsECS.LogDriverAwslogs).
 				SetOptions(map[string]*string{
-					"awslogs-group":         utility.ToStringPtr("group"),
-					"awslogs-region":        utility.ToStringPtr("region"),
-					"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+					"awslogs-group":  utility.ToStringPtr("group"),
+					"awslogs-region": utility.ToStringPtr("region"),
 				})
 			assert.NoError(t, lc.Validate())
 		})
