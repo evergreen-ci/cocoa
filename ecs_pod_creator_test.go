@@ -2,6 +2,7 @@ package cocoa
 
 import (
 	"fmt"
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"testing"
 
 	"github.com/evergreen-ci/utility"
@@ -705,6 +706,39 @@ func TestECSPodDefinition(t *testing.T) {
 
 			assert.NotEqual(t, h0, h1, "container repo creds name should affect hash")
 		})
+		t.Run("ChangesForDifferentLogConfiguration", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+			creds := NewRepositoryCredentials().SetID("id")
+			opts.ContainerDefinitions[0].SetRepositoryCredentials(*creds)
+			assert.NotEqual(t, baseHash, opts.Hash(), "container repo creds should affect hash")
+		})
+		t.Run("ChangesForDifferentLogConfigurationDriver", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			logConf := NewLogConfiguration()
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetLogDriver(awsECS.LogDriverAwslogs))
+			h1 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, "log configuration driver should affect hash")
+		})
+		t.Run("ChangesForDifferentLogConfigurationOptions", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			logConf := NewLogConfiguration()
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf)
+			h0 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]*string{"key": utility.ToStringPtr("value")}))
+			h1 := opts.Hash()
+
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]*string{"key": utility.ToStringPtr("value"), "key2": utility.ToStringPtr("value")}))
+			h2 := opts.Hash()
+
+			assert.NotEqual(t, h0, h1, h2, "log configuration options should affect hash")
+		})
 		t.Run("ChangesForDifferentPortMappings", func(t *testing.T) {
 			opts := getValidPodDefOpts()
 
@@ -859,6 +893,22 @@ func TestECSContainerDefinition(t *testing.T) {
 
 		def.AddPortMappings()
 		assert.ElementsMatch(t, pms, def.PortMappings)
+	})
+	t.Run("SetLogConfiguration", func(t *testing.T) {
+		lc := NewLogConfiguration().
+			SetLogDriver(awsECS.LogDriverAwslogs).
+			SetOptions(map[string]*string{
+				"awslogs-group":         utility.ToStringPtr("group"),
+				"awslogs-region":        utility.ToStringPtr("region"),
+				"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+			})
+
+		def := NewECSContainerDefinition().SetLogConfiguration(*lc)
+		assert.Len(t, def.LogConfiguration.Options, 3)
+		assert.Equal(t, awsECS.LogDriverAwslogs, utility.FromStringPtr(def.LogConfiguration.LogDriver))
+
+		def = NewECSContainerDefinition().SetLogConfiguration(LogConfiguration{})
+		assert.Empty(t, def.LogConfiguration)
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
@@ -1241,6 +1291,61 @@ func TestPortMappings(t *testing.T) {
 				SetContainerPort(1337).
 				SetHostPort(100000)
 			assert.Error(t, pm.Validate())
+		})
+	})
+}
+
+func TestLogConfiguration(t *testing.T) {
+	t.Run("NewLogConfiguration", func(t *testing.T) {
+		lc := NewLogConfiguration()
+		require.NotZero(t, lc)
+		assert.Zero(t, *lc)
+	})
+	t.Run("SetLogDriver", func(t *testing.T) {
+		driver := awsECS.LogDriverAwslogs
+		lc := NewLogConfiguration().SetLogDriver(awsECS.LogDriverAwslogs)
+		assert.Equal(t, driver, utility.FromStringPtr(lc.LogDriver))
+	})
+	t.Run("SetOptions", func(t *testing.T) {
+		options := map[string]*string{
+			"awslogs-group":         utility.ToStringPtr("group"),
+			"awslogs-region":        utility.ToStringPtr("region"),
+			"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+		}
+		lc := NewLogConfiguration().SetOptions(map[string]*string{
+			"awslogs-group":         utility.ToStringPtr("group"),
+			"awslogs-region":        utility.ToStringPtr("region"),
+			"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+		})
+		assert.Equal(t, options, lc.Options)
+	})
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
+			pm := NewLogConfiguration()
+			assert.Error(t, pm.Validate())
+		})
+		t.Run("FailsWithNoDriverPopulated", func(t *testing.T) {
+			lc := NewLogConfiguration().
+				SetOptions(map[string]*string{
+					"awslogs-group":         utility.ToStringPtr("group"),
+					"awslogs-region":        utility.ToStringPtr("region"),
+					"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+				})
+			assert.Error(t, lc.Validate())
+		})
+		t.Run("FailsWithNoOptionsPopulated", func(t *testing.T) {
+			lc := NewLogConfiguration().SetLogDriver(awsECS.LogDriverAwslogs)
+			assert.Error(t, lc.Validate())
+		})
+		t.Run("SucceedsWithDriverAndOptions", func(t *testing.T) {
+			lc := NewLogConfiguration().
+				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetOptions(map[string]*string{
+					"awslogs-group":         utility.ToStringPtr("group"),
+					"awslogs-region":        utility.ToStringPtr("region"),
+					"awslogs-stream-prefix": utility.ToStringPtr("prefix"),
+				})
+			assert.NoError(t, lc.Validate())
 		})
 	})
 }

@@ -456,6 +456,8 @@ type ECSContainerDefinition struct {
 	// PortMappings are mappings between the ports within the container to
 	// allow network traffic.
 	PortMappings []PortMapping
+	// LogConfiguration is the configuration for logging the container's output.
+	LogConfiguration *LogConfiguration
 }
 
 // NewECSContainerDefinition returns a new uninitialized container definition.
@@ -535,6 +537,12 @@ func (d *ECSContainerDefinition) AddPortMappings(mappings ...PortMapping) *ECSCo
 	return d
 }
 
+// SetLogConfiguration sets the log configuration for the container.
+func (d *ECSContainerDefinition) SetLogConfiguration(logConfiguration LogConfiguration) *ECSContainerDefinition {
+	d.LogConfiguration = &logConfiguration
+	return d
+}
+
 // Validate checks that the container definition is valid and sets defaults
 // where possible.
 func (d *ECSContainerDefinition) Validate() error {
@@ -548,6 +556,9 @@ func (d *ECSContainerDefinition) Validate() error {
 	}
 	if d.RepoCreds != nil {
 		catcher.Wrap(d.RepoCreds.Validate(), "invalid repository credentials")
+	}
+	if d.LogConfiguration != nil {
+		catcher.Wrap(d.LogConfiguration.Validate(), "invalid log configuration")
 	}
 	for _, pm := range d.PortMappings {
 		catcher.Wrapf(pm.Validate(), "invalid port mapping")
@@ -598,6 +609,10 @@ func (d *ECSContainerDefinition) hash() string {
 
 	if d.RepoCreds != nil {
 		h.Add(d.RepoCreds.hash())
+	}
+
+	if d.LogConfiguration != nil {
+		h.Add(d.LogConfiguration.hash())
 	}
 
 	if len(d.PortMappings) != 0 {
@@ -864,6 +879,54 @@ func (s *SecretOptions) hash() string {
 		h.Add(strconv.FormatBool(utility.FromBoolPtr(s.Owned)))
 	}
 
+	return h.Sum()
+}
+
+// LogConfiguration represents the configuration for a container's logging.
+type LogConfiguration struct {
+	// LogDriver is the logging driver to use.
+	LogDriver *string
+	// Options are the logging driver options.
+	Options map[string]*string
+}
+
+// NewLogConfiguration returns a new uninitialized log configuration.
+func NewLogConfiguration() *LogConfiguration {
+	return &LogConfiguration{}
+}
+
+// SetLogDriver sets the logging driver to use.
+func (c *LogConfiguration) SetLogDriver(logDriver string) *LogConfiguration {
+	c.LogDriver = &logDriver
+	return c
+}
+
+// SetOptions sets the logging driver options.
+func (c *LogConfiguration) SetOptions(options map[string]*string) *LogConfiguration {
+	c.Options = options
+	return c
+}
+
+// Validate check that the log driver is set.
+func (c *LogConfiguration) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(c.LogDriver == nil, "must specify a log driver")
+	catcher.NewWhen(c.Options == nil, "must specify log driver options")
+	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the log configuration.
+func (c *LogConfiguration) hash() string {
+	h := utility.NewSHA1Hash()
+	if c.LogDriver != nil {
+		h.Add(utility.FromStringPtr(c.LogDriver))
+	}
+	if c.Options != nil {
+		for key, value := range c.Options {
+			h.Add(key)
+			h.Add(utility.FromStringPtr(value))
+		}
+	}
 	return h.Sum()
 }
 
