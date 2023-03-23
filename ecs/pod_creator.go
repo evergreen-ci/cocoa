@@ -555,7 +555,11 @@ func exportLogConfiguration(logConfiguration *cocoa.LogConfiguration) *ecs.LogCo
 	}
 	var converted ecs.LogConfiguration
 	converted.SetLogDriver(utility.FromStringPtr(logConfiguration.LogDriver))
-	converted.SetOptions(logConfiguration.Options)
+	options := map[string]*string{}
+	for k, v := range logConfiguration.Options {
+		options[k] = utility.ToStringPtr(v)
+	}
+	converted.SetOptions(options)
 	return &converted
 }
 

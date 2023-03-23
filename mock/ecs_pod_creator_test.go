@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	awsECS "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/ecs"
@@ -147,6 +148,12 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetValue("env_var_value")
+			logConfiguration := cocoa.NewLogConfiguration().
+				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetOptions(map[string]string{
+					"awslogs-group":  "group",
+					"awslogs-region": "region",
+				})
 			containerDef := cocoa.NewECSContainerDefinition().
 				SetName("container_name").
 				SetImage("image").
@@ -154,6 +161,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetWorkingDir("working_dir").
 				SetMemoryMB(100).
 				SetCPU(200).
+				SetLogConfiguration(*logConfiguration).
 				AddEnvironmentVariables(*envVar)
 			podDefOpts := cocoa.NewECSPodDefinitionOptions().
 				SetMemoryMB(300).
@@ -231,6 +239,10 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(envVar.Value), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Value))
+			assert.Equal(t, utility.FromStringPtr(containerDef.LogConfiguration.LogDriver), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.LogDriver))
+			for k, v := range containerDef.LogConfiguration.Options {
+				assert.Equal(t, v, utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.Options[k]))
+			}
 
 			// Verify RunTask inputs.
 

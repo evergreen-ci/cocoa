@@ -731,13 +731,28 @@ func TestECSPodDefinition(t *testing.T) {
 			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf)
 			h0 := opts.Hash()
 
-			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]*string{"key": utility.ToStringPtr("value")}))
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]string{"key": "value"}))
 			h1 := opts.Hash()
 
-			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]*string{"key": utility.ToStringPtr("value"), "key2": utility.ToStringPtr("value")}))
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(map[string]string{"key": "value", "key2": "value"}))
 			h2 := opts.Hash()
 
 			assert.NotEqual(t, h0, h1, h2, "log configuration options should affect hash")
+		})
+		t.Run("ReturnsSameValueForSameUnorderedLogConfigurationOptions", func(t *testing.T) {
+			opts := getValidPodDefOpts()
+
+			logConf := NewLogConfiguration()
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf)
+			logConfOptions := map[string]string{}
+
+			for i := 0; i < 10; i++ {
+				logConfOptions[utility.RandomString()] = utility.RandomString()
+			}
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetOptions(logConfOptions))
+			h0 := opts.Hash()
+			h1 := opts.Hash()
+			assert.Equal(t, h0, h1, "order of log configuration options should not affect hash")
 		})
 		t.Run("ChangesForDifferentPortMappings", func(t *testing.T) {
 			opts := getValidPodDefOpts()
@@ -897,9 +912,9 @@ func TestECSContainerDefinition(t *testing.T) {
 	t.Run("SetLogConfiguration", func(t *testing.T) {
 		lc := NewLogConfiguration().
 			SetLogDriver(awsECS.LogDriverAwslogs).
-			SetOptions(map[string]*string{
-				"awslogs-group":  utility.ToStringPtr("group"),
-				"awslogs-region": utility.ToStringPtr("region"),
+			SetOptions(map[string]string{
+				"awslogs-group":  "group",
+				"awslogs-region": "region",
 			})
 
 		def := NewECSContainerDefinition().SetLogConfiguration(*lc)
@@ -1306,13 +1321,13 @@ func TestLogConfiguration(t *testing.T) {
 		assert.Equal(t, driver, utility.FromStringPtr(lc.LogDriver))
 	})
 	t.Run("SetOptions", func(t *testing.T) {
-		options := map[string]*string{
-			"awslogs-group":  utility.ToStringPtr("group"),
-			"awslogs-region": utility.ToStringPtr("region"),
+		options := map[string]string{
+			"awslogs-group":  "group",
+			"awslogs-region": "region",
 		}
-		lc := NewLogConfiguration().SetOptions(map[string]*string{
-			"awslogs-group":  utility.ToStringPtr("group"),
-			"awslogs-region": utility.ToStringPtr("region"),
+		lc := NewLogConfiguration().SetOptions(map[string]string{
+			"awslogs-group":  "group",
+			"awslogs-region": "region",
 		})
 		assert.Equal(t, options, lc.Options)
 	})
@@ -1323,9 +1338,9 @@ func TestLogConfiguration(t *testing.T) {
 		})
 		t.Run("FailsWithNoDriverPopulated", func(t *testing.T) {
 			lc := NewLogConfiguration().
-				SetOptions(map[string]*string{
-					"awslogs-group":  utility.ToStringPtr("group"),
-					"awslogs-region": utility.ToStringPtr("region"),
+				SetOptions(map[string]string{
+					"awslogs-group":  "group",
+					"awslogs-region": "region",
 				})
 			assert.Error(t, lc.Validate())
 		})
@@ -1336,25 +1351,25 @@ func TestLogConfiguration(t *testing.T) {
 		t.Run("FailsWithNoLogGroupOption", func(t *testing.T) {
 			lc := NewLogConfiguration().
 				SetLogDriver(awsECS.LogDriverAwslogs).
-				SetOptions(map[string]*string{
-					"awslogs-region": utility.ToStringPtr("region"),
+				SetOptions(map[string]string{
+					"awslogs-region": "region",
 				})
 			assert.Error(t, lc.Validate())
 		})
 		t.Run("FailsWithNoRegionOption", func(t *testing.T) {
 			lc := NewLogConfiguration().
 				SetLogDriver(awsECS.LogDriverAwslogs).
-				SetOptions(map[string]*string{
-					"awslogs-group": utility.ToStringPtr("group"),
+				SetOptions(map[string]string{
+					"awslogs-group": "group",
 				})
 			assert.Error(t, lc.Validate())
 		})
 		t.Run("SucceedsWithDriverAndOptions", func(t *testing.T) {
 			lc := NewLogConfiguration().
 				SetLogDriver(awsECS.LogDriverAwslogs).
-				SetOptions(map[string]*string{
-					"awslogs-group":  utility.ToStringPtr("group"),
-					"awslogs-region": utility.ToStringPtr("region"),
+				SetOptions(map[string]string{
+					"awslogs-group":  "group",
+					"awslogs-region": "region",
 				})
 			assert.NoError(t, lc.Validate())
 		})
