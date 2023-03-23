@@ -287,51 +287,51 @@ func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 	return catcher.Resolve()
 }
 
-// tagPair represents a tag with a key and value pair.
-type tagPair struct {
+// pair represents a key and value pair.
+type pair struct {
 	key   string
 	value string
 }
 
 // hash returns the hash digest of the tag pair.
-func (tp tagPair) hash() string {
+func (tp pair) hash() string {
 	h := utility.NewSHA1Hash()
 	h.Add(tp.key)
 	h.Add(tp.value)
 	return h.Sum()
 }
 
-// hashableTagPairs represents a slice of key-value tag that can be hashed.
-type hashableTagPairs []tagPair
+// hashablePairs represents a slice of key-value pairs that can be hashed.
+type hashablePairs []pair
 
-// newHashableTagPairs returns a sorted slice of hashable tag pairs.
-func newHashableTagPairs(tags map[string]string) hashableTagPairs {
-	var htp hashableTagPairs
+// newHashablePairs returns a sorted slice of hashable key value pairs.
+func newHashablePairs(tags map[string]string) hashablePairs {
+	var htp hashablePairs
 	for k, v := range tags {
-		htp = append(htp, tagPair{key: k, value: v})
+		htp = append(htp, pair{key: k, value: v})
 	}
 	sort.Sort(htp)
 	return htp
 }
 
 // Len returns the number of container definitions.
-func (htp hashableTagPairs) Len() int {
+func (htp hashablePairs) Len() int {
 	return len(htp)
 }
 
 // Less returns whether or not the key for the pair at index i is
 // lexicographically before the key for the pair at index j.
-func (htp hashableTagPairs) Less(i, j int) bool {
+func (htp hashablePairs) Less(i, j int) bool {
 	return htp[i].key < htp[j].key
 }
 
 // Swap swaps the tag pairs at indexes i and j.
-func (htp hashableTagPairs) Swap(i, j int) {
+func (htp hashablePairs) Swap(i, j int) {
 	htp[i], htp[j] = htp[j], htp[i]
 }
 
 // hash returns the hash digest of the tag pairs.
-func (htp hashableTagPairs) hash() string {
+func (htp hashablePairs) hash() string {
 	if !sort.IsSorted(htp) {
 		sort.Sort(htp)
 	}
@@ -378,7 +378,7 @@ func (o *ECSPodDefinitionOptions) Hash() string {
 	}
 
 	if len(o.Tags) != 0 {
-		h.Add(newHashableTagPairs(o.Tags).hash())
+		h.Add(newHashablePairs(o.Tags).hash())
 	}
 
 	return h.Sum()
@@ -456,6 +456,8 @@ type ECSContainerDefinition struct {
 	// PortMappings are mappings between the ports within the container to
 	// allow network traffic.
 	PortMappings []PortMapping
+	// LogConfiguration is the configuration for logging the container's output.
+	LogConfiguration *LogConfiguration
 }
 
 // NewECSContainerDefinition returns a new uninitialized container definition.
@@ -535,6 +537,12 @@ func (d *ECSContainerDefinition) AddPortMappings(mappings ...PortMapping) *ECSCo
 	return d
 }
 
+// SetLogConfiguration sets the log configuration for the container.
+func (d *ECSContainerDefinition) SetLogConfiguration(lc LogConfiguration) *ECSContainerDefinition {
+	d.LogConfiguration = &lc
+	return d
+}
+
 // Validate checks that the container definition is valid and sets defaults
 // where possible.
 func (d *ECSContainerDefinition) Validate() error {
@@ -548,6 +556,9 @@ func (d *ECSContainerDefinition) Validate() error {
 	}
 	if d.RepoCreds != nil {
 		catcher.Wrap(d.RepoCreds.Validate(), "invalid repository credentials")
+	}
+	if d.LogConfiguration != nil {
+		catcher.Wrap(d.LogConfiguration.Validate(), "invalid log configuration")
 	}
 	for _, pm := range d.PortMappings {
 		catcher.Wrapf(pm.Validate(), "invalid port mapping")
@@ -598,6 +609,10 @@ func (d *ECSContainerDefinition) hash() string {
 
 	if d.RepoCreds != nil {
 		h.Add(d.RepoCreds.hash())
+	}
+
+	if d.LogConfiguration != nil {
+		h.Add(d.LogConfiguration.hash())
 	}
 
 	if len(d.PortMappings) != 0 {
@@ -864,6 +879,55 @@ func (s *SecretOptions) hash() string {
 		h.Add(strconv.FormatBool(utility.FromBoolPtr(s.Owned)))
 	}
 
+	return h.Sum()
+}
+
+// LogConfiguration represents the configuration for a container's logging.
+type LogConfiguration struct {
+	// LogDriver is the logging driver to use.
+	LogDriver *string
+	// Options are the logging driver options.
+	Options map[string]string
+}
+
+// NewLogConfiguration returns a new uninitialized log configuration.
+func NewLogConfiguration() *LogConfiguration {
+	return &LogConfiguration{}
+}
+
+// SetLogDriver sets the logging driver to use.
+func (c *LogConfiguration) SetLogDriver(ld string) *LogConfiguration {
+	c.LogDriver = &ld
+	return c
+}
+
+// SetOptions sets the logging driver options.
+func (c *LogConfiguration) SetOptions(o map[string]string) *LogConfiguration {
+	c.Options = o
+	return c
+}
+
+// Validate checks that the log driver as well as required groups "awslogs-group" and "awslogs-region" are both set.
+func (c *LogConfiguration) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(c.LogDriver == nil, "must specify a log driver")
+	catcher.NewWhen(c.Options == nil, "must specify log driver options")
+	if c.Options != nil {
+		catcher.NewWhen(c.Options["awslogs-group"] == "", "must specify awslogs-group in options")
+		catcher.NewWhen(c.Options["awslogs-region"] == "", "must specify awslogs-region in options")
+	}
+	return catcher.Resolve()
+}
+
+// hash returns the hash digest of the log configuration.
+func (c *LogConfiguration) hash() string {
+	h := utility.NewSHA1Hash()
+	if c.LogDriver != nil {
+		h.Add(utility.FromStringPtr(c.LogDriver))
+	}
+	if c.Options != nil {
+		h.Add(newHashablePairs(c.Options).hash())
+	}
 	return h.Sum()
 }
 

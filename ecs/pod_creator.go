@@ -539,12 +539,28 @@ func exportContainerDefinitions(defs []cocoa.ECSContainerDefinition) []*ecs.Cont
 			SetName(utility.FromStringPtr(def.Name)).
 			SetEnvironment(exportEnvVars(def.EnvVars)).
 			SetSecrets(exportSecrets(def.EnvVars)).
+			SetLogConfiguration(exportLogConfiguration(def.LogConfiguration)).
 			SetRepositoryCredentials(exportRepoCreds(def.RepoCreds)).
 			SetPortMappings(exportPortMappings(def.PortMappings))
 		containerDefs = append(containerDefs, &containerDef)
 	}
 
 	return containerDefs
+}
+
+// exportLogConfiguration exports the log configuration into ECS log configuration.
+func exportLogConfiguration(logConfiguration *cocoa.LogConfiguration) *ecs.LogConfiguration {
+	if logConfiguration == nil {
+		return nil
+	}
+	var converted ecs.LogConfiguration
+	converted.SetLogDriver(utility.FromStringPtr(logConfiguration.LogDriver))
+	options := map[string]*string{}
+	for k, v := range logConfiguration.Options {
+		options[k] = utility.ToStringPtr(v)
+	}
+	converted.SetOptions(options)
+	return &converted
 }
 
 // exportRepoCreds exports the repository credentials into ECS repository
