@@ -907,7 +907,7 @@ func (c *LogConfiguration) SetOptions(o map[string]string) *LogConfiguration {
 	return c
 }
 
-// Validate checks that the log driver as well as required groups "awslogs-group" and "awslogs-region" are set.
+// Validate checks that the log driver as well as required groups "awslogs-group" and "awslogs-region" are both set.
 func (c *LogConfiguration) Validate() error {
 	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(c.LogDriver == nil, "must specify a log driver")
