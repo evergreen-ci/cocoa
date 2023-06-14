@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 )

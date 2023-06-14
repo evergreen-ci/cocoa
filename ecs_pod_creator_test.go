@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
+	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/cocoa/internal/testcase"

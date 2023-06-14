@@ -3,7 +3,7 @@ package cocoa
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 // SecretsManagerClient provides a common interface to interact with a client

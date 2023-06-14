@@ -9,9 +9,9 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/awserr"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 // BasicSecretsManager provides a cocoa.Vault implementation backed by AWS

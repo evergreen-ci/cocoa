@@ -3,7 +3,7 @@ package awsutil
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/evergreen-ci/utility"
 	"github.com/pkg/errors"
 )
@@ -11,8 +11,8 @@ import (
 // BaseClient provides various helpers to set up and use AWS clients for various
 // services.
 type BaseClient struct {
-	opts    ClientOptions
-	session *session.Session
+	opts   ClientOptions
+	config *aws.Config
 }
 
 // NewBaseClient creates a new base AWS client from the client options.
@@ -21,23 +21,23 @@ func NewBaseClient(opts ClientOptions) BaseClient {
 }
 
 // GetSession ensures that the session is initialized and returns it.
-func (c *BaseClient) GetSession() (*session.Session, error) {
+func (c *BaseClient) GetConfig(ctx context.Context) (*aws.Config, error) {
 	if err := c.opts.Validate(); err != nil {
 		return nil, errors.Wrap(err, "invalid options")
 	}
 
-	if c.session != nil {
-		return c.session, nil
+	if c.config != nil {
+		return c.config, nil
 	}
 
-	sess, err := c.opts.GetSession()
+	config, err := c.opts.GetConfig(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating session")
 	}
 
-	c.session = sess
+	c.config = config
 
-	return c.session, nil
+	return c.config, nil
 }
 
 // GetRetryOptions returns the retry options for the client.

@@ -3,7 +3,7 @@ package cocoa
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 )
 
 // TagClient provides a common interface to interact with a client backed by the

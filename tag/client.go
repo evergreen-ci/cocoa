@@ -7,8 +7,8 @@ import (
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
 )

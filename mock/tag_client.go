@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/evergreen-ci/utility"
 )
 
