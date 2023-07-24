@@ -130,7 +130,7 @@ func (o *ClientOptions) GetCredentials(ctx context.Context) (aws.CredentialsProv
 	return o.stsProvider, nil
 }
 
-// GetSession gets the authenticated session to perform authorized API actions.
+// GetConfig gets the authenticated config to perform authorized API actions.
 func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 	if o.config != nil {
 		return o.config, nil

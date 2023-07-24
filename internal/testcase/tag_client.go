@@ -6,7 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretsManagerTypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -23,9 +25,9 @@ func TagClientTests() map[string]TagClientTestCase {
 	return map[string]TagClientTestCase{
 		"GetResourcesFailsWithInvalidInput": func(ctx context.Context, t *testing.T, c cocoa.TagClient) {
 			out, err := c.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				TagFilters: []types.TagFilter{
 					{
-						Values: []*string{aws.String("")},
+						Values: []string{""},
 					},
 				},
 			})
@@ -34,18 +36,18 @@ func TagClientTests() map[string]TagClientTestCase {
 		},
 		"GetResourcesFailsWithInvalidResourceType": func(ctx context.Context, t *testing.T, c cocoa.TagClient) {
 			out, err := c.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("nonexistent")},
+				ResourceTypeFilters: []string{"nonexistent"},
 			})
 			assert.Error(t, err)
 			assert.Zero(t, out)
 		},
 		"GetResourcesSucceedsWithNoResults": func(ctx context.Context, t *testing.T, c cocoa.TagClient) {
 			out, err := c.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    aws.String("nonexistent"),
-						Values: []*string{aws.String("nonexistent")},
+						Values: []string{"nonexistent"},
 					},
 				},
 			})
@@ -72,7 +74,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 	}
 	return map[string]TagClientSecretTestCase{
 		"GetResourcesMatchesSingleTagKeyAndValueForSingleResource": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -86,11 +88,11 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{inputTags[0].Value},
+						Values: []string{utility.FromStringPtr(inputTags[0].Value)},
 					},
 				},
 			})
@@ -99,7 +101,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			checkResources(t, *getResourcesOut, []string{utility.FromStringPtr(createSecretOut.ARN)})
 		},
 		"GetResourcesMatchesSingleKeyAndValueForMultipleResources": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -117,11 +119,11 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			}
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{inputTags[0].Value},
+						Values: []string{utility.FromStringPtr(inputTags[0].Value)},
 					},
 				},
 			})
@@ -130,7 +132,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			checkResources(t, *getResourcesOut, arns)
 		},
 		"GetResourcesMatchesSingleTagKeyAndOneOfMultipleValues": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -144,11 +146,11 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{aws.String("foo"), aws.String("bar"), inputTags[0].Value, aws.String("baz")},
+						Values: []string{"foo", "bar", utility.FromStringPtr(inputTags[0].Value), "baz"},
 					},
 				},
 			})
@@ -157,7 +159,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			checkResources(t, *getResourcesOut, []string{utility.FromStringPtr(createSecretOut.ARN)})
 		},
 		"GetResourcesMatchesMultipleTagKeys": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -175,8 +177,8 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key: inputTags[0].Key,
 					},
@@ -190,7 +192,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			checkResources(t, *getResourcesOut, []string{utility.FromStringPtr(createSecretOut.ARN)})
 		},
 		"GetResourcesMatchesMultipleTagKeysAndValues": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -208,15 +210,15 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{aws.String("foo"), inputTags[0].Value, aws.String("baz")},
+						Values: []string{"foo", utility.FromStringPtr(inputTags[0].Value), "baz"},
 					},
 					{
 						Key:    inputTags[1].Key,
-						Values: []*string{aws.String("qux"), inputTags[1].Value, aws.String("quux")},
+						Values: []string{"qux", utility.FromStringPtr(inputTags[1].Value), "quux"},
 					},
 				},
 			})
@@ -225,7 +227,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			checkResources(t, *getResourcesOut, []string{utility.FromStringPtr(createSecretOut.ARN)})
 		},
 		"GetResourcesReturnsNoResultsForUnmatchedResourceType": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -239,11 +241,11 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("ecs:task-definition")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"ecs:task-definition"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{inputTags[0].Value},
+						Values: []string{utility.FromStringPtr(inputTags[0].Value)},
 					},
 				},
 			})
@@ -252,7 +254,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			assert.Empty(t, getResourcesOut.ResourceTagMappingList)
 		},
 		"GetResourcesOmitsResultForAnyUnmatchedTagKey": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -266,11 +268,11 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{inputTags[0].Value},
+						Values: []string{utility.FromStringPtr(inputTags[0].Value)},
 					},
 					{
 						Key: aws.String("nonexistent"),
@@ -282,7 +284,7 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			assert.Empty(t, getResourcesOut.ResourceTagMappingList)
 		},
 		"GetResourcesOmitsResultsForAnyUnmatchedTagValues": func(ctx context.Context, t *testing.T, tagClient cocoa.TagClient, smClient cocoa.SecretsManagerClient) {
-			inputTags := []*secretsmanager.Tag{
+			inputTags := []secretsManagerTypes.Tag{
 				{
 					Key:   aws.String(utility.RandomString()),
 					Value: aws.String(utility.RandomString()),
@@ -296,15 +298,15 @@ func TagClientSecretTests() map[string]TagClientSecretTestCase {
 			defer cleanupSecret(ctx, t, smClient, &createSecretOut)
 
 			getResourcesOut, err := tagClient.GetResources(ctx, &resourcegroupstaggingapi.GetResourcesInput{
-				ResourceTypeFilters: []*string{aws.String("secretsmanager:secret")},
-				TagFilters: []*resourcegroupstaggingapi.TagFilter{
+				ResourceTypeFilters: []string{"secretsmanager:secret"},
+				TagFilters: []types.TagFilter{
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{inputTags[0].Value},
+						Values: []string{utility.FromStringPtr(inputTags[0].Value)},
 					},
 					{
 						Key:    inputTags[0].Key,
-						Values: []*string{aws.String("nonexistent")},
+						Values: []string{"nonexistent"},
 					},
 				},
 			})

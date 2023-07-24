@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/aws/aws-sdk-go-v2/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
 )
@@ -34,7 +34,7 @@ func AWSRole() string {
 func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
 		SetHTTPClient(hc).
-		SetCredentials(credentials.NewEnvCredentials()).
+		SetCredentials(credentials.NewStaticCredentialsProvider("", "", "")).
 		SetRole(AWSRole()).
 		SetRegion(AWSRegion())
 }
@@ -43,6 +43,6 @@ func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 // that doesn't make any actual requests to AWS.
 func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
-		SetCredentials(credentials.NewEnvCredentials()).
+		SetCredentials(credentials.NewStaticCredentialsProvider("", "", "")).
 		SetRegion("us-east-1")
 }

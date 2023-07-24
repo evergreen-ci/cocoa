@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,9 +13,9 @@ import (
 
 func TestClientOptions(t *testing.T) {
 	t.Run("SetCredentials", func(t *testing.T) {
-		creds := credentials.NewEnvCredentials()
+		creds := credentials.NewStaticCredentialsProvider("", "", "")
 		opts := NewClientOptions().SetCredentials(creds)
-		assert.Equal(t, creds, opts.Creds)
+		assert.Equal(t, creds, opts.CredsProvider)
 	})
 	t.Run("SetRole", func(t *testing.T) {
 		role := "role"
@@ -48,7 +48,7 @@ func TestClientOptions(t *testing.T) {
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("SucceedsWithAllOptionSet", func(t *testing.T) {
-			creds := credentials.NewEnvCredentials()
+			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			role := "role"
 			region := "region"
 			retryOpts := utility.RetryOptions{
@@ -66,7 +66,7 @@ func TestClientOptions(t *testing.T) {
 
 			require.NoError(t, opts.Validate())
 
-			assert.Equal(t, creds, opts.Creds)
+			assert.Equal(t, creds, opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)
@@ -91,7 +91,7 @@ func TestClientOptions(t *testing.T) {
 			assert.NoError(t, opts.Validate())
 		})
 		t.Run("SucceedsWithoutRoleWhenCredentialsAreGiven", func(t *testing.T) {
-			creds := credentials.NewEnvCredentials()
+			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			region := "region"
 			retryOpts := utility.RetryOptions{
 				MaxAttempts: 10,
@@ -123,7 +123,7 @@ func TestClientOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("FailsWithoutRegion", func(t *testing.T) {
-			creds := credentials.NewEnvCredentials()
+			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			role := "role"
 			retryOpts := utility.RetryOptions{
 				MaxAttempts: 10,
@@ -140,7 +140,7 @@ func TestClientOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("DefaultsHTTPClient", func(t *testing.T) {
-			creds := credentials.NewEnvCredentials()
+			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			role := "role"
 			region := "region"
 			retryOpts := utility.RetryOptions{
@@ -157,7 +157,7 @@ func TestClientOptions(t *testing.T) {
 			require.NoError(t, opts.Validate())
 			defer opts.Close()
 
-			assert.Equal(t, creds, opts.Creds)
+			assert.Equal(t, creds, opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)

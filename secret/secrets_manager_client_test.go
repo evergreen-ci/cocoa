@@ -28,7 +28,7 @@ func TestBasicSecretsManagerClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicSecretsManagerClient(testutil.ValidIntegrationAWSOptions(hc))
+	c, err := NewBasicSecretsManagerClient(ctx, testutil.ValidIntegrationAWSOptions(hc))
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)

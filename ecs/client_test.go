@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -28,7 +29,7 @@ func TestBasicECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicClient(testutil.ValidIntegrationAWSOptions(hc))
+	c, err := NewBasicClient(ctx, testutil.ValidIntegrationAWSOptions(hc))
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -75,7 +76,7 @@ func TestConvertFailureToError(t *testing.T) {
 			reason = "some reason"
 			detail = "some detail"
 		)
-		err := ConvertFailureToError(&awsECS.Failure{
+		err := ConvertFailureToError(types.Failure{
 			Arn:    aws.String(arn),
 			Reason: aws.String(reason),
 			Detail: aws.String(detail),
@@ -86,7 +87,7 @@ func TestConvertFailureToError(t *testing.T) {
 		assert.Contains(t, err.Error(), detail)
 	})
 	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
-		err := ConvertFailureToError(&awsECS.Failure{
+		err := ConvertFailureToError(types.Failure{
 			Arn:    aws.String("arn"),
 			Reason: aws.String(ReasonTaskMissing),
 		})

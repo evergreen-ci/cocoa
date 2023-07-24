@@ -132,7 +132,7 @@ func (p *BasicPod) StatusInfo() cocoa.ECSPodStatusInfo {
 func (p *BasicPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatusInfo, error) {
 	out, err := p.client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: p.resources.Cluster,
-		Tasks:   []*string{p.resources.TaskID},
+		Tasks:   []string{utility.FromStringPtr(p.resources.TaskID)},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "describing task")
@@ -149,7 +149,7 @@ func (p *BasicPod) LatestStatusInfo(ctx context.Context) (*cocoa.ECSPodStatusInf
 		return nil, errors.New("expected a task to exist in ECS, but none was returned")
 	}
 
-	p.statusInfo = translatePodStatusInfo(*out.Tasks[0])
+	p.statusInfo = translatePodStatusInfo(out.Tasks[0])
 
 	return &p.statusInfo, nil
 }
@@ -163,7 +163,8 @@ func (p *BasicPod) Stop(ctx context.Context) error {
 	}
 
 	var stopTask ecs.StopTaskInput
-	stopTask.SetCluster(utility.FromStringPtr(p.resources.Cluster)).SetTask(utility.FromStringPtr(p.resources.TaskID))
+	stopTask.Cluster = p.resources.Cluster
+	stopTask.Task = p.resources.TaskID
 
 	_, err := p.client.StopTask(ctx, &stopTask)
 	// If the pod has already been stopped, ECS will not have information about
@@ -190,7 +191,7 @@ func (p *BasicPod) Delete(ctx context.Context) error {
 
 	if p.resources.TaskDefinition != nil && utility.FromBoolPtr(p.resources.TaskDefinition.Owned) {
 		var deregisterDef ecs.DeregisterTaskDefinitionInput
-		deregisterDef.SetTaskDefinition(utility.FromStringPtr(p.resources.TaskDefinition.ID))
+		deregisterDef.TaskDefinition = p.resources.TaskDefinition.ID
 
 		if _, err := p.client.DeregisterTaskDefinition(ctx, &deregisterDef); err != nil {
 			catcher.Wrap(err, "deregistering task definition")

@@ -20,7 +20,7 @@ func NewBaseClient(opts ClientOptions) BaseClient {
 	return BaseClient{opts: opts}
 }
 
-// GetSession ensures that the session is initialized and returns it.
+// GetConfig ensures that the config is initialized and returns it.
 func (c *BaseClient) GetConfig(ctx context.Context) (*aws.Config, error) {
 	if err := c.opts.Validate(); err != nil {
 		return nil, errors.Wrap(err, "invalid options")

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
@@ -46,11 +46,11 @@ func CleanupSecrets(ctx context.Context, t *testing.T, c cocoa.SecretsManagerCli
 func cleanupSecretsWithToken(ctx context.Context, t *testing.T, c cocoa.SecretsManagerClient, token *string) (nextToken *string) {
 	out, err := c.ListSecrets(ctx, &secretsmanager.ListSecretsInput{
 		NextToken: token,
-		Filters: []*secretsmanager.Filter{
+		Filters: []types.Filter{
 			{
 				// Ignore secrets that were not generated within this test.
-				Key:    aws.String("name"),
-				Values: []*string{aws.String(secretName(t))},
+				Key:    "name",
+				Values: []string{secretName(t)},
 			},
 		},
 	})
@@ -62,9 +62,6 @@ func cleanupSecretsWithToken(ctx context.Context, t *testing.T, c cocoa.SecretsM
 	}
 
 	for _, secret := range out.SecretList {
-		if secret == nil {
-			continue
-		}
 		if secret.ARN == nil {
 			continue
 		}

@@ -162,7 +162,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
 			require.NotZero(t, opts.NetworkMode)
-			assert.EqualValues(t, *opts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
+			assert.EqualValues(t, *opts.NetworkMode, c.RegisterTaskDefinitionInput.NetworkMode)
 			assert.Equal(t, utility.FromStringPtr(opts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			assert.Len(t, c.RegisterTaskDefinitionInput.Tags, 2, "should have user-defined tag and cache tracking tag")
@@ -178,10 +178,10 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 				}
 			}
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu))
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory)
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu)
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(envVar.Value), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Value))
@@ -225,7 +225,7 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 			require.NoError(t, err)
 			assert.Equal(t, utility.FromIntPtr(opts.CPU), cpu)
 			require.NotZero(t, opts.NetworkMode)
-			assert.EqualValues(t, *opts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
+			assert.EqualValues(t, *opts.NetworkMode, c.RegisterTaskDefinitionInput.NetworkMode)
 			assert.Equal(t, utility.FromStringPtr(opts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(opts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			assert.Len(t, c.RegisterTaskDefinitionInput.Tags, 2, "should have user-defined tag and cache tracking tag")
@@ -241,10 +241,10 @@ func ecsPodDefinitionManagerTests() map[string]func(ctx context.Context, t *test
 				}
 			}
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu))
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory)
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu)
 
 			assert.NotZero(t, pdc.PutInput, "should have attempted to cache the pod definition")
 

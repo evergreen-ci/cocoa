@@ -4,13 +4,13 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/awserr"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
@@ -96,7 +96,8 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 
 	out, err := m.client.CreateSecret(ctx, in)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == secretsmanager.ErrCodeResourceExistsException {
+		var resourceExistsError types.ResourceExistsException
+		if errors.As(err, &resourceExistsError) {
 			// The secret already exists, so describe it to get the ARN.
 			describeOut, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{SecretId: s.Name})
 			if err != nil {
@@ -211,13 +212,14 @@ func (m *BasicSecretsManager) getCacheTag() string {
 
 // ExportTags converts a mapping of tag names to values into Secrets Manager
 // tags.
-func ExportTags(tags map[string]string) []*secretsmanager.Tag {
-	var smTags []*secretsmanager.Tag
+func ExportTags(tags map[string]string) []types.Tag {
+	var smTags []types.Tag
 
 	for k, v := range tags {
-		var tag secretsmanager.Tag
-		tag.SetKey(k).SetValue(v)
-		smTags = append(smTags, &tag)
+		var tag types.Tag
+		tag.Key = aws.String(k)
+		tag.Value = aws.String(v)
+		smTags = append(smTags, tag)
 	}
 
 	return smTags

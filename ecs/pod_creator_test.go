@@ -53,13 +53,13 @@ func TestBasicPodCreator(t *testing.T) {
 
 			awsOpts := testutil.ValidNonIntegrationAWSOptions()
 
-			c, err := NewBasicClient(awsOpts)
+			c, err := NewBasicClient(ctx, awsOpts)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
 			}()
 
-			smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
+			smc, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 			require.NoError(t, err)
 			require.NotNil(t, c)
 			defer func() {
@@ -86,7 +86,7 @@ func TestECSPodCreator(t *testing.T) {
 
 	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
 
-	c, err := NewBasicClient(awsOpts)
+	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -107,7 +107,7 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
+	smc, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)
