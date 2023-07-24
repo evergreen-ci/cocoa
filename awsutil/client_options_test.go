@@ -14,7 +14,7 @@ import (
 func TestClientOptions(t *testing.T) {
 	t.Run("SetCredentials", func(t *testing.T) {
 		creds := credentials.NewStaticCredentialsProvider("", "", "")
-		opts := NewClientOptions().SetCredentials(creds)
+		opts := NewClientOptions().SetCredentialsProvider(creds)
 		assert.Equal(t, creds, opts.CredsProvider)
 	})
 	t.Run("SetRole", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestClientOptions(t *testing.T) {
 			}
 			hc := http.DefaultClient
 			opts := NewClientOptions().
-				SetCredentials(creds).
+				SetCredentialsProvider(creds).
 				SetRole(role).
 				SetRegion(region).
 				SetRetryOptions(retryOpts).
@@ -100,7 +100,7 @@ func TestClientOptions(t *testing.T) {
 			}
 			hc := http.DefaultClient
 			opts := NewClientOptions().
-				SetCredentials(creds).
+				SetCredentialsProvider(creds).
 				SetRegion(region).
 				SetRetryOptions(retryOpts).
 				SetHTTPClient(hc)
@@ -132,7 +132,7 @@ func TestClientOptions(t *testing.T) {
 			}
 			hc := http.DefaultClient
 			opts := NewClientOptions().
-				SetCredentials(creds).
+				SetCredentialsProvider(creds).
 				SetRole(role).
 				SetRetryOptions(retryOpts).
 				SetHTTPClient(hc)
@@ -149,7 +149,7 @@ func TestClientOptions(t *testing.T) {
 				MaxDelay:    time.Second,
 			}
 			opts := NewClientOptions().
-				SetCredentials(creds).
+				SetCredentialsProvider(creds).
 				SetRole(role).
 				SetRegion(region).
 				SetRetryOptions(retryOpts)

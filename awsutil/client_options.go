@@ -44,8 +44,8 @@ func NewClientOptions() *ClientOptions {
 	return &ClientOptions{}
 }
 
-// SetCredentials sets the client's credentials.
-func (o *ClientOptions) SetCredentials(creds aws.CredentialsProvider) *ClientOptions {
+// SetCredentialsProvider sets the client's credentials provider.
+func (o *ClientOptions) SetCredentialsProvider(creds aws.CredentialsProvider) *ClientOptions {
 	o.CredsProvider = &creds
 	return o
 }

@@ -34,7 +34,7 @@ func AWSRole() string {
 func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
 		SetHTTPClient(hc).
-		SetCredentials(credentials.NewStaticCredentialsProvider("", "", "")).
+		SetCredentialsProvider(credentials.NewStaticCredentialsProvider("", "", "")).
 		SetRole(AWSRole()).
 		SetRegion(AWSRegion())
 }
@@ -43,6 +43,6 @@ func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
 // that doesn't make any actual requests to AWS.
 func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
-		SetCredentials(credentials.NewStaticCredentialsProvider("", "", "")).
+		SetCredentialsProvider(credentials.NewStaticCredentialsProvider("", "", "")).
 		SetRegion("us-east-1")
 }
