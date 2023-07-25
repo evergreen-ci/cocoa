@@ -319,18 +319,18 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 			containerOverride.Command = def.Command
 		}
 		if def.MemoryMB != nil {
-			containerOverride.Memory = aws.Int32(int32(*def.MemoryMB))
+			containerOverride.Memory = def.MemoryMB
 		}
 		if def.CPU != nil {
-			containerOverride.Cpu = aws.Int32(int32(*def.CPU))
+			containerOverride.Cpu = def.CPU
 		}
 
 		var envVars []types.KeyValuePair
 		for _, envVar := range def.EnvVars {
-			var pair types.KeyValuePair
-			pair.Name = envVar.Name
-			pair.Value = envVar.Value
-			envVars = append(envVars, pair)
+			envVars = append(envVars, types.KeyValuePair{
+				Name:  envVar.Name,
+				Value: envVar.Value,
+			})
 		}
 		containerOverride.Environment = envVars
 
@@ -492,6 +492,8 @@ func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.Registe
 	taskDef.ContainerDefinitions = exportContainerDefinitions(opts.ContainerDefinitions)
 	taskDef.Family = opts.Name
 	taskDef.Tags = ExportTags(opts.Tags)
+	taskDef.TaskRoleArn = opts.TaskRole
+	taskDef.ExecutionRoleArn = opts.ExecutionRole
 
 	if mem := utility.FromIntPtr(opts.MemoryMB); mem != 0 {
 		taskDef.Memory = aws.String(strconv.Itoa(mem))
@@ -499,13 +501,6 @@ func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.Registe
 
 	if cpu := utility.FromIntPtr(opts.CPU); cpu != 0 {
 		taskDef.Cpu = aws.String(strconv.Itoa(cpu))
-	}
-
-	if opts.TaskRole != nil {
-		taskDef.TaskRoleArn = opts.TaskRole
-	}
-	if opts.ExecutionRole != nil {
-		taskDef.ExecutionRoleArn = opts.ExecutionRole
 	}
 
 	if opts.NetworkMode != nil {
@@ -608,10 +603,10 @@ func exportPortMappings(mappings []cocoa.PortMapping) []types.PortMapping {
 	for _, pm := range mappings {
 		mapping := types.PortMapping{}
 		if pm.ContainerPort != nil {
-			mapping.ContainerPort = aws.Int32(int32(utility.FromIntPtr(pm.ContainerPort)))
+			mapping.ContainerPort = pm.ContainerPort
 		}
 		if pm.HostPort != nil {
-			mapping.HostPort = aws.Int32(int32(utility.FromIntPtr(pm.HostPort)))
+			mapping.HostPort = pm.HostPort
 		}
 		converted = append(converted, mapping)
 	}

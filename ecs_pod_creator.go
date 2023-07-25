@@ -255,9 +255,9 @@ func (o *ECSPodDefinitionOptions) validateContainerDefinitions() error {
 			catcher.NewWhen(len(def.PortMappings) != 0, "cannot specify port mappings because networking is disabled")
 		case NetworkModeHost, NetworkModeAWSVPC:
 			for _, pm := range def.PortMappings {
-				containerPort := utility.FromIntPtr(pm.ContainerPort)
+				containerPort := utility.FromInt32Ptr(pm.ContainerPort)
 				if pm.HostPort != nil {
-					hostPort := utility.FromIntPtr(pm.HostPort)
+					hostPort := utility.FromInt32Ptr(pm.HostPort)
 					catcher.ErrorfWhen(hostPort != containerPort,
 						"host port '%d' must be omitted or identical to the container port '%d' when network mode is '%s'", hostPort, containerPort, networkMode)
 				}
@@ -1068,14 +1068,14 @@ func (c *StoredRepositoryCredentials) hash() string {
 type PortMapping struct {
 	// ContainerPort is the port within the container to expose to network
 	// traffic.
-	ContainerPort *int
+	ContainerPort *int32
 	// HostPort is the port within the container instance to which the container
 	// port will be bound.
 	// If the pod's network mode is NetworkModeAWSVPC or NetworkModeHost, then
 	// this will be set to the same value as ContainerPort.
 	// If the pod's network mode is NetworkModeBridge, this can either be
 	// explicitly set or omitted to be assigned a port at random.
-	HostPort *int
+	HostPort *int32
 }
 
 // NewPortMapping returns a new uninitialized port mapping.
@@ -1085,14 +1085,14 @@ func NewPortMapping() *PortMapping {
 
 // SetContainerPort sets the port within the container to expose to network
 // traffic.
-func (m *PortMapping) SetContainerPort(port int) *PortMapping {
+func (m *PortMapping) SetContainerPort(port int32) *PortMapping {
 	m.ContainerPort = &port
 	return m
 }
 
 // SetHostPort sets the port within the container instance to which the
 // container port will be bound.
-func (m *PortMapping) SetHostPort(port int) *PortMapping {
+func (m *PortMapping) SetHostPort(port int32) *PortMapping {
 	m.HostPort = &port
 	return m
 }
@@ -1105,11 +1105,11 @@ func (m *PortMapping) Validate() error {
 		maxPort = 2 << 15
 	)
 	catcher := grip.NewBasicCatcher()
-	containerPort := utility.FromIntPtr(m.ContainerPort)
+	containerPort := utility.FromInt32Ptr(m.ContainerPort)
 	catcher.NewWhen(m.ContainerPort == nil, "must specify a container port")
 	catcher.ErrorfWhen(containerPort <= minPort || containerPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
 	if m.HostPort != nil {
-		hostPort := utility.FromIntPtr(m.HostPort)
+		hostPort := utility.FromInt32Ptr(m.HostPort)
 		catcher.ErrorfWhen(hostPort <= minPort || hostPort >= maxPort, "must specify a container port between %d-%d", minPort, maxPort)
 	}
 	return catcher.Resolve()
@@ -1119,11 +1119,11 @@ func (m *PortMapping) Validate() error {
 func (m *PortMapping) hash() string {
 	h := utility.NewSHA1Hash()
 	if m.ContainerPort != nil {
-		h.Add(strconv.Itoa(utility.FromIntPtr(m.ContainerPort)))
+		h.Add(strconv.Itoa(int(utility.FromInt32Ptr(m.ContainerPort))))
 	}
 
 	if m.HostPort != nil {
-		h.Add(strconv.Itoa(utility.FromIntPtr(m.HostPort)))
+		h.Add(strconv.Itoa(int(utility.FromInt32Ptr(m.HostPort))))
 	}
 
 	return h.Sum()
@@ -1147,9 +1147,9 @@ func (hpm hashablePortMappings) Len() int {
 // less than the container port for the mapping at index j. If they're equal,
 // the host ports are compared.
 func (hpm hashablePortMappings) Less(i, j int) bool {
-	cpi, cpj := utility.FromIntPtr(hpm[i].ContainerPort), utility.FromIntPtr(hpm[j].ContainerPort)
+	cpi, cpj := utility.FromInt32Ptr(hpm[i].ContainerPort), utility.FromInt32Ptr(hpm[j].ContainerPort)
 	if cpi == cpj {
-		return utility.FromIntPtr(hpm[i].HostPort) < utility.FromIntPtr(hpm[j].HostPort)
+		return utility.FromInt32Ptr(hpm[i].HostPort) < utility.FromInt32Ptr(hpm[j].HostPort)
 	}
 
 	return cpi < cpj
@@ -1436,9 +1436,9 @@ type ECSOverrideContainerDefinition struct {
 	// Command is the command to run, overriding any existing container command.
 	Command []string
 	// MemoryMB is the amount of memory (in MB) to allocate.
-	MemoryMB *int
+	MemoryMB *int32
 	// CPU is the number of CPU units to allocate.
-	CPU *int
+	CPU *int32
 	// EnvVars are the environment variables to override for this container. If
 	// there is an existing environment variable with the same name, it is
 	// overridden; otherwise, the environment variable is appended to the
@@ -1466,13 +1466,13 @@ func (d *ECSOverrideContainerDefinition) SetCommand(cmd []string) *ECSOverrideCo
 
 // SetMemoryMB sets the overriding amount of memory (in MB) to allocate for the
 // container.
-func (d *ECSOverrideContainerDefinition) SetMemoryMB(mem int) *ECSOverrideContainerDefinition {
+func (d *ECSOverrideContainerDefinition) SetMemoryMB(mem int32) *ECSOverrideContainerDefinition {
 	d.MemoryMB = &mem
 	return d
 }
 
 // SetCPU sets the overriding number of CPU units to allocate for the container.
-func (d *ECSOverrideContainerDefinition) SetCPU(cpu int) *ECSOverrideContainerDefinition {
+func (d *ECSOverrideContainerDefinition) SetCPU(cpu int32) *ECSOverrideContainerDefinition {
 	d.CPU = &cpu
 	return d
 }
