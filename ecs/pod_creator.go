@@ -70,7 +70,7 @@ func (pc *BasicPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCr
 		return nil, errors.Wrap(err, "running task")
 	}
 
-	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), task, *taskDef, mergedPodCreationOpts.DefinitionOpts.ContainerDefinitions)
+	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, mergedPodCreationOpts.DefinitionOpts.ContainerDefinitions)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod after requesting task")
 	}
@@ -99,7 +99,7 @@ func (pc *BasicPodCreator) CreatePodFromExistingDefinition(ctx context.Context, 
 		return nil, errors.Wrap(err, "running task")
 	}
 
-	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), task, *taskDef, nil)
+	p, err := pc.createPod(utility.FromStringPtr(mergedPodExecutionOpts.Cluster), *task, *taskDef, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating pod after requesting task")
 	}
@@ -159,18 +159,18 @@ func validateRegisterTaskDefinitionOutput(out *ecs.RegisterTaskDefinitionOutput)
 
 // runTask makes the request to run an ECS task from the execution options and
 // task definition and checks that it returns a valid task.
-func (pc *BasicPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExecutionOptions, def cocoa.ECSTaskDefinition) (types.Task, error) {
+func (pc *BasicPodCreator) runTask(ctx context.Context, opts cocoa.ECSPodExecutionOptions, def cocoa.ECSTaskDefinition) (*types.Task, error) {
 	in := pc.exportTaskExecutionOptions(opts, def)
 	out, err := pc.client.RunTask(ctx, in)
 	if err != nil {
-		return types.Task{}, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(in.TaskDefinition), utility.FromStringPtr(in.Cluster))
+		return nil, errors.Wrapf(err, "running task for definition '%s' in cluster '%s'", utility.FromStringPtr(in.TaskDefinition), utility.FromStringPtr(in.Cluster))
 	}
 
 	if err := pc.validateRunTaskOutput(out); err != nil {
-		return types.Task{}, errors.Wrap(err, "validating response from running task")
+		return nil, errors.Wrap(err, "validating response from running task")
 	}
 
-	return out.Tasks[0], nil
+	return &out.Tasks[0], nil
 }
 
 // validateRunTaskOutput checks that the output from running a task contains no

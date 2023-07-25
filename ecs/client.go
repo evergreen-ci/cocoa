@@ -318,10 +318,10 @@ func (c *BasicClient) Close(ctx context.Context) error {
 // known to be not retryable.
 func (c *BasicClient) isNonRetryableError(err error) bool {
 	for _, errType := range []error{
+		&types.AccessDeniedException{},
 		&types.ClientException{},
 		&types.InvalidParameterException{},
 		&types.ClusterNotFoundException{},
-		&types.AccessDeniedException{},
 		&smithy.InvalidParamsError{},
 		&smithy.ParamRequiredError{},
 	} {
@@ -336,7 +336,7 @@ func (c *BasicClient) isNonRetryableError(err error) bool {
 // isTaskNotFoundError returns whether or not the error returned from ECS is
 // because the task cannot be found.
 func isTaskNotFoundError(err error) bool {
-	invalidParameterErr := types.InvalidParameterException{}
+	var invalidParameterErr types.InvalidParameterException
 	return errors.As(err, &invalidParameterErr) &&
 		strings.Contains(invalidParameterErr.ErrorMessage(), "The referenced task was not found")
 }
