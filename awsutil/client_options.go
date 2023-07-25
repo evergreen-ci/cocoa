@@ -99,8 +99,8 @@ func (o *ClientOptions) Validate() error {
 	return nil
 }
 
-// GetCredentials retrieves the appropriate credentials to use for the client.
-func (o *ClientOptions) GetCredentials(ctx context.Context) (aws.CredentialsProvider, error) {
+// GetCredentialsProvider retrieves the appropriate credentials provider to use for the client.
+func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
 	if o.Role == nil && o.CredsProvider == nil {
 		return nil, errors.New("cannot get client credentials when neither explicit credentials are given, nor the role to assume is given")
 	}
@@ -136,7 +136,7 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 		return o.config, nil
 	}
 
-	creds, err := o.GetCredentials(ctx)
+	creds, err := o.GetCredentialsProvider(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting credentials")
 	}
