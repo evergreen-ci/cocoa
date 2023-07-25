@@ -15,7 +15,7 @@ func TestClientOptions(t *testing.T) {
 	t.Run("SetCredentials", func(t *testing.T) {
 		creds := credentials.NewStaticCredentialsProvider("", "", "")
 		opts := NewClientOptions().SetCredentialsProvider(creds)
-		assert.Equal(t, creds, opts.CredsProvider)
+		assert.Equal(t, creds, *opts.CredsProvider)
 	})
 	t.Run("SetRole", func(t *testing.T) {
 		role := "role"
@@ -66,7 +66,7 @@ func TestClientOptions(t *testing.T) {
 
 			require.NoError(t, opts.Validate())
 
-			assert.Equal(t, creds, opts.CredsProvider)
+			assert.Equal(t, creds, *opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)
@@ -157,7 +157,7 @@ func TestClientOptions(t *testing.T) {
 			require.NoError(t, opts.Validate())
 			defer opts.Close()
 
-			assert.Equal(t, creds, opts.CredsProvider)
+			assert.Equal(t, creds, *opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)
