@@ -233,7 +233,7 @@ func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 	return c.BaseClient.Close(ctx)
 }
 
-// isNonRetryableErrorCode returns whether or not the error code from Secrets
+// isNonRetryableError returns whether or not the error type from Secrets
 // Manager is known to be not retryable.
 func (c *BasicSecretsManagerClient) isNonRetryableError(err error) bool {
 	for _, errType := range []error{
@@ -244,7 +244,7 @@ func (c *BasicSecretsManagerClient) isNonRetryableError(err error) bool {
 		&smithy.InvalidParamsError{},
 		&smithy.ParamRequiredError{},
 	} {
-		if errors.As(err, errType) {
+		if errors.As(err, &errType) {
 			return true
 		}
 	}

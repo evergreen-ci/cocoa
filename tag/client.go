@@ -66,7 +66,7 @@ func (c *BasicTagClient) GetResources(ctx context.Context, in *resourcegroupstag
 		if errors.As(err, &apiErr) {
 			grip.Debug(message.WrapError(apiErr, msg))
 		}
-		if c.isNonRetryableErrorCode(err) {
+		if c.isNonRetryableError(err) {
 			return false, err
 		}
 
@@ -82,11 +82,11 @@ func (c *BasicTagClient) Close(ctx context.Context) error {
 	return c.BaseClient.Close(ctx)
 }
 
-func (c *BasicTagClient) isNonRetryableErrorCode(err error) bool {
+func (c *BasicTagClient) isNonRetryableError(err error) bool {
 	for _, errType := range []error{
 		&types.InvalidParameterException{},
 	} {
-		if errors.As(err, errType) {
+		if errors.As(err, &errType) {
 			return true
 		}
 	}
