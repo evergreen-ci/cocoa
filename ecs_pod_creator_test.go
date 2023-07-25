@@ -1266,12 +1266,12 @@ func TestPortMappings(t *testing.T) {
 	t.Run("SetContainerPort", func(t *testing.T) {
 		port := 1337
 		pm := NewPortMapping().SetContainerPort(1337)
-		assert.Equal(t, port, utility.FromInt32Ptr(pm.ContainerPort))
+		assert.EqualValues(t, port, utility.FromInt32Ptr(pm.ContainerPort))
 	})
 	t.Run("SetHostPort", func(t *testing.T) {
 		port := 1337
 		pm := NewPortMapping().SetHostPort(1337)
-		assert.Equal(t, port, utility.FromInt32Ptr(pm.HostPort))
+		assert.EqualValues(t, port, utility.FromInt32Ptr(pm.HostPort))
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("FailsWithNoFieldsPopulated", func(t *testing.T) {
@@ -1562,12 +1562,12 @@ func TestECSOverrideContainerDefinition(t *testing.T) {
 	t.Run("SetMemoryMB", func(t *testing.T) {
 		const mem = 128
 		def := NewECSOverrideContainerDefinition().SetMemoryMB(mem)
-		assert.Equal(t, mem, utility.FromInt32Ptr(def.MemoryMB))
+		assert.EqualValues(t, mem, utility.FromInt32Ptr(def.MemoryMB))
 	})
 	t.Run("SetCPU", func(t *testing.T) {
 		const mem = 128
 		def := NewECSOverrideContainerDefinition().SetCPU(mem)
-		assert.Equal(t, mem, utility.FromInt32Ptr(def.CPU))
+		assert.EqualValues(t, mem, utility.FromInt32Ptr(def.CPU))
 	})
 	t.Run("SetEnvironmentVariables", func(t *testing.T) {
 		envVar := NewKeyValue().SetName("name").SetValue("value")
