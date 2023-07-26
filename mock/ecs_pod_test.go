@@ -151,7 +151,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 		require.NoError(t, err)
 		assert.Empty(t, describeTasks.Failures)
 		require.Len(t, describeTasks.Tasks, 1)
-		assert.Equal(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].LastStatus))
+		assert.EqualValues(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].LastStatus))
 
 		for _, containerRes := range res.Containers {
 			for _, s := range containerRes.Secrets {

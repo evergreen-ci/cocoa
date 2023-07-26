@@ -402,7 +402,7 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 	require.NoError(t, err)
 	require.Empty(t, describeTasks.Failures)
 	require.Len(t, describeTasks.Tasks, 1)
-	assert.Equal(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].DesiredStatus))
+	assert.EqualValues(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].DesiredStatus))
 
 	require.NotZero(t, res.TaskDefinition)
 	if utility.FromBoolPtr(res.TaskDefinition.Owned) {
