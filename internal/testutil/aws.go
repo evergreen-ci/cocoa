@@ -1,12 +1,15 @@
 package testutil
 
 import (
+	"context"
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
+	"github.com/pkg/errors"
 )
 
 // runtimeNamespace is a random string generated during testing runtime that
@@ -19,11 +22,6 @@ import (
 // tests, they should not affect one another.
 var runtimeNamespace = utility.RandomString()
 
-// AWSRegion returns the AWS region from the environment variable.
-func AWSRegion() string {
-	return os.Getenv("AWS_REGION")
-}
-
 // AWSRole returns the AWS IAM role from the environment variable.
 func AWSRole() string {
 	return os.Getenv("AWS_ROLE")
@@ -31,12 +29,33 @@ func AWSRole() string {
 
 // ValidIntegrationAWSOptions returns valid options to create an AWS client that
 // can make actual requests to AWS for integration testing.
-func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
-	return *awsutil.NewClientOptions().
-		SetHTTPClient(hc).
-		SetCredentialsProvider(credentials.NewStaticCredentialsProvider("", "", "")).
-		SetRole(AWSRole()).
-		SetRegion(AWSRegion())
+func ValidIntegrationAWSOptions(ctx context.Context, hc *http.Client) (awsutil.ClientOptions, error) {
+	config, err := config.LoadDefaultConfig(ctx,
+		config.WithHTTPClient(hc),
+	)
+	if err != nil {
+		return awsutil.ClientOptions{}, errors.Wrap(err, "loading config")
+	}
+
+	role := AWSRole()
+	if role == "" {
+		return awsutil.ClientOptions{
+			Config: &config,
+		}, nil
+	}
+
+	config.Credentials, err = (&awsutil.ClientOptions{
+		HTTPClient:    hc,
+		Role:          &role,
+		Region:        &config.Region,
+		CredsProvider: &config.Credentials,
+	}).GetCredentialsProvider(ctx)
+	if err != nil {
+		return awsutil.ClientOptions{}, errors.Wrap(err, "getting credentials")
+	}
+	return awsutil.ClientOptions{
+		Config: &config,
+	}, nil
 }
 
 // ValidNonIntegrationAWSOptions returns valid options to create an AWS client

@@ -29,7 +29,10 @@ func TestBasicTagClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicTagClient(ctx, testutil.ValidIntegrationAWSOptions(hc))
+	awsOpts, err := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	require.NoError(t, err)
+
+	c, err := NewBasicTagClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, c.Close(ctx))
@@ -44,7 +47,7 @@ func TestBasicTagClient(t *testing.T) {
 		})
 	}
 
-	smClient, err := secret.NewBasicSecretsManagerClient(ctx, testutil.ValidIntegrationAWSOptions(hc))
+	smClient, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smClient)

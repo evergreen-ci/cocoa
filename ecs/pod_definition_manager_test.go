@@ -50,7 +50,8 @@ func TestECSPodDefinitionManager(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
+	awsOpts, err := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	require.NoError(t, err)
 
 	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)

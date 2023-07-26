@@ -29,7 +29,9 @@ func TestBasicECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicClient(ctx, testutil.ValidIntegrationAWSOptions(hc))
+	awsOpts, err := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	require.NoError(t, err)
+	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 

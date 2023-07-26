@@ -16,6 +16,9 @@ import (
 // ClientOptions represent AWS client options such as authentication and making
 // requests.
 type ClientOptions struct {
+	// Config is a preconfigured AWS config to use instead of constructing one from the
+	// rest of the options. If Config is specified the rest of the options are ignored.
+	Config *aws.Config
 	// CredsProvider is a credentials provider, which may be used to either connect to
 	// the AWS API directly, or authenticate to STS to retrieve temporary
 	// credentials to access the API (if Role is specified).
@@ -33,8 +36,6 @@ type ClientOptions struct {
 
 	stsClient   *sts.Client
 	stsProvider *stscreds.AssumeRoleProvider
-
-	config *aws.Config
 
 	ownsHTTPClient bool
 }
@@ -77,8 +78,11 @@ func (o *ClientOptions) SetHTTPClient(hc *http.Client) *ClientOptions {
 // Validate checks that all required fields are given and sets defaults for
 // unspecified options.
 func (o *ClientOptions) Validate() error {
-	catcher := grip.NewBasicCatcher()
+	if o.Config != nil {
+		return nil
+	}
 
+	catcher := grip.NewBasicCatcher()
 	catcher.NewWhen(o.Region == nil, "must provide geographical region")
 	catcher.NewWhen(o.Role == nil && o.CredsProvider == nil, "must provide either explicit credentials, role to assume, or both")
 
@@ -132,8 +136,8 @@ func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.Credent
 
 // GetConfig gets the authenticated config to perform authorized API actions.
 func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
-	if o.config != nil {
-		return o.config, nil
+	if o.Config != nil {
+		return o.Config, nil
 	}
 
 	creds, err := o.GetCredentialsProvider(ctx)
@@ -150,9 +154,9 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 		return nil, errors.Wrap(err, "creating config")
 	}
 
-	o.config = &config
+	o.Config = &config
 
-	return o.config, nil
+	return o.Config, nil
 }
 
 // Close cleans up the HTTP client if it is owned by this client.
