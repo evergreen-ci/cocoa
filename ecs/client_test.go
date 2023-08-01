@@ -29,8 +29,7 @@ func TestBasicECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts, err := testutil.ValidIntegrationAWSOptions(ctx, hc)
-	require.NoError(t, err)
+	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
 	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	require.NotNil(t, c)
@@ -95,4 +94,17 @@ func TestConvertFailureToError(t *testing.T) {
 		})
 		assert.True(t, cocoa.IsECSTaskNotFoundError(err))
 	})
+}
+
+func TestIsNonRetryableError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	awsOpts := testutil.ValidNonIntegrationAWSOptions()
+	c, err := NewBasicClient(ctx, awsOpts)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+
+	assert.False(t, c.isNonRetryableError(&types.UpdateInProgressException{}))
+	assert.True(t, c.isNonRetryableError(&types.AccessDeniedException{}))
 }

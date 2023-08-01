@@ -83,12 +83,6 @@ func (c *BasicTagClient) Close(ctx context.Context) error {
 }
 
 func (c *BasicTagClient) isNonRetryableError(err error) bool {
-	for _, errType := range []error{
-		&types.InvalidParameterException{},
-	} {
-		if errors.As(err, &errType) {
-			return true
-		}
-	}
-	return false
+	var errType *types.InvalidParameterException
+	return errors.As(err, &errType)
 }

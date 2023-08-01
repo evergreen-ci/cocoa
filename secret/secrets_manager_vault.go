@@ -96,7 +96,7 @@ func (m *BasicSecretsManager) CreateSecret(ctx context.Context, s cocoa.NamedSec
 
 	out, err := m.client.CreateSecret(ctx, in)
 	if err != nil {
-		resourceExistsError := &types.ResourceExistsException{}
+		var resourceExistsError *types.ResourceExistsException
 		if errors.As(err, &resourceExistsError) {
 			// The secret already exists, so describe it to get the ARN.
 			describeOut, err := m.client.DescribeSecret(ctx, &secretsmanager.DescribeSecretInput{SecretId: s.Name})

@@ -426,7 +426,7 @@ func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanag
 
 	s, ok := GlobalSecretCache[id]
 	if !ok {
-		return nil, &types.ResourceExistsException{Message: aws.String("secret not found")}
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	if s.IsDeleted {

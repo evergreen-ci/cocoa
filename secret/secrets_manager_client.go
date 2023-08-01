@@ -236,17 +236,15 @@ func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 // isNonRetryableError returns whether or not the error type from Secrets
 // Manager is known to be not retryable.
 func (c *BasicSecretsManagerClient) isNonRetryableError(err error) bool {
-	for _, errType := range []error{
-		&types.InvalidParameterException{},
-		&types.InvalidRequestException{},
-		&types.ResourceNotFoundException{},
-		&types.ResourceExistsException{},
-		&smithy.InvalidParamsError{},
-		&smithy.ParamRequiredError{},
-	} {
-		if errors.As(err, &errType) {
-			return true
-		}
-	}
-	return false
+	return matchesError[*types.InvalidParameterException](err) ||
+		matchesError[*types.InvalidRequestException](err) ||
+		matchesError[*types.ResourceNotFoundException](err) ||
+		matchesError[*types.ResourceExistsException](err) ||
+		matchesError[*smithy.InvalidParamsError](err) ||
+		matchesError[*smithy.ParamRequiredError](err)
+}
+
+func matchesError[T error](err error) bool {
+	var errType T
+	return errors.As(err, &errType)
 }

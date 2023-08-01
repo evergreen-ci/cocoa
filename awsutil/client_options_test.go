@@ -15,7 +15,7 @@ func TestClientOptions(t *testing.T) {
 	t.Run("SetCredentials", func(t *testing.T) {
 		creds := credentials.NewStaticCredentialsProvider("", "", "")
 		opts := NewClientOptions().SetCredentialsProvider(creds)
-		assert.Equal(t, creds, *opts.CredsProvider)
+		assert.Equal(t, creds, opts.CredsProvider)
 	})
 	t.Run("SetRole", func(t *testing.T) {
 		role := "role"
@@ -66,7 +66,7 @@ func TestClientOptions(t *testing.T) {
 
 			require.NoError(t, opts.Validate())
 
-			assert.Equal(t, creds, *opts.CredsProvider)
+			assert.Equal(t, creds, opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)
@@ -107,38 +107,7 @@ func TestClientOptions(t *testing.T) {
 
 			assert.NoError(t, opts.Validate())
 		})
-		t.Run("FailsWithNeitherCredentialsNorRoleAreGiven", func(t *testing.T) {
-			region := "region"
-			retryOpts := utility.RetryOptions{
-				MaxAttempts: 10,
-				MinDelay:    100 * time.Millisecond,
-				MaxDelay:    time.Second,
-			}
-			hc := http.DefaultClient
-			opts := NewClientOptions().
-				SetRegion(region).
-				SetRetryOptions(retryOpts).
-				SetHTTPClient(hc)
 
-			assert.Error(t, opts.Validate())
-		})
-		t.Run("FailsWithoutRegion", func(t *testing.T) {
-			creds := credentials.NewStaticCredentialsProvider("", "", "")
-			role := "role"
-			retryOpts := utility.RetryOptions{
-				MaxAttempts: 10,
-				MinDelay:    100 * time.Millisecond,
-				MaxDelay:    time.Second,
-			}
-			hc := http.DefaultClient
-			opts := NewClientOptions().
-				SetCredentialsProvider(creds).
-				SetRole(role).
-				SetRetryOptions(retryOpts).
-				SetHTTPClient(hc)
-
-			assert.Error(t, opts.Validate())
-		})
 		t.Run("DefaultsHTTPClient", func(t *testing.T) {
 			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			role := "role"
@@ -157,7 +126,7 @@ func TestClientOptions(t *testing.T) {
 			require.NoError(t, opts.Validate())
 			defer opts.Close()
 
-			assert.Equal(t, creds, *opts.CredsProvider)
+			assert.Equal(t, creds, opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)

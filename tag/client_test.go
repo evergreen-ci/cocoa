@@ -29,9 +29,7 @@ func TestBasicTagClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts, err := testutil.ValidIntegrationAWSOptions(ctx, hc)
-	require.NoError(t, err)
-
+	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
 	c, err := NewBasicTagClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
