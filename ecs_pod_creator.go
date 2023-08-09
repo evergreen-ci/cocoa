@@ -1119,11 +1119,11 @@ func (m *PortMapping) Validate() error {
 func (m *PortMapping) hash() string {
 	h := utility.NewSHA1Hash()
 	if m.ContainerPort != nil {
-		h.Add(strconv.Itoa(int(utility.FromIntPtr(m.ContainerPort))))
+		h.Add(strconv.Itoa(utility.FromIntPtr(m.ContainerPort)))
 	}
 
 	if m.HostPort != nil {
-		h.Add(strconv.Itoa(int(utility.FromIntPtr(m.HostPort))))
+		h.Add(strconv.Itoa(utility.FromIntPtr(m.HostPort)))
 	}
 
 	return h.Sum()
