@@ -206,7 +206,7 @@ type ECSContainer struct {
 	TaskARN    *string
 	Name       *string
 	Image      *string
-	CPU        int32
+	CPU        *int32
 	MemoryMB   *int32
 	Status     string
 	GoalStatus string
@@ -228,7 +228,7 @@ func newECSContainer(def ECSContainerDefinition, task ECSTask) ECSContainer {
 		TaskARN:    utility.ToStringPtr(task.ARN),
 		Name:       def.Name,
 		Image:      def.Image,
-		CPU:        def.CPU,
+		CPU:        aws.Int32(def.CPU),
 		MemoryMB:   def.MemoryMB,
 		Status:     string(types.DesiredStatusPending),
 		GoalStatus: string(types.DesiredStatusRunning),
@@ -244,7 +244,9 @@ func (c *ECSContainer) export() types.Container {
 		LastStatus:   aws.String(c.Status),
 	}
 
-	exported.Cpu = utility.ToStringPtr(strconv.Itoa(int(c.CPU)))
+	if c.CPU != nil {
+		exported.Cpu = utility.ToStringPtr(strconv.Itoa(int(*c.CPU)))
+	}
 	if c.MemoryMB != nil {
 		exported.Memory = utility.ToStringPtr(strconv.Itoa(int(utility.FromInt32Ptr(c.MemoryMB))))
 	}
