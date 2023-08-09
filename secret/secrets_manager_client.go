@@ -42,7 +42,7 @@ func (c *BasicSecretsManagerClient) setup(ctx context.Context) error {
 
 	config, err := c.GetConfig(ctx)
 	if err != nil {
-		return errors.Wrap(err, "initializing session")
+		return errors.Wrap(err, "initializing config")
 	}
 
 	c.sm = secretsmanager.NewFromConfig(*config)
@@ -61,10 +61,7 @@ func (c *BasicSecretsManagerClient) CreateSecret(ctx context.Context, in *secret
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("CreateSecret", in)
 		out, err = c.sm.CreateSecret(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -86,10 +83,7 @@ func (c *BasicSecretsManagerClient) GetSecretValue(ctx context.Context, in *secr
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("GetSecretValue", in)
 		out, err = c.sm.GetSecretValue(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -111,10 +105,7 @@ func (c *BasicSecretsManagerClient) DescribeSecret(ctx context.Context, in *secr
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("DescribeSecret", in)
 		out, err = c.sm.DescribeSecret(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -137,10 +128,7 @@ func (c *BasicSecretsManagerClient) ListSecrets(ctx context.Context, in *secrets
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("ListSecrets", in)
 		out, err = c.sm.ListSecrets(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -163,10 +151,7 @@ func (c *BasicSecretsManagerClient) UpdateSecretValue(ctx context.Context, in *s
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("UpdateSecret", in)
 		out, err = c.sm.UpdateSecret(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -188,10 +173,7 @@ func (c *BasicSecretsManagerClient) TagResource(ctx context.Context, in *secrets
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("TagResource", in)
 		out, err = c.sm.TagResource(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -213,10 +195,7 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("DeleteSecret", in)
 		out, err = c.sm.DeleteSecret(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -236,15 +215,10 @@ func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
 // isNonRetryableError returns whether or not the error type from Secrets
 // Manager is known to be not retryable.
 func (c *BasicSecretsManagerClient) isNonRetryableError(err error) bool {
-	return matchesError[*types.InvalidParameterException](err) ||
-		matchesError[*types.InvalidRequestException](err) ||
-		matchesError[*types.ResourceNotFoundException](err) ||
-		matchesError[*types.ResourceExistsException](err) ||
-		matchesError[*smithy.InvalidParamsError](err) ||
-		matchesError[*smithy.ParamRequiredError](err)
-}
-
-func matchesError[T error](err error) bool {
-	var errType T
-	return errors.As(err, &errType)
+	return utility.MatchesError[*types.InvalidParameterException](err) ||
+		utility.MatchesError[*types.InvalidRequestException](err) ||
+		utility.MatchesError[*types.ResourceNotFoundException](err) ||
+		utility.MatchesError[*types.ResourceExistsException](err) ||
+		utility.MatchesError[*smithy.InvalidParamsError](err) ||
+		utility.MatchesError[*smithy.ParamRequiredError](err)
 }

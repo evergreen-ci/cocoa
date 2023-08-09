@@ -268,8 +268,8 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.Len(t, c.RunTaskInput.Overrides.ContainerOverrides, 1)
 			containerOverride := c.RunTaskInput.Overrides.ContainerOverrides[0]
 			assert.Equal(t, overrideContainerDef.Command, containerOverride.Command)
-			assert.Equal(t, utility.FromInt32Ptr(overrideContainerDef.MemoryMB), utility.FromInt32Ptr(containerOverride.Memory))
-			assert.Equal(t, utility.FromInt32Ptr(overrideContainerDef.CPU), utility.FromInt32Ptr(containerOverride.Cpu))
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.MemoryMB), utility.FromInt32Ptr(containerOverride.Memory))
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.CPU), utility.FromInt32Ptr(containerOverride.Cpu))
 			require.Len(t, containerOverride.Environment, 1)
 			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Name), utility.FromStringPtr(containerOverride.Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Value), utility.FromStringPtr(containerOverride.Environment[0].Value))

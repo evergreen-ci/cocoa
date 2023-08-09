@@ -216,10 +216,10 @@ func ExportTags(tags map[string]string) []types.Tag {
 	var smTags []types.Tag
 
 	for k, v := range tags {
-		var tag types.Tag
-		tag.Key = aws.String(k)
-		tag.Value = aws.String(v)
-		smTags = append(smTags, tag)
+		smTags = append(smTags, types.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
 	}
 
 	return smTags

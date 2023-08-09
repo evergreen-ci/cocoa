@@ -272,10 +272,10 @@ func ExportTags(tags map[string]string) []types.Tag {
 	var ecsTags []types.Tag
 
 	for k, v := range tags {
-		var tag types.Tag
-		tag.Key = aws.String(k)
-		tag.Value = aws.String(v)
-		ecsTags = append(ecsTags, tag)
+		ecsTags = append(ecsTags, types.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
 	}
 
 	return ecsTags
@@ -288,21 +288,16 @@ func (pc *BasicPodCreator) exportOverrides(opts *cocoa.ECSOverridePodDefinitionO
 		return nil
 	}
 
-	var overrides types.TaskOverride
-
-	overrides.ContainerOverrides = pc.exportOverrideContainerDefinitions(opts.ContainerDefinitions)
-
+	overrides := types.TaskOverride{
+		ContainerOverrides: pc.exportOverrideContainerDefinitions(opts.ContainerDefinitions),
+		TaskRoleArn:        opts.TaskRole,
+		ExecutionRoleArn:   opts.ExecutionRole,
+	}
 	if opts.MemoryMB != nil {
 		overrides.Memory = aws.String(strconv.Itoa(*opts.MemoryMB))
 	}
 	if opts.CPU != nil {
 		overrides.Cpu = aws.String(strconv.Itoa(*opts.CPU))
-	}
-	if opts.TaskRole != nil {
-		overrides.TaskRoleArn = opts.TaskRole
-	}
-	if opts.ExecutionRole != nil {
-		overrides.ExecutionRoleArn = opts.ExecutionRole
 	}
 
 	return &overrides
@@ -314,17 +309,6 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 	var containerOverrides []types.ContainerOverride
 
 	for _, def := range defs {
-		var containerOverride types.ContainerOverride
-		if def.Command != nil {
-			containerOverride.Command = def.Command
-		}
-		if def.MemoryMB != nil {
-			containerOverride.Memory = def.MemoryMB
-		}
-		if def.CPU != nil {
-			containerOverride.Cpu = def.CPU
-		}
-
 		var envVars []types.KeyValuePair
 		for _, envVar := range def.EnvVars {
 			envVars = append(envVars, types.KeyValuePair{
@@ -332,10 +316,13 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 				Value: envVar.Value,
 			})
 		}
-		containerOverride.Environment = envVars
-
-		containerOverride.Name = def.Name
-		containerOverrides = append(containerOverrides, containerOverride)
+		containerOverrides = append(containerOverrides, types.ContainerOverride{
+			Name:        def.Name,
+			Command:     def.Command,
+			Memory:      aws.Int32(int32(utility.FromIntPtr(def.MemoryMB))),
+			Cpu:         aws.Int32(int32(utility.FromIntPtr(def.CPU))),
+			Environment: envVars,
+		})
 	}
 
 	return containerOverrides
@@ -344,10 +331,12 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 // exportStrategy converts the strategy and parameter into an ECS placement
 // strategy.
 func (pc *BasicPodCreator) exportStrategy(opts *cocoa.ECSPodPlacementOptions) []types.PlacementStrategy {
-	var placementStrat types.PlacementStrategy
-	placementStrat.Type = types.PlacementStrategyType(*opts.Strategy)
-	placementStrat.Field = opts.StrategyParameter
-	return []types.PlacementStrategy{placementStrat}
+	return []types.PlacementStrategy{
+		{
+			Type:  types.PlacementStrategyType(*opts.Strategy),
+			Field: opts.StrategyParameter,
+		},
+	}
 }
 
 // exportPlacementConstraints converts the placement options into ECS placement
@@ -378,10 +367,10 @@ func exportEnvVars(envVars []cocoa.EnvironmentVariable) []types.KeyValuePair {
 		if envVar.SecretOpts != nil {
 			continue
 		}
-		var pair types.KeyValuePair
-		pair.Name = envVar.Name
-		pair.Value = envVar.Value
-		converted = append(converted, pair)
+		converted = append(converted, types.KeyValuePair{
+			Name:  envVar.Name,
+			Value: envVar.Value,
+		})
 	}
 
 	return converted
@@ -396,10 +385,10 @@ func exportSecrets(envVars []cocoa.EnvironmentVariable) []types.Secret {
 		if envVar.SecretOpts == nil {
 			continue
 		}
-
-		var secret types.Secret
-		secret.Name = envVar.Name
-		secret.ValueFrom = envVar.SecretOpts.ID
+		secret := types.Secret{
+			Name:      envVar.Name,
+			ValueFrom: envVar.SecretOpts.ID,
+		}
 		secrets = append(secrets, secret)
 	}
 
@@ -487,13 +476,13 @@ func translateContainerStatusInfo(containers []types.Container) []cocoa.ECSConta
 // exportPodDefinitionOptions converts options to create a pod definition into
 // its equivalent ECS task definition.
 func exportPodDefinitionOptions(opts cocoa.ECSPodDefinitionOptions) *ecs.RegisterTaskDefinitionInput {
-	var taskDef ecs.RegisterTaskDefinitionInput
-
-	taskDef.ContainerDefinitions = exportContainerDefinitions(opts.ContainerDefinitions)
-	taskDef.Family = opts.Name
-	taskDef.Tags = ExportTags(opts.Tags)
-	taskDef.TaskRoleArn = opts.TaskRole
-	taskDef.ExecutionRoleArn = opts.ExecutionRole
+	taskDef := ecs.RegisterTaskDefinitionInput{
+		ContainerDefinitions: exportContainerDefinitions(opts.ContainerDefinitions),
+		Family:               opts.Name,
+		Tags:                 ExportTags(opts.Tags),
+		TaskRoleArn:          opts.TaskRole,
+		ExecutionRoleArn:     opts.ExecutionRole,
+	}
 
 	if mem := utility.FromIntPtr(opts.MemoryMB); mem != 0 {
 		taskDef.Memory = aws.String(strconv.Itoa(mem))
@@ -516,7 +505,16 @@ func exportContainerDefinitions(defs []cocoa.ECSContainerDefinition) []types.Con
 	var containerDefs []types.ContainerDefinition
 
 	for _, def := range defs {
-		var containerDef types.ContainerDefinition
+		containerDef := types.ContainerDefinition{
+			Command:               def.Command,
+			Image:                 def.Image,
+			Name:                  def.Name,
+			Environment:           exportEnvVars(def.EnvVars),
+			Secrets:               exportSecrets(def.EnvVars),
+			LogConfiguration:      exportLogConfiguration(def.LogConfiguration),
+			RepositoryCredentials: exportRepoCreds(def.RepoCreds),
+			PortMappings:          exportPortMappings(def.PortMappings),
+		}
 		if mem := utility.FromIntPtr(def.MemoryMB); mem != 0 {
 			containerDef.Memory = aws.Int32(int32(mem))
 		}
@@ -526,14 +524,7 @@ func exportContainerDefinitions(defs []cocoa.ECSContainerDefinition) []types.Con
 		if dir := utility.FromStringPtr(def.WorkingDir); dir != "" {
 			containerDef.WorkingDirectory = aws.String(dir)
 		}
-		containerDef.Command = def.Command
-		containerDef.Image = def.Image
-		containerDef.Name = def.Name
-		containerDef.Environment = exportEnvVars(def.EnvVars)
-		containerDef.Secrets = exportSecrets(def.EnvVars)
-		containerDef.LogConfiguration = exportLogConfiguration(def.LogConfiguration)
-		containerDef.RepositoryCredentials = exportRepoCreds(def.RepoCreds)
-		containerDef.PortMappings = exportPortMappings(def.PortMappings)
+
 		containerDefs = append(containerDefs, containerDef)
 	}
 
@@ -545,14 +536,15 @@ func exportLogConfiguration(logConfiguration *cocoa.LogConfiguration) *types.Log
 	if logConfiguration == nil {
 		return nil
 	}
-	var converted types.LogConfiguration
-	converted.LogDriver = types.LogDriver(utility.FromStringPtr(logConfiguration.LogDriver))
+
 	options := map[string]string{}
 	for k, v := range logConfiguration.Options {
 		options[k] = v
 	}
-	converted.Options = options
-	return &converted
+	return &types.LogConfiguration{
+		LogDriver: types.LogDriver(utility.FromStringPtr(logConfiguration.LogDriver)),
+		Options:   options,
+	}
 }
 
 // exportRepoCreds exports the repository credentials into ECS repository
@@ -561,26 +553,24 @@ func exportRepoCreds(creds *cocoa.RepositoryCredentials) *types.RepositoryCreden
 	if creds == nil {
 		return nil
 	}
-	var converted types.RepositoryCredentials
-	converted.CredentialsParameter = creds.ID
-	return &converted
+	return &types.RepositoryCredentials{CredentialsParameter: creds.ID}
 }
 
 // exportTaskExecutionOptions converts execution options and a task definition
 // into an ECS task execution input.
 func (pc *BasicPodCreator) exportTaskExecutionOptions(opts cocoa.ECSPodExecutionOptions, taskDef cocoa.ECSTaskDefinition) *ecs.RunTaskInput {
-	var runTask ecs.RunTaskInput
-	runTask.Cluster = opts.Cluster
-	runTask.CapacityProviderStrategy = pc.exportCapacityProvider(opts.CapacityProvider)
-	runTask.TaskDefinition = taskDef.ID
-	runTask.Tags = ExportTags(opts.Tags)
-	runTask.EnableExecuteCommand = utility.FromBoolPtr(opts.SupportsDebugMode)
-	runTask.Overrides = pc.exportOverrides(opts.OverrideOpts)
-	runTask.PlacementStrategy = pc.exportStrategy(opts.PlacementOpts)
-	runTask.PlacementConstraints = pc.exportPlacementConstraints(opts.PlacementOpts)
-	runTask.NetworkConfiguration = pc.exportAWSVPCOptions(opts.AWSVPCOpts)
-
-	if opts.PlacementOpts != nil && opts.PlacementOpts.Group != nil {
+	runTask := ecs.RunTaskInput{
+		Cluster:                  opts.Cluster,
+		CapacityProviderStrategy: pc.exportCapacityProvider(opts.CapacityProvider),
+		TaskDefinition:           taskDef.ID,
+		Tags:                     ExportTags(opts.Tags),
+		EnableExecuteCommand:     utility.FromBoolPtr(opts.SupportsDebugMode),
+		Overrides:                pc.exportOverrides(opts.OverrideOpts),
+		PlacementStrategy:        pc.exportStrategy(opts.PlacementOpts),
+		PlacementConstraints:     pc.exportPlacementConstraints(opts.PlacementOpts),
+		NetworkConfiguration:     pc.exportAWSVPCOptions(opts.AWSVPCOpts),
+	}
+	if opts.PlacementOpts != nil {
 		runTask.Group = opts.PlacementOpts.Group
 	}
 	return &runTask
@@ -592,21 +582,16 @@ func (pc *BasicPodCreator) exportCapacityProvider(provider *string) []types.Capa
 	if provider == nil {
 		return nil
 	}
-	var converted types.CapacityProviderStrategyItem
-	converted.CapacityProvider = provider
-	return []types.CapacityProviderStrategyItem{converted}
+	return []types.CapacityProviderStrategyItem{{CapacityProvider: provider}}
 }
 
 // exportPortMappings converts port mappings into ECS port mappings.
 func exportPortMappings(mappings []cocoa.PortMapping) []types.PortMapping {
 	var converted []types.PortMapping
 	for _, pm := range mappings {
-		mapping := types.PortMapping{}
-		if pm.ContainerPort != nil {
-			mapping.ContainerPort = pm.ContainerPort
-		}
-		if pm.HostPort != nil {
-			mapping.HostPort = pm.HostPort
+		mapping := types.PortMapping{
+			ContainerPort: aws.Int32(int32(utility.FromIntPtr(pm.ContainerPort))),
+			HostPort:      aws.Int32(int32(utility.FromIntPtr(pm.HostPort))),
 		}
 		converted = append(converted, mapping)
 	}
@@ -619,16 +604,10 @@ func (pc *BasicPodCreator) exportAWSVPCOptions(opts *cocoa.AWSVPCOptions) *types
 		return nil
 	}
 
-	var converted types.AwsVpcConfiguration
-	if len(opts.Subnets) != 0 {
-		converted.Subnets = opts.Subnets
+	return &types.NetworkConfiguration{
+		AwsvpcConfiguration: &types.AwsVpcConfiguration{
+			Subnets:        opts.Subnets,
+			SecurityGroups: opts.SecurityGroups,
+		},
 	}
-	if len(opts.SecurityGroups) != 0 {
-		converted.SecurityGroups = opts.SecurityGroups
-	}
-
-	var networkConf types.NetworkConfiguration
-	networkConf.AwsvpcConfiguration = &converted
-
-	return &networkConf
 }

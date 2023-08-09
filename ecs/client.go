@@ -42,7 +42,7 @@ func (c *BasicClient) setup(ctx context.Context) error {
 
 	config, err := c.GetConfig(ctx)
 	if err != nil {
-		return errors.Wrap(err, "initializing session")
+		return errors.Wrap(err, "initializing config")
 	}
 
 	c.ecs = ecs.NewFromConfig(*config)
@@ -61,10 +61,7 @@ func (c *BasicClient) RegisterTaskDefinition(ctx context.Context, in *ecs.Regist
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("RegisterTaskDefinition", in)
 		out, err = c.ecs.RegisterTaskDefinition(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -87,10 +84,7 @@ func (c *BasicClient) DescribeTaskDefinition(ctx context.Context, in *ecs.Descri
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("DescribeTaskDefinition", in)
 		out, err = c.ecs.DescribeTaskDefinition(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -113,10 +107,7 @@ func (c *BasicClient) ListTaskDefinitions(ctx context.Context, in *ecs.ListTaskD
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("ListTaskDefinitions", in)
 		out, err = c.ecs.ListTaskDefinitions(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -138,10 +129,7 @@ func (c *BasicClient) DeregisterTaskDefinition(ctx context.Context, in *ecs.Dere
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("DeregisterTaskDefinition", in)
 		out, err = c.ecs.DeregisterTaskDefinition(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -164,9 +152,9 @@ func (c *BasicClient) RunTask(ctx context.Context, in *ecs.RunTaskInput) (*ecs.R
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("RunTask", in)
 		out, err = c.ecs.RunTask(ctx, in)
+		grip.Debug(message.WrapError(err, msg))
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
 			if strings.Contains(apiErr.Error(), "provisioning capacity limit exceeded") {
 				// The ECS cluster has exceeded its maximum limit for number of
 				// tasks in the PROVISIONING state. This is a service-side issue
@@ -217,10 +205,7 @@ func (c *BasicClient) DescribeTasks(ctx context.Context, in *ecs.DescribeTasksIn
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("DescribeTasks", in)
 		out, err = c.ecs.DescribeTasks(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -242,10 +227,7 @@ func (c *BasicClient) ListTasks(ctx context.Context, in *ecs.ListTasksInput) (*e
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("ListTasks", in)
 		out, err = c.ecs.ListTasks(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -267,10 +249,7 @@ func (c *BasicClient) StopTask(ctx context.Context, in *ecs.StopTaskInput) (*ecs
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("StopTask", in)
 		out, err = c.ecs.StopTask(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if isTaskNotFoundError(err) {
 			return false, cocoa.NewECSTaskNotFoundError(utility.FromStringPtr(in.Task))
 		}
@@ -295,10 +274,7 @@ func (c *BasicClient) TagResource(ctx context.Context, in *ecs.TagResourceInput)
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("TagResource", in)
 		out, err = c.ecs.TagResource(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -317,17 +293,12 @@ func (c *BasicClient) Close(ctx context.Context) error {
 // isNonRetryableError returns whether or not the error type from ECS is
 // known to be not retryable.
 func (c *BasicClient) isNonRetryableError(err error) bool {
-	return matchesError[*types.AccessDeniedException](err) ||
-		matchesError[*types.ClientException](err) ||
-		matchesError[*types.InvalidParameterException](err) ||
-		matchesError[*types.ClusterNotFoundException](err) ||
-		matchesError[*smithy.InvalidParamsError](err) ||
-		matchesError[*smithy.ParamRequiredError](err)
-}
-
-func matchesError[T error](err error) bool {
-	var errType T
-	return errors.As(err, &errType)
+	return utility.MatchesError[*types.AccessDeniedException](err) ||
+		utility.MatchesError[*types.ClientException](err) ||
+		utility.MatchesError[*types.InvalidParameterException](err) ||
+		utility.MatchesError[*types.ClusterNotFoundException](err) ||
+		utility.MatchesError[*smithy.InvalidParamsError](err) ||
+		utility.MatchesError[*smithy.ParamRequiredError](err)
 }
 
 // isTaskNotFoundError returns whether or not the error returned from ECS is

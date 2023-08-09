@@ -32,7 +32,7 @@ func (c *BaseClient) GetConfig(ctx context.Context) (*aws.Config, error) {
 
 	config, err := c.opts.GetConfig(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating session")
+		return nil, errors.Wrap(err, "creating config")
 	}
 
 	c.config = config

@@ -104,7 +104,7 @@ func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.Credent
 			config.WithCredentialsProvider(o.CredsProvider),
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "creating session")
+			return nil, errors.Wrap(err, "creating STS config")
 		}
 
 		o.stsClient = sts.NewFromConfig(config)

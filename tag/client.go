@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
-	"github.com/aws/smithy-go"
 
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
@@ -43,7 +42,7 @@ func (c *BasicTagClient) setup(ctx context.Context) error {
 
 	config, err := c.GetConfig(ctx)
 	if err != nil {
-		return errors.Wrap(err, "initializing session")
+		return errors.Wrap(err, "initializing config")
 	}
 
 	c.rgt = resourcegroupstaggingapi.NewFromConfig(*config)
@@ -62,10 +61,7 @@ func (c *BasicTagClient) GetResources(ctx context.Context, in *resourcegroupstag
 	if err := utility.Retry(ctx, func() (bool, error) {
 		msg := awsutil.MakeAPILogMessage("GetResources", in)
 		out, err = c.rgt.GetResources(ctx, in)
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) {
-			grip.Debug(message.WrapError(apiErr, msg))
-		}
+		grip.Debug(message.WrapError(err, msg))
 		if c.isNonRetryableError(err) {
 			return false, err
 		}
@@ -83,6 +79,5 @@ func (c *BasicTagClient) Close(ctx context.Context) error {
 }
 
 func (c *BasicTagClient) isNonRetryableError(err error) bool {
-	var errType *types.InvalidParameterException
-	return errors.As(err, &errType)
+	return utility.MatchesError[*types.InvalidParameterException](err)
 }
