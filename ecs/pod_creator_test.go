@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -53,13 +53,13 @@ func TestBasicPodCreator(t *testing.T) {
 
 			awsOpts := testutil.ValidNonIntegrationAWSOptions()
 
-			c, err := NewBasicClient(awsOpts)
+			c, err := NewBasicClient(ctx, awsOpts)
 			require.NoError(t, err)
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
 			}()
 
-			smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
+			smc, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 			require.NoError(t, err)
 			require.NotNil(t, c)
 			defer func() {
@@ -84,9 +84,8 @@ func TestECSPodCreator(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	awsOpts := testutil.ValidIntegrationAWSOptions(hc)
-
-	c, err := NewBasicClient(awsOpts)
+	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
@@ -107,7 +106,7 @@ func TestECSPodCreator(t *testing.T) {
 		})
 	}
 
-	smc, err := secret.NewBasicSecretsManagerClient(awsOpts)
+	smc, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)

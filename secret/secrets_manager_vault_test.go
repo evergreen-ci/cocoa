@@ -22,7 +22,7 @@ func TestBasicSecretsManager(t *testing.T) {
 	defer utility.PutHTTPClient(hc)
 
 	t.Run("NewBasicSecretsManager", func(t *testing.T) {
-		c, err := NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
+		c, err := NewBasicSecretsManagerClient(ctx, testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, c.Close(ctx))
@@ -55,7 +55,8 @@ func TestSecretsManager(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicSecretsManagerClient(testutil.ValidIntegrationAWSOptions(hc))
+	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	c, err := NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)
@@ -78,6 +79,9 @@ func TestSecretsManager(t *testing.T) {
 }
 
 func TestBasicSecretsManagerOptions(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
@@ -87,7 +91,7 @@ func TestBasicSecretsManagerOptions(t *testing.T) {
 		assert.Zero(t, *opts)
 	})
 	t.Run("SetClient", func(t *testing.T) {
-		c, err := NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
+		c, err := NewBasicSecretsManagerClient(ctx, testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
 		opts := NewBasicSecretsManagerOptions().SetClient(c)
 		assert.Equal(t, c, opts.Client)
@@ -104,7 +108,7 @@ func TestBasicSecretsManagerOptions(t *testing.T) {
 			assert.Error(t, opts.Validate())
 		})
 		t.Run("SucceedsWithAllFieldsPopulated", func(t *testing.T) {
-			smClient, err := NewBasicSecretsManagerClient(testutil.ValidNonIntegrationAWSOptions())
+			smClient, err := NewBasicSecretsManagerClient(ctx, testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
 			opts := NewBasicSecretsManagerOptions().
 				SetClient(smClient).

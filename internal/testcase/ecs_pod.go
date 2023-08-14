@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -95,7 +96,7 @@ func ECSPodTests() map[string]ECSPodTestCase {
 
 			task, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 				Cluster: res.Cluster,
-				Tasks:   []*string{res.TaskID},
+				Tasks:   []string{utility.FromStringPtr(res.TaskID)},
 			})
 			require.NoError(t, err)
 			require.Len(t, task.Tasks, 1)
@@ -395,13 +396,13 @@ func checkPodDeleted(ctx context.Context, t *testing.T, c cocoa.ECSClient, v coc
 	res := p.Resources()
 
 	describeTasks, err := c.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Tasks:   []*string{res.TaskID},
+		Tasks:   []string{utility.FromStringPtr(res.TaskID)},
 		Cluster: res.Cluster,
 	})
 	require.NoError(t, err)
 	require.Empty(t, describeTasks.Failures)
 	require.Len(t, describeTasks.Tasks, 1)
-	assert.Equal(t, ecs.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].DesiredStatus))
+	assert.EqualValues(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].DesiredStatus))
 
 	require.NotZero(t, res.TaskDefinition)
 	if utility.FromBoolPtr(res.TaskDefinition.Owned) {

@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
@@ -66,7 +67,7 @@ func CleanupTaskDefinitions(ctx context.Context, t *testing.T, c cocoa.ECSClient
 // Cocoa tests based on the results from the pagination token.
 func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient, token *string) (nextToken *string) {
 	out, err := c.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
-		Status:    aws.String(ecs.TaskDefinitionStatusActive),
+		Status:    types.TaskDefinitionStatusActive,
 		NextToken: token,
 	})
 	if !assert.NoError(t, err) {
@@ -77,11 +78,7 @@ func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.
 	}
 
 	for _, arn := range out.TaskDefinitionArns {
-		if arn == nil {
-			continue
-		}
-
-		taskDefARN := *arn
+		taskDefARN := arn
 
 		// Ignore task definitions that were not generated within this test.
 		name := taskDefinitionFamily(t)
@@ -90,7 +87,7 @@ func cleanupTaskDefinitionsWithToken(ctx context.Context, t *testing.T, c cocoa.
 		}
 
 		_, err := c.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{
-			TaskDefinition: arn,
+			TaskDefinition: aws.String(arn),
 		})
 		if assert.NoError(t, err) {
 			grip.Info(message.Fields{
@@ -138,9 +135,6 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 	}
 
 	for _, task := range describeOut.Tasks {
-		if task == nil {
-			continue
-		}
 		if task.TaskArn == nil {
 			continue
 		}
@@ -178,9 +172,9 @@ func cleanupTasksWithToken(ctx context.Context, t *testing.T, c cocoa.ECSClient,
 // registering an ECS task definition.
 func ValidRegisterTaskDefinitionInput(t *testing.T) ecs.RegisterTaskDefinitionInput {
 	return ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
+		ContainerDefinitions: []types.ContainerDefinition{
 			{
-				Command: []*string{aws.String("echo"), aws.String("foo")},
+				Command: []string{"echo", "foo"},
 				Image:   aws.String("busybox"),
 				Name:    aws.String("print_foo"),
 			},

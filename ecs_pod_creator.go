@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/utility"
 	"github.com/mongodb/grip"
 )
@@ -1616,14 +1616,14 @@ type ECSPlacementStrategy string
 const (
 	// StrategySpread indicates that the ECS pod will be assigned in such a way
 	// to achieve an even spread based on the given ECSStrategyParameter.
-	StrategySpread ECSPlacementStrategy = ecs.PlacementStrategyTypeSpread
+	StrategySpread ECSPlacementStrategy = ECSPlacementStrategy(types.PlacementStrategyTypeSpread)
 	// StrategyRandom indicates that the ECS pod should be assigned to a
 	// container instance randomly.
-	StrategyRandom ECSPlacementStrategy = ecs.PlacementStrategyTypeRandom
+	StrategyRandom ECSPlacementStrategy = ECSPlacementStrategy(types.PlacementStrategyTypeRandom)
 	// StrategyBinpack indicates that the the ECS pod will be placed on a
 	// container instance with the least amount of memory or CPU that will be
 	// sufficient for the pod's requirements if possible.
-	StrategyBinpack ECSPlacementStrategy = ecs.PlacementStrategyTypeBinpack
+	StrategyBinpack ECSPlacementStrategy = ECSPlacementStrategy(types.PlacementStrategyTypeBinpack)
 )
 
 // Validate checks that the ECS pod status is one of the recognized placement

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 	"github.com/evergreen-ci/utility"
 )
 
@@ -16,17 +17,17 @@ type taggedResource struct {
 	Tags map[string]string
 }
 
-func exportTagMapping(res taggedResource) *resourcegroupstaggingapi.ResourceTagMapping {
-	return &resourcegroupstaggingapi.ResourceTagMapping{
+func exportTagMapping(res taggedResource) types.ResourceTagMapping {
+	return types.ResourceTagMapping{
 		ResourceARN: utility.ToStringPtr(res.ID),
 		Tags:        exportResourceTags(res.Tags),
 	}
 }
 
-func exportResourceTags(tags map[string]string) []*resourcegroupstaggingapi.Tag {
-	var exported []*resourcegroupstaggingapi.Tag
+func exportResourceTags(tags map[string]string) []types.Tag {
+	var exported []types.Tag
 	for k, v := range tags {
-		exported = append(exported, &resourcegroupstaggingapi.Tag{
+		exported = append(exported, types.Tag{
 			Key:   utility.ToStringPtr(k),
 			Value: utility.ToStringPtr(v),
 		})
@@ -73,7 +74,7 @@ func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstagginga
 		}
 	}
 
-	var converted []*resourcegroupstaggingapi.ResourceTagMapping
+	var converted []types.ResourceTagMapping
 	for _, match := range allMatches {
 		converted = append(converted, exportTagMapping(match))
 	}
@@ -83,7 +84,7 @@ func (c *TagClient) GetResources(ctx context.Context, in *resourcegroupstagginga
 	}, nil
 }
 
-func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*string) ([]taggedResourceFinder, error) {
+func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []string) ([]taggedResourceFinder, error) {
 	var matchingAnyResourceType []taggedResourceFinder
 
 	if len(resourceTypes) == 0 {
@@ -97,10 +98,9 @@ func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*strin
 	// In order for a resource to be a match, it must match at least one
 	// resource type filter.
 	for _, rt := range resourceTypes {
-		resourceType := utility.FromStringPtr(rt)
-		matchingResourceType := c.getResourceFinders(resourceType)
+		matchingResourceType := c.getResourceFinders(rt)
 		if len(matchingResourceType) == 0 {
-			return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, fmt.Sprintf("unsupported resource type '%s'", resourceType), nil)
+			return nil, &types.InvalidParameterException{Message: aws.String(fmt.Sprintf("unsupported resource type '%s'", rt))}
 		}
 
 		matchingAnyResourceType = append(matchingAnyResourceType, matchingResourceType...)
@@ -109,7 +109,7 @@ func (c *TagClient) getResourceFindersMatchingTypeFilters(resourceTypes []*strin
 	return matchingAnyResourceType, nil
 }
 
-func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFilters []*resourcegroupstaggingapi.TagFilter) (map[string]taggedResource, error) {
+func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFilters []types.TagFilter) (map[string]taggedResource, error) {
 	var matchingAllTags map[string]taggedResource
 
 	if len(tagFilters) != 0 {
@@ -118,16 +118,11 @@ func (c *TagClient) getResourcesMatchingTagFilters(f taggedResourceFinder, tagFi
 		// must have a tag with an exact matching key and its corresponding
 		// value must match one of the possible tag values.
 		for _, tf := range tagFilters {
-			if tf == nil {
-				continue
-			}
-
 			key := utility.FromStringPtr(tf.Key)
 			if key == "" {
-				return nil, awserr.New(resourcegroupstaggingapi.ErrCodeInvalidParameterException, "must specify a non-empty key for tag filter", nil)
+				return nil, &types.InvalidParameterException{Message: aws.String("must specify a non-empty key for tag filter")}
 			}
-			values := utility.FromStringPtrSlice(tf.Values)
-			matchingTag := f.getTaggedResources(key, values)
+			matchingTag := f.getTaggedResources(key, tf.Values)
 
 			if matchingAllTags == nil {
 				// Initialize the candidate set of matching resources for
@@ -212,7 +207,7 @@ func (f *ecsTaskDefinitionResourceFinder) getTaggedResources(key string, values 
 	res := map[string]taggedResource{}
 	for _, family := range GlobalECSService.TaskDefs {
 		for _, def := range family {
-			if utility.FromStringPtr(def.Status) == awsECS.TaskDefinitionStatusInactive {
+			if utility.FromStringPtr(def.Status) == string(ecsTypes.TaskDefinitionStatusInactive) {
 				continue
 			}
 

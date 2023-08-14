@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
@@ -145,12 +146,12 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 
 		describeTasks, err := c.DescribeTasks(ctx, &awsECS.DescribeTasksInput{
 			Cluster: res.Cluster,
-			Tasks:   []*string{res.TaskID},
+			Tasks:   []string{utility.FromStringPtr(res.TaskID)},
 		})
 		require.NoError(t, err)
 		assert.Empty(t, describeTasks.Failures)
 		require.Len(t, describeTasks.Tasks, 1)
-		assert.Equal(t, awsECS.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].LastStatus))
+		assert.EqualValues(t, types.DesiredStatusStopped, utility.FromStringPtr(describeTasks.Tasks[0].LastStatus))
 
 		for _, containerRes := range res.Containers {
 			for _, s := range containerRes.Secrets {
@@ -391,7 +392,7 @@ func ecsPodTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.E
 			require.NoError(t, err)
 
 			c.DescribeTasksOutput = &awsECS.DescribeTasksOutput{
-				Failures: []*awsECS.Failure{{
+				Failures: []types.Failure{{
 					Arn:    p.Resources().TaskDefinition.ID,
 					Detail: aws.String("fake detail"),
 					Reason: aws.String("fake reason"),

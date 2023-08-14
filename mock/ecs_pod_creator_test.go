@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/ecs"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
@@ -149,7 +149,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 				SetName("env_var_name").
 				SetValue("env_var_value")
 			logConfiguration := cocoa.NewLogConfiguration().
-				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetLogDriver(string(types.LogDriverAwslogs)).
 				SetOptions(map[string]string{
 					"awslogs-group":  "group",
 					"awslogs-region": "region",
@@ -222,7 +222,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromIntPtr(podDefOpts.CPU), cpu)
 
 			require.NotZero(t, podDefOpts.NetworkMode)
-			assert.EqualValues(t, *podDefOpts.NetworkMode, utility.FromStringPtr(c.RegisterTaskDefinitionInput.NetworkMode))
+			assert.EqualValues(t, *podDefOpts.NetworkMode, c.RegisterTaskDefinitionInput.NetworkMode)
 
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
@@ -232,16 +232,16 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, podDefOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
 
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory))
-			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), utility.FromInt64Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu))
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.MemoryMB), utility.FromInt32Ptr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Memory))
+			assert.EqualValues(t, utility.FromIntPtr(containerDef.CPU), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Cpu)
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(envVar.Value), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Environment[0].Value))
-			assert.Equal(t, utility.FromStringPtr(containerDef.LogConfiguration.LogDriver), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.LogDriver))
+			assert.EqualValues(t, utility.FromStringPtr(containerDef.LogConfiguration.LogDriver), c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.LogDriver)
 			for k, v := range containerDef.LogConfiguration.Options {
-				assert.Equal(t, v, utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.Options[k]))
+				assert.Equal(t, v, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].LogConfiguration.Options[k])
 			}
 
 			// Verify RunTask inputs.
@@ -267,33 +267,33 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			require.Len(t, c.RunTaskInput.Overrides.ContainerOverrides, 1)
 			containerOverride := c.RunTaskInput.Overrides.ContainerOverrides[0]
-			assert.Equal(t, overrideContainerDef.Command, utility.FromStringPtrSlice(containerOverride.Command))
-			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.MemoryMB), utility.FromInt64Ptr(containerOverride.Memory))
-			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.CPU), utility.FromInt64Ptr(containerOverride.Cpu))
+			assert.Equal(t, overrideContainerDef.Command, containerOverride.Command)
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.MemoryMB), utility.FromInt32Ptr(containerOverride.Memory))
+			assert.EqualValues(t, utility.FromIntPtr(overrideContainerDef.CPU), utility.FromInt32Ptr(containerOverride.Cpu))
 			require.Len(t, containerOverride.Environment, 1)
 			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Name), utility.FromStringPtr(containerOverride.Environment[0].Name))
 			assert.Equal(t, utility.FromStringPtr(overrideEnvVar.Value), utility.FromStringPtr(containerOverride.Environment[0].Value))
 
 			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
-			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
+			assert.EqualValues(t, *placementOpts.Strategy, c.RunTaskInput.PlacementStrategy[0].Type)
 			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
 			require.Len(t, c.RunTaskInput.PlacementConstraints, 2)
-			assert.Equal(t, "memberOf", utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Type))
+			assert.EqualValues(t, "memberOf", c.RunTaskInput.PlacementConstraints[0].Type)
 			assert.Equal(t, placementOpts.InstanceFilters[0], utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Expression))
-			assert.Equal(t, cocoa.ConstraintDistinctInstance, utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[1].Type))
+			assert.EqualValues(t, cocoa.ConstraintDistinctInstance, c.RunTaskInput.PlacementConstraints[1].Type)
 			assert.Zero(t, c.RunTaskInput.PlacementConstraints[1].Expression)
 
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration)
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration)
-			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets))
-			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups))
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets)
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups)
 
 			require.Len(t, c.RunTaskInput.Tags, 1)
 			assert.Equal(t, "execution_tag", utility.FromStringPtr(c.RunTaskInput.Tags[0].Key))
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
 
-			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
+			assert.True(t, c.RunTaskInput.EnableExecuteCommand)
 		},
 		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
@@ -331,7 +331,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
 			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets, 1)
 			assert.Equal(t, utility.FromStringPtr(envVar.Name), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Secrets[0].Name))
 			res := p.Resources()
@@ -378,7 +378,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromIntPtr(defOpts.CPU), cpu)
 			assert.Equal(t, utility.FromStringPtr(defOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
-			assert.Equal(t, containerDef.Command, utility.FromStringPtrSlice(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command))
+			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			res := p.Resources()
 			require.Len(t, res.Containers, 1)
 			require.Len(t, res.Containers[0].Secrets, 1)
@@ -475,21 +475,21 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(execOpts.CapacityProvider), utility.FromStringPtr(c.RunTaskInput.CapacityProviderStrategy[0].CapacityProvider))
 			assert.Equal(t, utility.FromStringPtr(placementOpts.Group), utility.FromStringPtr(c.RunTaskInput.Group))
 			require.Len(t, c.RunTaskInput.PlacementStrategy, 1)
-			assert.EqualValues(t, *placementOpts.Strategy, utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Type))
+			assert.EqualValues(t, *placementOpts.Strategy, c.RunTaskInput.PlacementStrategy[0].Type)
 			assert.Equal(t, utility.FromStringPtr(placementOpts.StrategyParameter), utility.FromStringPtr(c.RunTaskInput.PlacementStrategy[0].Field))
 			require.Len(t, c.RunTaskInput.PlacementConstraints, 2)
-			assert.Equal(t, "memberOf", utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Type))
+			assert.EqualValues(t, "memberOf", c.RunTaskInput.PlacementConstraints[0].Type)
 			assert.Equal(t, placementOpts.InstanceFilters[0], utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[0].Expression))
-			assert.Equal(t, cocoa.ConstraintDistinctInstance, utility.FromStringPtr(c.RunTaskInput.PlacementConstraints[1].Type))
+			assert.EqualValues(t, cocoa.ConstraintDistinctInstance, c.RunTaskInput.PlacementConstraints[1].Type)
 			assert.Zero(t, c.RunTaskInput.PlacementConstraints[1].Expression)
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration)
 			require.NotZero(t, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration)
-			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets))
-			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, utility.FromStringPtrSlice(c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups))
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.Subnets, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.Subnets)
+			assert.ElementsMatch(t, execOpts.AWSVPCOpts.SecurityGroups, c.RunTaskInput.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups)
 			require.Len(t, c.RunTaskInput.Tags, 1)
 			assert.Equal(t, "execution_tag", utility.FromStringPtr(c.RunTaskInput.Tags[0].Key))
 			assert.Equal(t, execOpts.Tags["execution_tag"], utility.FromStringPtr(c.RunTaskInput.Tags[0].Value))
-			assert.True(t, utility.FromBoolPtr(c.RunTaskInput.EnableExecuteCommand))
+			assert.True(t, c.RunTaskInput.EnableExecuteCommand)
 		},
 	}
 }

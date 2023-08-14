@@ -5,8 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/evergreen-ci/utility"
 )
 
@@ -38,8 +39,8 @@ func newStoredSecret(in *secretsmanager.CreateSecretInput, ts time.Time) StoredS
 	return s
 }
 
-func exportSecretListEntry(s StoredSecret) *secretsmanager.SecretListEntry {
-	return &secretsmanager.SecretListEntry{
+func exportSecretListEntry(s StoredSecret) types.SecretListEntry {
+	return types.SecretListEntry{
 		ARN:              utility.ToStringPtr(s.Name),
 		Name:             utility.ToStringPtr(s.Name),
 		CreatedDate:      utility.ToTimePtr(s.Created),
@@ -50,21 +51,18 @@ func exportSecretListEntry(s StoredSecret) *secretsmanager.SecretListEntry {
 	}
 }
 
-func newSecretsManagerTags(tags []*secretsmanager.Tag) map[string]string {
+func newSecretsManagerTags(tags []types.Tag) map[string]string {
 	converted := map[string]string{}
 	for _, t := range tags {
-		if t == nil {
-			continue
-		}
 		converted[utility.FromStringPtr(t.Key)] = utility.FromStringPtr(t.Value)
 	}
 	return converted
 }
 
-func exportSecretsManagerTags(tags map[string]string) []*secretsmanager.Tag {
-	var exported []*secretsmanager.Tag
+func exportSecretsManagerTags(tags map[string]string) []types.Tag {
+	var exported []types.Tag
 	for k, v := range tags {
-		exported = append(exported, &secretsmanager.Tag{
+		exported = append(exported, types.Tag{
 			Key:   utility.ToStringPtr(k),
 			Value: utility.ToStringPtr(v),
 		})
@@ -136,18 +134,18 @@ func (c *SecretsManagerClient) CreateSecret(ctx context.Context, in *secretsmana
 	}
 
 	if in.Name == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret name", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("missing secret name")}
 	}
 	if in.SecretBinary != nil && in.SecretString != nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "cannot specify both secret binary and secret string", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("cannot specify both secret binary and secret string")}
 	}
 	if in.SecretBinary == nil && in.SecretString == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "must specify either secret binary or secret string", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("must specify either secret binary or secret string")}
 	}
 
 	name := utility.FromStringPtr(in.Name)
 	if s, ok := GlobalSecretCache[name]; ok && !s.IsDeleted {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret already exists", nil)
+		return nil, &types.ResourceExistsException{Message: aws.String("secret already exists")}
 	}
 
 	newSecret := newStoredSecret(in, time.Now())
@@ -170,17 +168,17 @@ func (c *SecretsManagerClient) GetSecretValue(ctx context.Context, in *secretsma
 	}
 
 	if in.SecretId == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret ID", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("missing secret ID")}
 	}
 
 	id := utility.FromStringPtr(in.SecretId)
 	s := c.getSecret(id)
 	if s == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	if s.IsDeleted {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
+		return nil, &types.InvalidRequestException{Message: aws.String("secret is deleted")}
 	}
 
 	s.LastAccessed = time.Now()
@@ -219,12 +217,12 @@ func (c *SecretsManagerClient) DescribeSecret(ctx context.Context, in *secretsma
 	}
 
 	if in.SecretId == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret ID", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("missing secret ID")}
 	}
 
 	s, ok := GlobalSecretCache[utility.FromStringPtr(in.SecretId)]
 	if !ok {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	return &secretsmanager.DescribeSecretOutput{
@@ -252,18 +250,14 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 	var matchingAllFilters map[string]StoredSecret
 	if len(in.Filters) != 0 {
 		for _, f := range in.Filters {
-			if f == nil {
-				continue
-			}
-
 			var matchingValues map[string]StoredSecret
-			switch utility.FromStringPtr(f.Key) {
+			switch f.Key {
 			case "name":
-				matchingValues = c.secretsMatchingAnyNameValue(utility.FromStringPtrSlice(f.Values))
+				matchingValues = c.secretsMatchingAnyNameValue(f.Values)
 				// This could support other filter keys, but it's not worth it
 				// unless the need arises.
 			default:
-				return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "unsupported filter", nil)
+				return nil, &types.InvalidParameterException{Message: aws.String("unsupported filter")}
 			}
 
 			if matchingAllFilters == nil {
@@ -279,7 +273,7 @@ func (c *SecretsManagerClient) ListSecrets(ctx context.Context, in *secretsmanag
 		matchingAllFilters = GlobalSecretCache
 	}
 
-	var converted []*secretsmanager.SecretListEntry
+	var converted []types.SecretListEntry
 	for _, s := range matchingAllFilters {
 		converted = append(converted, exportSecretListEntry(s))
 	}
@@ -332,23 +326,23 @@ func (c *SecretsManagerClient) UpdateSecretValue(ctx context.Context, in *secret
 	}
 
 	if in.SecretId == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret ID", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("missing secret ID")}
 	}
 	if in.SecretBinary != nil && in.SecretString != nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "cannot specify both secret binary and secret string", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("cannot specify both secret binary and secret string")}
 	}
 	if in.SecretBinary == nil && in.SecretString == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "must specify either secret binary or secret string", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("must specify either secret binary or secret string")}
 	}
 
 	id := utility.FromStringPtr(in.SecretId)
 	s, ok := GlobalSecretCache[id]
 	if !ok {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	if s.IsDeleted {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
+		return nil, &types.InvalidRequestException{Message: aws.String("secret is deleted")}
 	}
 
 	if in.SecretBinary != nil {
@@ -381,16 +375,16 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 	}
 
 	if in.SecretId == nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "missing secret ID", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("missing secret ID")}
 	}
 
 	if utility.FromBoolPtr(in.ForceDeleteWithoutRecovery) && in.RecoveryWindowInDays != nil {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "cannot force delete without recovery and also schedule a recovery window", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("cannot force delete without recovery and also schedule a recovery window")}
 	}
 
 	window := int(utility.FromInt64Ptr(in.RecoveryWindowInDays))
 	if in.RecoveryWindowInDays != nil && (window < 7 || window > 30) {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidParameterException, "recovery window must be between 7 and 30 days", nil)
+		return nil, &types.InvalidParameterException{Message: aws.String("recovery window must be between 7 and 30 days")}
 	}
 	if window == 0 {
 		window = 30
@@ -399,7 +393,7 @@ func (c *SecretsManagerClient) DeleteSecret(ctx context.Context, in *secretsmana
 	id := utility.FromStringPtr(in.SecretId)
 	s, ok := GlobalSecretCache[id]
 	if !utility.FromBoolPtr(in.ForceDeleteWithoutRecovery) && !ok {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceNotFoundException, "secret not found", nil)
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	ts := time.Now()
@@ -432,11 +426,11 @@ func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanag
 
 	s, ok := GlobalSecretCache[id]
 	if !ok {
-		return nil, awserr.New(secretsmanager.ErrCodeResourceExistsException, "secret not found", nil)
+		return nil, &types.ResourceNotFoundException{Message: aws.String("secret not found")}
 	}
 
 	if s.IsDeleted {
-		return nil, awserr.New(secretsmanager.ErrCodeInvalidRequestException, "secret is deleted", nil)
+		return nil, &types.InvalidRequestException{Message: aws.String("secret is deleted")}
 	}
 
 	for k, v := range newSecretsManagerTags(in.Tags) {

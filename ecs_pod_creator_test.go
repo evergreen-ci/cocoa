@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -719,7 +719,7 @@ func TestECSPodDefinition(t *testing.T) {
 			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf)
 			h0 := opts.Hash()
 
-			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetLogDriver(awsECS.LogDriverAwslogs))
+			opts.ContainerDefinitions[0].SetLogConfiguration(*logConf.SetLogDriver(string(types.LogDriverAwslogs)))
 			h1 := opts.Hash()
 
 			assert.NotEqual(t, h0, h1, "log configuration driver should affect hash")
@@ -911,7 +911,7 @@ func TestECSContainerDefinition(t *testing.T) {
 	})
 	t.Run("SetLogConfiguration", func(t *testing.T) {
 		lc := NewLogConfiguration().
-			SetLogDriver(awsECS.LogDriverAwslogs).
+			SetLogDriver(string(types.LogDriverAwslogs)).
 			SetOptions(map[string]string{
 				"awslogs-group":  "group",
 				"awslogs-region": "region",
@@ -919,7 +919,7 @@ func TestECSContainerDefinition(t *testing.T) {
 
 		def := NewECSContainerDefinition().SetLogConfiguration(*lc)
 		assert.Len(t, def.LogConfiguration.Options, 2)
-		assert.Equal(t, awsECS.LogDriverAwslogs, utility.FromStringPtr(def.LogConfiguration.LogDriver))
+		assert.Equal(t, string(types.LogDriverAwslogs), utility.FromStringPtr(def.LogConfiguration.LogDriver))
 
 		def = NewECSContainerDefinition().SetLogConfiguration(LogConfiguration{})
 		assert.Empty(t, def.LogConfiguration)
@@ -1316,8 +1316,8 @@ func TestLogConfiguration(t *testing.T) {
 		assert.Zero(t, *lc)
 	})
 	t.Run("SetLogDriver", func(t *testing.T) {
-		driver := awsECS.LogDriverAwslogs
-		lc := NewLogConfiguration().SetLogDriver(awsECS.LogDriverAwslogs)
+		driver := string(types.LogDriverAwslogs)
+		lc := NewLogConfiguration().SetLogDriver(string(types.LogDriverAwslogs))
 		assert.Equal(t, driver, utility.FromStringPtr(lc.LogDriver))
 	})
 	t.Run("SetOptions", func(t *testing.T) {
@@ -1345,12 +1345,12 @@ func TestLogConfiguration(t *testing.T) {
 			assert.Error(t, lc.Validate())
 		})
 		t.Run("FailsWithNoOptionsPopulated", func(t *testing.T) {
-			lc := NewLogConfiguration().SetLogDriver(awsECS.LogDriverAwslogs)
+			lc := NewLogConfiguration().SetLogDriver(string(types.LogDriverAwslogs))
 			assert.Error(t, lc.Validate())
 		})
 		t.Run("FailsWithNoLogGroupOption", func(t *testing.T) {
 			lc := NewLogConfiguration().
-				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetLogDriver(string(types.LogDriverAwslogs)).
 				SetOptions(map[string]string{
 					"awslogs-region": "region",
 				})
@@ -1358,7 +1358,7 @@ func TestLogConfiguration(t *testing.T) {
 		})
 		t.Run("FailsWithNoRegionOption", func(t *testing.T) {
 			lc := NewLogConfiguration().
-				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetLogDriver(string(types.LogDriverAwslogs)).
 				SetOptions(map[string]string{
 					"awslogs-group": "group",
 				})
@@ -1366,7 +1366,7 @@ func TestLogConfiguration(t *testing.T) {
 		})
 		t.Run("SucceedsWithDriverAndOptions", func(t *testing.T) {
 			lc := NewLogConfiguration().
-				SetLogDriver(awsECS.LogDriverAwslogs).
+				SetLogDriver(string(types.LogDriverAwslogs)).
 				SetOptions(map[string]string{
 					"awslogs-group":  "group",
 					"awslogs-region": "region",

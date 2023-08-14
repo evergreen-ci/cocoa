@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	awsECS "github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsECS "github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
@@ -28,7 +29,8 @@ func TestBasicECSClient(t *testing.T) {
 	hc := utility.GetHTTPClient()
 	defer utility.PutHTTPClient(hc)
 
-	c, err := NewBasicClient(testutil.ValidIntegrationAWSOptions(hc))
+	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -75,7 +77,7 @@ func TestConvertFailureToError(t *testing.T) {
 			reason = "some reason"
 			detail = "some detail"
 		)
-		err := ConvertFailureToError(&awsECS.Failure{
+		err := ConvertFailureToError(types.Failure{
 			Arn:    aws.String(arn),
 			Reason: aws.String(reason),
 			Detail: aws.String(detail),
@@ -86,10 +88,23 @@ func TestConvertFailureToError(t *testing.T) {
 		assert.Contains(t, err.Error(), detail)
 	})
 	t.Run("ConvertsMissingTaskFailureToTaskNotFound", func(t *testing.T) {
-		err := ConvertFailureToError(&awsECS.Failure{
+		err := ConvertFailureToError(types.Failure{
 			Arn:    aws.String("arn"),
 			Reason: aws.String(ReasonTaskMissing),
 		})
 		assert.True(t, cocoa.IsECSTaskNotFoundError(err))
 	})
+}
+
+func TestIsNonRetryableError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	awsOpts := testutil.ValidNonIntegrationAWSOptions()
+	c, err := NewBasicClient(ctx, awsOpts)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+
+	assert.False(t, c.isNonRetryableError(&types.UpdateInProgressException{}))
+	assert.True(t, c.isNonRetryableError(&types.AccessDeniedException{}))
 }

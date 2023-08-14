@@ -1,24 +1,24 @@
 package awsutil
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/evergreen-ci/utility"
-	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
 )
 
 // ClientOptions represent AWS client options such as authentication and making
 // requests.
 type ClientOptions struct {
-	// Creds are the client credentials, which may be used to either connect to
+	// CredsProvider is a credentials provider, which may be used to either connect to
 	// the AWS API directly, or authenticate to STS to retrieve temporary
 	// credentials to access the API (if Role is specified).
-	Creds *credentials.Credentials
+	CredsProvider aws.CredentialsProvider
 	// Role is the STS role that should be used to perform authorized actions.
 	// If specified, Creds will be used to retrieve temporary credentials from
 	// STS.
@@ -30,10 +30,9 @@ type ClientOptions struct {
 	// HTTPClient is the HTTP client to use to make requests.
 	HTTPClient *http.Client
 
-	stsSession *session.Session
-	stsCreds   *credentials.Credentials
-
-	session *session.Session
+	stsClient   *sts.Client
+	stsProvider *stscreds.AssumeRoleProvider
+	config      *aws.Config
 
 	ownsHTTPClient bool
 }
@@ -43,9 +42,9 @@ func NewClientOptions() *ClientOptions {
 	return &ClientOptions{}
 }
 
-// SetCredentials sets the client's credentials.
-func (o *ClientOptions) SetCredentials(creds *credentials.Credentials) *ClientOptions {
-	o.Creds = creds
+// SetCredentialsProvider sets the client's credentials provider.
+func (o *ClientOptions) SetCredentialsProvider(creds aws.CredentialsProvider) *ClientOptions {
+	o.CredsProvider = creds
 	return o
 }
 
@@ -73,18 +72,8 @@ func (o *ClientOptions) SetHTTPClient(hc *http.Client) *ClientOptions {
 	return o
 }
 
-// Validate checks that all required fields are given and sets defaults for
-// unspecified options.
+// Validate sets defaults for unspecified options.
 func (o *ClientOptions) Validate() error {
-	catcher := grip.NewBasicCatcher()
-
-	catcher.NewWhen(o.Region == nil, "must provide geographical region")
-	catcher.NewWhen(o.Role == nil && o.Creds == nil, "must provide either explicit credentials, role to assume, or both")
-
-	if catcher.HasErrors() {
-		return catcher.Resolve()
-	}
-
 	if o.HTTPClient == nil {
 		o.HTTPClient = utility.GetHTTPClient()
 		o.ownsHTTPClient = true
@@ -98,60 +87,53 @@ func (o *ClientOptions) Validate() error {
 	return nil
 }
 
-// GetCredentials retrieves the appropriate credentials to use for the client.
-func (o *ClientOptions) GetCredentials() (*credentials.Credentials, error) {
-	if o.Role == nil && o.Creds == nil {
-		return nil, errors.New("cannot get client credentials when neither explicit credentials are given, nor the role to assume is given")
-	}
+// GetCredentialsProvider retrieves the appropriate credentials provider to use for the client.
+func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
 	if o.Role == nil {
-		return o.Creds, nil
+		return o.CredsProvider, nil
 	}
 
-	if o.stsCreds != nil {
-		return o.stsCreds, nil
+	if o.stsProvider != nil {
+		return o.stsProvider, nil
 	}
 
-	if o.stsSession == nil {
-		sess, err := session.NewSession(&aws.Config{
-			HTTPClient:  o.HTTPClient,
-			Region:      o.Region,
-			Credentials: o.Creds,
-		})
+	if o.stsClient == nil {
+		config, err := config.LoadDefaultConfig(ctx,
+			config.WithRegion(utility.FromStringPtr(o.Region)),
+			config.WithHTTPClient(o.HTTPClient),
+			config.WithCredentialsProvider(o.CredsProvider),
+		)
 		if err != nil {
-			return nil, errors.Wrap(err, "creating session")
+			return nil, errors.Wrap(err, "creating STS config")
 		}
 
-		o.stsSession = sess
+		o.stsClient = sts.NewFromConfig(config)
 	}
 
-	o.stsCreds = stscreds.NewCredentials(o.stsSession, *o.Role)
+	o.stsProvider = stscreds.NewAssumeRoleProvider(o.stsClient, *o.Role)
 
-	return o.stsCreds, nil
+	return o.stsProvider, nil
 }
 
-// GetSession gets the authenticated session to perform authorized API actions.
-func (o *ClientOptions) GetSession() (*session.Session, error) {
-	if o.session != nil {
-		return o.session, nil
-	}
-
-	creds, err := o.GetCredentials()
+// GetConfig gets the authenticated config to perform authorized API actions.
+func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
+	creds, err := o.GetCredentialsProvider(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting credentials")
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		HTTPClient:  o.HTTPClient,
-		Region:      o.Region,
-		Credentials: creds,
-	})
+	config, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(utility.FromStringPtr(o.Region)),
+		config.WithHTTPClient(o.HTTPClient),
+		config.WithCredentialsProvider(creds),
+	)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating session")
+		return nil, errors.Wrap(err, "creating config")
 	}
 
-	o.session = sess
+	o.config = &config
 
-	return o.session, nil
+	return o.config, nil
 }
 
 // Close cleans up the HTTP client if it is owned by this client.

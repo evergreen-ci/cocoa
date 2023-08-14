@@ -1,10 +1,11 @@
 package testutil
 
 import (
+	"context"
 	"net/http"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/evergreen-ci/cocoa/awsutil"
 	"github.com/evergreen-ci/utility"
 )
@@ -19,30 +20,26 @@ import (
 // tests, they should not affect one another.
 var runtimeNamespace = utility.RandomString()
 
-// AWSRegion returns the AWS region from the environment variable.
-func AWSRegion() string {
-	return os.Getenv("AWS_REGION")
-}
-
 // AWSRole returns the AWS IAM role from the environment variable.
 func AWSRole() string {
 	return os.Getenv("AWS_ROLE")
 }
 
 // ValidIntegrationAWSOptions returns valid options to create an AWS client that
-// can make actual requests to AWS for integration testing.
-func ValidIntegrationAWSOptions(hc *http.Client) awsutil.ClientOptions {
-	return *awsutil.NewClientOptions().
-		SetHTTPClient(hc).
-		SetCredentials(credentials.NewEnvCredentials()).
-		SetRole(AWSRole()).
-		SetRegion(AWSRegion())
+// can make actual requests to AWS for integration testing. Credentials and the region
+// will be extracted from the standard environment variables.
+func ValidIntegrationAWSOptions(ctx context.Context, hc *http.Client) awsutil.ClientOptions {
+	options := awsutil.NewClientOptions()
+	if role := AWSRole(); role != "" {
+		options.SetRole(role)
+	}
+	return *options
 }
 
 // ValidNonIntegrationAWSOptions returns valid options to create an AWS client
 // that doesn't make any actual requests to AWS.
 func ValidNonIntegrationAWSOptions() awsutil.ClientOptions {
 	return *awsutil.NewClientOptions().
-		SetCredentials(credentials.NewEnvCredentials()).
+		SetCredentialsProvider(credentials.NewStaticCredentialsProvider("", "", "")).
 		SetRegion("us-east-1")
 }

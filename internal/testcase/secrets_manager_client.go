@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/utility"
@@ -183,7 +184,7 @@ func SecretsManagerClientTests() map[string]SecretsManagerClientTestCase {
 			})
 			defer cleanupSecret(ctx, t, c, &createOut)
 
-			tags := []*secretsmanager.Tag{
+			tags := []types.Tag{
 				{
 					Key:   aws.String("some_key"),
 					Value: aws.String("some_value"),
@@ -211,7 +212,7 @@ func SecretsManagerClientTests() map[string]SecretsManagerClientTestCase {
 			})
 			defer cleanupSecret(ctx, t, c, &createOut)
 
-			tags := []*secretsmanager.Tag{
+			tags := []types.Tag{
 				{
 					Key:   aws.String("some_key"),
 					Value: aws.String("some_value"),
