@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/evergreen-ci/utility"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 )
 
 // ClientOptions represent AWS client options such as authentication and making
@@ -130,6 +131,7 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "creating config")
 	}
+	otelaws.AppendMiddlewares(&config.APIOptions)
 
 	o.config = &config
 
