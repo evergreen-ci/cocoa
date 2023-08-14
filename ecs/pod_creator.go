@@ -316,13 +316,18 @@ func (pc *BasicPodCreator) exportOverrideContainerDefinitions(defs []cocoa.ECSOv
 				Value: envVar.Value,
 			})
 		}
-		containerOverrides = append(containerOverrides, types.ContainerOverride{
+		override := types.ContainerOverride{
 			Name:        def.Name,
 			Command:     def.Command,
-			Memory:      aws.Int32(int32(utility.FromIntPtr(def.MemoryMB))),
-			Cpu:         aws.Int32(int32(utility.FromIntPtr(def.CPU))),
 			Environment: envVars,
-		})
+		}
+		if def.MemoryMB != nil {
+			override.Memory = aws.Int32(int32(utility.FromIntPtr(def.MemoryMB)))
+		}
+		if def.CPU != nil {
+			override.Cpu = aws.Int32(int32(utility.FromIntPtr(def.CPU)))
+		}
+		containerOverrides = append(containerOverrides, override)
 	}
 
 	return containerOverrides
