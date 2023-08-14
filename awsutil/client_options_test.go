@@ -48,7 +48,6 @@ func TestClientOptions(t *testing.T) {
 	})
 	t.Run("Validate", func(t *testing.T) {
 		t.Run("SucceedsWithAllOptionSet", func(t *testing.T) {
-			creds := credentials.NewStaticCredentialsProvider("", "", "")
 			role := "role"
 			region := "region"
 			retryOpts := utility.RetryOptions{
@@ -58,7 +57,6 @@ func TestClientOptions(t *testing.T) {
 			}
 			hc := http.DefaultClient
 			opts := NewClientOptions().
-				SetCredentialsProvider(creds).
 				SetRole(role).
 				SetRegion(region).
 				SetRetryOptions(retryOpts).
@@ -66,7 +64,6 @@ func TestClientOptions(t *testing.T) {
 
 			require.NoError(t, opts.Validate())
 
-			assert.Equal(t, creds, opts.CredsProvider)
 			assert.Equal(t, region, *opts.Region)
 			assert.Equal(t, role, *opts.Role)
 			assert.Equal(t, retryOpts, *opts.RetryOpts)
