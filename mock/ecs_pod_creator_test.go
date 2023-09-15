@@ -229,7 +229,9 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 
-			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 1)
+			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 2)
+			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
+			assert.Equal(t, "cocoa-tracked", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[1].Key))
 			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
 			assert.Equal(t, podDefOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
 
