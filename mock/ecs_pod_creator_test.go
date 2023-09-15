@@ -38,6 +38,8 @@ func TestECSPodCreator(t *testing.T) {
 
 			resetECSAndSecretsManagerCache()
 
+			pdc := &testutil.NoopECSPodDefinitionCache{}
+
 			c := &ECSClient{}
 			defer func() {
 				assert.NoError(t, c.Close(ctx))
@@ -52,7 +54,7 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c).SetVault(mv).SetCache(pdc))
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)
@@ -73,7 +75,7 @@ func TestECSPodCreator(t *testing.T) {
 				assert.NoError(t, c.Close(ctx))
 			}()
 
-			pc, err := ecs.NewBasicPodCreator(c, nil)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)
@@ -103,7 +105,7 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c).SetVault(mv))
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)
@@ -130,7 +132,7 @@ func TestECSPodCreator(t *testing.T) {
 				assert.NoError(t, sm.Close(tctx))
 			}()
 
-			pc, err := ecs.NewBasicPodCreator(c, nil)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			mpc := NewECSPodCreator(pc)
