@@ -14,21 +14,66 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BasicPodCreator provides an cocoa.ECSPodCreator implementation to create
+// BasicPodCreator provides a cocoa.ECSPodCreator implementation to create
 // AWS ECS pods.
 type BasicPodCreator struct {
 	client cocoa.ECSClient
 	vault  cocoa.Vault
+	cache  cocoa.ECSPodDefinitionCache
 }
 
-// NewBasicPodCreator creates a helper to create pods backed by AWS ECS.
-func NewBasicPodCreator(c cocoa.ECSClient, v cocoa.Vault) (*BasicPodCreator, error) {
-	if c == nil {
-		return nil, errors.New("missing client")
+// BasicPodCreatorOptions are options to create a basic ECS pod
+// creator that's optionally backed by a cache.
+type BasicPodCreatorOptions struct {
+	Client cocoa.ECSClient
+	Vault  cocoa.Vault
+	Cache  cocoa.ECSPodDefinitionCache
+}
+
+// NewBasicPodCreatorOptions returns new uninitialized options to
+// create a basic pod creator.
+func NewBasicPodCreatorOptions() *BasicPodCreatorOptions {
+	return &BasicPodCreatorOptions{}
+}
+
+// SetClient sets the client the pod creator uses to communicate with ECS.
+func (o *BasicPodCreatorOptions) SetClient(c cocoa.ECSClient) *BasicPodCreatorOptions {
+	o.Client = c
+	return o
+}
+
+// SetVault sets the vault that the pod creator uses to manage secrets.
+func (o *BasicPodCreatorOptions) SetVault(v cocoa.Vault) *BasicPodCreatorOptions {
+	o.Vault = v
+	return o
+}
+
+// SetCache sets the cache used to track pod definitions externally.
+func (o *BasicPodCreatorOptions) SetCache(pdc cocoa.ECSPodDefinitionCache) *BasicPodCreatorOptions {
+	o.Cache = pdc
+	return o
+}
+
+// Validate checks that the required parameters to initialize a pod creator are given.
+func (o *BasicPodCreatorOptions) Validate() error {
+	catcher := grip.NewBasicCatcher()
+	catcher.NewWhen(o.Client == nil, "must specify a client")
+	if catcher.HasErrors() {
+		return catcher.Resolve()
+	}
+
+	return nil
+}
+
+// NewBasicPodCreator creates a new pod creator optionally backed by a cache.
+func NewBasicPodCreator(opts BasicPodCreatorOptions) (*BasicPodCreator, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid options")
 	}
 	return &BasicPodCreator{
-		client: c,
-		vault:  v,
+		client: opts.Client,
+		vault:  opts.Vault,
+		cache:  opts.Cache,
 	}, nil
 }
 
@@ -50,7 +95,8 @@ func (pc *BasicPodCreator) CreatePod(ctx context.Context, opts ...cocoa.ECSPodCr
 
 	pdm, err := NewBasicPodDefinitionManager(*NewBasicPodDefinitionManagerOptions().
 		SetClient(pc.client).
-		SetVault(pc.vault))
+		SetVault(pc.vault).
+		SetCache(pc.cache))
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing pod definition manager")
 	}

@@ -94,7 +94,7 @@ func TestECSPod(t *testing.T) {
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
 
-			pc, err := NewBasicPodCreator(c, v)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(v))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc, c, v)
