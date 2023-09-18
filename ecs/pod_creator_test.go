@@ -24,22 +24,22 @@ func TestBasicPodCreator(t *testing.T) {
 
 	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault){
 		"NewPodCreatorFailsWithMissingClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(nil, nil)
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions())
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
 		"NewPodCreatorFailsWithMissingClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(nil, v)
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetVault(v))
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
 		"NewPodCreatorSucceedsWithNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(c, nil)
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
 		"NewPodCreatorSucceedsWithClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(c, v)
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(v))
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
@@ -99,7 +99,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -123,7 +123,7 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, m)
 
-			pc, err := NewBasicPodCreator(c, m)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(m))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -143,7 +143,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc, *registerOut.TaskDefinition)
