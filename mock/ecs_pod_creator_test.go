@@ -38,7 +38,7 @@ func TestECSPodCreator(t *testing.T) {
 
 			resetECSAndSecretsManagerCache()
 
-			pdc := &testutil.NoopECSPodDefinitionCache{}
+			pdc := NewECSPodDefinitionCache(&testutil.NoopECSPodDefinitionCache{Tag: "cache-tag"})
 
 			c := &ECSClient{}
 			defer func() {
@@ -59,7 +59,7 @@ func TestECSPodCreator(t *testing.T) {
 
 			mpc := NewECSPodCreator(pc)
 
-			tCase(tctx, t, mpc, c, sm)
+			tCase(tctx, t, mpc, pdc, c, sm)
 		})
 	}
 
@@ -144,9 +144,9 @@ func TestECSPodCreator(t *testing.T) {
 
 // ecsPodCreatorTests are mock-specific tests for ECS and Secrets Manager with
 // the ECS pod creator.
-func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
-	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient){
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithAllFieldsSetAndSendsExpectedInput": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
+	return map[string]func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient){
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithAllFieldsSetAndSendsExpectedInput": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
 			envVar := cocoa.NewEnvironmentVariable().
 				SetName("env_var_name").
 				SetValue("env_var_value")
@@ -229,12 +229,18 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.TaskRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.TaskRoleArn))
 			assert.Equal(t, utility.FromStringPtr(podDefOpts.ExecutionRole), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ExecutionRoleArn))
 
-			require.Len(t, c.RegisterTaskDefinitionInput.Tags, 2)
-			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
-			assert.Equal(t, "cocoa-tracked", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[1].Key))
-			assert.Equal(t, "creation_tag", utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Key))
-			assert.Equal(t, podDefOpts.Tags["creation_tag"], utility.FromStringPtr(c.RegisterTaskDefinitionInput.Tags[0].Value))
-
+			assert.Len(t, c.RegisterTaskDefinitionInput.Tags, 2, "should have user-defined tag and cache tracking tag")
+			for _, tag := range c.RegisterTaskDefinitionInput.Tags {
+				key := utility.FromStringPtr(tag.Key)
+				switch key {
+				case "creation_tag":
+					assert.Equal(t, podDefOpts.Tags["creation_tag"], utility.FromStringPtr(tag.Value), "user-defined tag should be defined")
+				case pdc.GetTag():
+					assert.Equal(t, "false", utility.FromStringPtr(tag.Value), "cache tag should initially mark pod definition as uncached before caching")
+				default:
+					assert.FailNow(t, "unrecognized tag", "unexpected tag '%s'", key)
+				}
+			}
 			require.Len(t, c.RegisterTaskDefinitionInput.ContainerDefinitions, 1)
 			assert.Equal(t, containerDef.Command, c.RegisterTaskDefinitionInput.ContainerDefinitions[0].Command)
 			assert.Equal(t, utility.FromStringPtr(containerDef.WorkingDir), utility.FromStringPtr(c.RegisterTaskDefinitionInput.ContainerDefinitions[0].WorkingDirectory))
@@ -299,7 +305,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 
 			assert.True(t, c.RunTaskInput.EnableExecuteCommand)
 		},
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedSecrets": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, dc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
 				SetNewValue("secret_value")
@@ -347,7 +353,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			assert.Equal(t, utility.FromStringPtr(secretOpts.Name), utility.FromStringPtr(sm.CreateSecretInput.Name))
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
-		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodRegistersTaskDefinitionAndRunsTaskWithNewlyCreatedRepositoryCredentials": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
 			repoCreds := cocoa.NewRepositoryCredentials().
 				SetName("repo_creds_secret_name").
 				SetNewCredentials(*cocoa.NewStoredRepositoryCredentials().
@@ -394,7 +400,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.NoError(t, err)
 			assert.Equal(t, string(storedCreds), utility.FromStringPtr(sm.CreateSecretInput.SecretString))
 		},
-		"CreatingNewSecretsIsRetryable": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatingNewSecretsIsRetryable": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
 			secretOpts := cocoa.NewSecretOptions().
 				SetName("secret_name").
 				SetNewValue("secret_value")
@@ -446,7 +452,7 @@ func ecsPodCreatorTests() map[string]func(ctx context.Context, t *testing.T, pc 
 			require.NotZero(t, getSecretOut)
 			assert.Equal(t, utility.FromStringPtr(secretOpts.NewValue), utility.FromStringPtr(getSecretOut.SecretString))
 		},
-		"CreatePodFromExistingDefinitionRunsTaskWithExpectedTaskDefinitionAndExecutionOptions": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, c *ECSClient, sm *SecretsManagerClient) {
+		"CreatePodFromExistingDefinitionRunsTaskWithExpectedTaskDefinitionAndExecutionOptions": func(ctx context.Context, t *testing.T, pc cocoa.ECSPodCreator, pdc *ECSPodDefinitionCache, c *ECSClient, sm *SecretsManagerClient) {
 			registerIn := testutil.ValidRegisterTaskDefinitionInput(t)
 			registerOut, err := c.RegisterTaskDefinition(ctx, &registerIn)
 			require.NoError(t, err)
