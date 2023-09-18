@@ -8,17 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// CheckAWSEnvVars checks that the required environment variables are defined
-// for testing against any AWS API.
-func CheckAWSEnvVars(t *testing.T) {
-	CheckEnvVars(t,
-		"AWS_ACCESS_KEY",
-		"AWS_SECRET_ACCESS_KEY",
-		"AWS_ROLE",
-		"AWS_REGION",
-	)
-}
-
 // CheckAWSEnvVarsForECS checks that the required environment variables are
 // defined for testing against AWS ECS.
 func CheckAWSEnvVarsForECS(t *testing.T) {
