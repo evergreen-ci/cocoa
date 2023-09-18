@@ -48,7 +48,7 @@ func TestECSPod(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c).SetVault(mv))
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 
@@ -77,7 +77,7 @@ func TestECSPod(t *testing.T) {
 			require.NoError(t, err)
 			mv := NewVault(v)
 
-			pc, err := ecs.NewBasicPodCreator(c, mv)
+			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c).SetVault(mv))
 			require.NoError(t, err)
 			mpc := NewECSPodCreator(pc)
 

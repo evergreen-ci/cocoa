@@ -22,24 +22,34 @@ func TestBasicPodCreator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault){
-		"NewPodCreatorFailsWithMissingClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(nil, nil)
+	for tName, tCase := range map[string]func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache){
+		"NewPodCreatorFailsWithMissingClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions())
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
-		"NewPodCreatorFailsWithMissingClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(nil, v)
+		"NewPodCreatorFailsWithMissingClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetVault(v))
 			require.Error(t, err)
 			require.Zero(t, podCreator)
 		},
-		"NewPodCreatorSucceedsWithNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(c, nil)
+		"NewPodCreatorSucceedsWithNoVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
-		"NewPodCreatorSucceedsWithClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault) {
-			podCreator, err := NewBasicPodCreator(c, v)
+		"NewPodCreatorSucceedsWithClientAndVault": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(v))
+			require.NoError(t, err)
+			require.NotZero(t, podCreator)
+		},
+		"NewPodCreatorSucceedsWithClientVaultAndCache": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(v).SetCache(pdc))
+			require.NoError(t, err)
+			require.NotZero(t, podCreator)
+		},
+		"NewPodCreatorSucceedsWithCacheAndClient": func(ctx context.Context, t *testing.T, c cocoa.ECSClient, v cocoa.Vault, pdc cocoa.ECSPodDefinitionCache) {
+			podCreator, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetCache(pdc))
 			require.NoError(t, err)
 			require.NotZero(t, podCreator)
 		},
@@ -70,7 +80,9 @@ func TestBasicPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, m)
 
-			tCase(tctx, t, c, m)
+			pdc := &testutil.NoopECSPodDefinitionCache{Tag: "cache-tag"}
+
+			tCase(tctx, t, c, m, pdc)
 		})
 	}
 }
@@ -99,7 +111,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -123,7 +135,7 @@ func TestECSPodCreator(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, m)
 
-			pc, err := NewBasicPodCreator(c, m)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c).SetVault(m))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc)
@@ -143,7 +155,7 @@ func TestECSPodCreator(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
 
-			pc, err := NewBasicPodCreator(c, nil)
+			pc, err := NewBasicPodCreator(*NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
 			tCase(tctx, t, pc, *registerOut.TaskDefinition)
