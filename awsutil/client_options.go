@@ -81,6 +81,29 @@ func (o *ClientOptions) Validate() error {
 	return nil
 }
 
+var configCache = make(map[string]*aws.Config)
+
+func getAWSConfig(ctx context.Context, region string, httpClient *http.Client, credsProvider aws.CredentialsProvider) (*aws.Config, error) {
+	cachableConfig := httpClient == nil && credsProvider == nil
+	if cachableConfig && configCache[region] != nil {
+		return configCache[region], nil
+	}
+
+	config, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+		config.WithHTTPClient(httpClient),
+		config.WithCredentialsProvider(credsProvider),
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "loading default AWS config")
+	}
+	if cachableConfig {
+		configCache[region] = &config
+	}
+
+	return &config, nil
+}
+
 // GetCredentialsProvider retrieves the appropriate credentials provider to use for the client.
 func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
 	if o.Role == nil {
@@ -92,16 +115,12 @@ func (o *ClientOptions) GetCredentialsProvider(ctx context.Context) (aws.Credent
 	}
 
 	if o.stsClient == nil {
-		config, err := config.LoadDefaultConfig(ctx,
-			config.WithRegion(utility.FromStringPtr(o.Region)),
-			config.WithHTTPClient(o.HTTPClient),
-			config.WithCredentialsProvider(o.CredsProvider),
-		)
+		config, err := getAWSConfig(ctx, utility.FromStringPtr(o.Region), o.HTTPClient, o.CredsProvider)
 		if err != nil {
 			return nil, errors.Wrap(err, "creating STS config")
 		}
 
-		o.stsClient = sts.NewFromConfig(config)
+		o.stsClient = sts.NewFromConfig(*config)
 	}
 
 	o.stsProvider = stscreds.NewAssumeRoleProvider(o.stsClient, *o.Role)
@@ -116,17 +135,13 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 		return nil, errors.Wrap(err, "getting credentials")
 	}
 
-	config, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(utility.FromStringPtr(o.Region)),
-		config.WithHTTPClient(o.HTTPClient),
-		config.WithCredentialsProvider(creds),
-	)
+	config, err := getAWSConfig(ctx, utility.FromStringPtr(o.Region), o.HTTPClient, creds)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating config")
 	}
 	otelaws.AppendMiddlewares(&config.APIOptions)
 
-	o.config = &config
+	o.config = config
 
 	return o.config, nil
 }
