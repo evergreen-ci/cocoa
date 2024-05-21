@@ -23,10 +23,6 @@ func TestSecretsManagerClient(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, c.Close(tctx))
-			}()
-
 			tCase(tctx, t, c)
 		})
 	}

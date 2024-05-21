@@ -41,14 +41,7 @@ func TestECSPodCreator(t *testing.T) {
 			pdc := NewECSPodDefinitionCache(&testutil.NoopECSPodDefinitionCache{Tag: "cache-tag"})
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			sm := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, sm.Close(tctx))
-			}()
 
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
 			require.NoError(t, err)
@@ -71,10 +64,6 @@ func TestECSPodCreator(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)
 
@@ -92,15 +81,7 @@ func TestECSPodCreator(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			sm := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, sm.Close(tctx))
-			}()
-
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
 			require.NoError(t, err)
 			mv := NewVault(v)
@@ -122,15 +103,7 @@ func TestECSPodCreator(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
 			registerOut := testutil.RegisterTaskDefinition(ctx, t, c, testutil.ValidRegisterTaskDefinitionInput(t))
-
-			sm := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, sm.Close(tctx))
-			}()
 
 			pc, err := ecs.NewBasicPodCreator(*ecs.NewBasicPodCreatorOptions().SetClient(c))
 			require.NoError(t, err)

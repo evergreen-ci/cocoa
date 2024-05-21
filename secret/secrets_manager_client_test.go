@@ -33,8 +33,6 @@ func TestBasicSecretsManagerClient(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.SecretsManagerClientTests() {

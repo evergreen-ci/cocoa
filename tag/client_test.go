@@ -32,9 +32,6 @@ func TestBasicTagClient(t *testing.T) {
 	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
 	c, err := NewBasicTagClient(ctx, awsOpts)
 	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, c.Close(ctx))
-	}()
 
 	for tName, tCase := range testcase.TagClientTests() {
 		t.Run(tName, func(t *testing.T) {
@@ -49,8 +46,6 @@ func TestBasicTagClient(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smClient)
-
-		assert.NoError(t, smClient.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.TagClientSecretTests() {

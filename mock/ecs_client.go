@@ -459,8 +459,6 @@ type ECSClient struct {
 	TagResourceInput  *awsECS.TagResourceInput
 	TagResourceOutput *awsECS.TagResourceOutput
 	TagResourceError  error
-
-	CloseError error
 }
 
 // RegisterTaskDefinition saves the input and returns a new mock task
@@ -790,14 +788,4 @@ func (c *ECSClient) TagResource(ctx context.Context, in *awsECS.TagResourceInput
 	}
 
 	return nil, &types.ResourceNotFoundException{Message: aws.String("task or task definition not found")}
-}
-
-// Close closes the mock client. The mock output can be customized. By default,
-// it is a no-op that returns no error.
-func (c *ECSClient) Close(ctx context.Context) error {
-	if c.CloseError != nil {
-		return c.CloseError
-	}
-
-	return nil
 }

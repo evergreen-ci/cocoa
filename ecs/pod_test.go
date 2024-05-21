@@ -50,9 +50,6 @@ func TestBasicPod(t *testing.T) {
 
 			c, err := NewBasicClient(tctx, testutil.ValidNonIntegrationAWSOptions())
 			require.NoError(t, err)
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
 
 			tCase(tctx, t, c)
 		})

@@ -44,8 +44,6 @@ type TagClient struct {
 	GetResourcesInput  *resourcegroupstaggingapi.GetResourcesInput
 	GetResourcesOutput *resourcegroupstaggingapi.GetResourcesOutput
 	GetResourcesError  error
-
-	CloseError error
 }
 
 // GetResources saves the input and filters for the resources matching the input
@@ -155,16 +153,6 @@ func (c *TagClient) getSetIntersection(a, b map[string]taggedResource) map[strin
 		}
 	}
 	return intersection
-}
-
-// Close closes the mock client. The mock output can be customized. By default,
-// it is a no-op that returns no error.
-func (c *TagClient) Close(ctx context.Context) error {
-	if c.CloseError != nil {
-		return c.CloseError
-	}
-
-	return nil
 }
 
 // serviceToResourceFinders maps the AWS service name to the taggable resources

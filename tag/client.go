@@ -73,11 +73,6 @@ func (c *BasicTagClient) GetResources(ctx context.Context, in *resourcegroupstag
 	return out, nil
 }
 
-// Close cleans up all resources owned by the client.
-func (c *BasicTagClient) Close(ctx context.Context) error {
-	return c.BaseClient.Close(ctx)
-}
-
 func (c *BasicTagClient) isNonRetryableError(err error) bool {
 	return utility.MatchesError[*types.InvalidParameterException](err)
 }

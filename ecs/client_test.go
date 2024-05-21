@@ -37,16 +37,12 @@ func TestBasicECSClient(t *testing.T) {
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
 		testutil.CleanupTasks(ctx, t, c)
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSClientTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
 			defer tcancel()
-
-			defer c.Close(tctx)
 
 			tCase(tctx, t, c)
 		})

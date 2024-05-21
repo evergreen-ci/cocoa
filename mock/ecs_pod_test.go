@@ -35,15 +35,7 @@ func TestECSPod(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			smc := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, smc.Close(tctx))
-			}()
-
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
 			mv := NewVault(v)
@@ -64,15 +56,7 @@ func TestECSPod(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			smc := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, smc.Close(tctx))
-			}()
-
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
 			mv := NewVault(v)

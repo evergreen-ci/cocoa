@@ -34,8 +34,6 @@ type ClientOptions struct {
 	stsClient   *sts.Client
 	stsProvider *stscreds.AssumeRoleProvider
 	config      *aws.Config
-
-	ownsHTTPClient bool
 }
 
 // NewClientOptions returns new unconfigured client options.
@@ -75,11 +73,6 @@ func (o *ClientOptions) SetHTTPClient(hc *http.Client) *ClientOptions {
 
 // Validate sets defaults for unspecified options.
 func (o *ClientOptions) Validate() error {
-	if o.HTTPClient == nil {
-		o.HTTPClient = utility.GetHTTPClient()
-		o.ownsHTTPClient = true
-	}
-
 	if o.RetryOpts == nil {
 		o.RetryOpts = &utility.RetryOptions{}
 	}
@@ -136,11 +129,4 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 	o.config = &config
 
 	return o.config, nil
-}
-
-// Close cleans up the HTTP client if it is owned by this client.
-func (o *ClientOptions) Close() {
-	if o.ownsHTTPClient {
-		utility.PutHTTPClient(o.HTTPClient)
-	}
 }

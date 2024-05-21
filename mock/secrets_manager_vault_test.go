@@ -28,10 +28,6 @@ func TestVaultWithSecretsManager(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, c.Close(tctx))
-			}()
-
 			sc := NewSecretCache(&testutil.NoopSecretCache{Tag: "cache-tag"})
 
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().
@@ -60,9 +56,6 @@ func TestVaultWithSecretsManager(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, c.Close(tctx))
-			}()
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(c))
 			require.NoError(t, err)
 			mv := NewVault(v)

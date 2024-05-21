@@ -24,9 +24,6 @@ func TestBasicSecretsManager(t *testing.T) {
 	t.Run("NewBasicSecretsManager", func(t *testing.T) {
 		c, err := NewBasicSecretsManagerClient(ctx, testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
-		defer func() {
-			assert.NoError(t, c.Close(ctx))
-		}()
 		t.Run("FailsWithZeroOptions", func(t *testing.T) {
 			sm, err := NewBasicSecretsManager(*NewBasicSecretsManagerOptions())
 			assert.Error(t, err)
@@ -60,8 +57,6 @@ func TestSecretsManager(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.VaultTests(cleanupSecret) {

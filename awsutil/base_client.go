@@ -47,9 +47,3 @@ func (c *BaseClient) GetRetryOptions() utility.RetryOptions {
 	}
 	return *c.opts.RetryOpts
 }
-
-// Close closes the client and cleans up its resources.
-func (c *BaseClient) Close(ctx context.Context) error {
-	c.opts.Close()
-	return nil
-}
