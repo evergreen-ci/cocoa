@@ -33,7 +33,6 @@ type ClientOptions struct {
 
 	stsClient   *sts.Client
 	stsProvider *stscreds.AssumeRoleProvider
-	config      *aws.Config
 }
 
 // NewClientOptions returns new unconfigured client options.
@@ -97,6 +96,8 @@ func getAWSConfig(ctx context.Context, region string, httpClient *http.Client, c
 	if err != nil {
 		return nil, errors.Wrap(err, "loading default AWS config")
 	}
+	otelaws.AppendMiddlewares(&config.APIOptions)
+
 	if cachableConfig {
 		configCache[region] = &config
 	}
@@ -139,9 +140,5 @@ func (o *ClientOptions) GetConfig(ctx context.Context) (*aws.Config, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "creating config")
 	}
-	otelaws.AppendMiddlewares(&config.APIOptions)
-
-	o.config = config
-
-	return o.config, nil
+	return config, nil
 }
