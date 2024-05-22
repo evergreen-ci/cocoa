@@ -49,10 +49,7 @@ func TestSecretsManager(t *testing.T) {
 		}
 	}
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {

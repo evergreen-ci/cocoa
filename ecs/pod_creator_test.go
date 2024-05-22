@@ -87,10 +87,7 @@ func TestECSPodCreator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {

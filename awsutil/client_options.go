@@ -2,7 +2,6 @@ package awsutil
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -19,6 +18,7 @@ type ClientOptions struct {
 	// CredsProvider is a credentials provider, which may be used to either connect to
 	// the AWS API directly, or authenticate to STS to retrieve temporary
 	// credentials to access the API (if Role is specified).
+	// If not specified the AWS SDK will attempt to retrieve one from its credentials chain.
 	CredsProvider aws.CredentialsProvider
 	// Role is the STS role that should be used to perform authorized actions.
 	// If specified, Creds will be used to retrieve temporary credentials from
@@ -29,7 +29,8 @@ type ClientOptions struct {
 	// RetryOpts sets the retry policy for API requests.
 	RetryOpts *utility.RetryOptions
 	// HTTPClient is the HTTP client to use to make requests.
-	HTTPClient *http.Client
+	// If not specified the AWS SDK's default client will be used.
+	HTTPClient config.HTTPClient
 
 	stsClient   *sts.Client
 	stsProvider *stscreds.AssumeRoleProvider
@@ -65,7 +66,7 @@ func (o *ClientOptions) SetRetryOptions(opts utility.RetryOptions) *ClientOption
 }
 
 // SetHTTPClient sets the HTTP client to use.
-func (o *ClientOptions) SetHTTPClient(hc *http.Client) *ClientOptions {
+func (o *ClientOptions) SetHTTPClient(hc config.HTTPClient) *ClientOptions {
 	o.HTTPClient = hc
 	return o
 }
@@ -82,7 +83,7 @@ func (o *ClientOptions) Validate() error {
 
 var configCache = make(map[string]*aws.Config)
 
-func getAWSConfig(ctx context.Context, region string, httpClient *http.Client, credsProvider aws.CredentialsProvider) (*aws.Config, error) {
+func getAWSConfig(ctx context.Context, region string, httpClient config.HTTPClient, credsProvider aws.CredentialsProvider) (*aws.Config, error) {
 	cachableConfig := httpClient == nil && credsProvider == nil
 	if cachableConfig && configCache[region] != nil {
 		return configCache[region], nil
