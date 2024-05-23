@@ -23,8 +23,6 @@ func TestECSClient(t *testing.T) {
 	c := &ECSClient{}
 	defer func() {
 		resetECSAndSecretsManagerCache()
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSClientTests() {

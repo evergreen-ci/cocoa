@@ -12,7 +12,4 @@ import (
 type TagClient interface {
 	// GetResources lists arbitrary AWS resources matching the input.
 	GetResources(ctx context.Context, in *resourcegroupstaggingapi.GetResourcesInput) (*resourcegroupstaggingapi.GetResourcesOutput, error)
-	// Close closes the client and cleans up its resources. Implementations
-	// should ensure that this is idempotent.
-	Close(ctx context.Context) error
 }

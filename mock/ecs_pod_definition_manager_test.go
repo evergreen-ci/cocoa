@@ -30,15 +30,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			sm := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, sm.Close(tctx))
-			}()
-
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(sm))
 			require.NoError(t, err)
 			mv := NewVault(v)
@@ -65,10 +57,6 @@ func TestECSPodDefinitionManager(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			opts := ecs.NewBasicPodDefinitionManagerOptions().SetClient(c)
 
 			pdm, err := ecs.NewBasicPodDefinitionManager(*opts)
@@ -88,15 +76,7 @@ func TestECSPodDefinitionManager(t *testing.T) {
 			resetECSAndSecretsManagerCache()
 
 			c := &ECSClient{}
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
-
 			smc := &SecretsManagerClient{}
-			defer func() {
-				assert.NoError(t, smc.Close(ctx))
-			}()
-
 			v, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
 			mv := NewVault(v)

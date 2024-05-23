@@ -285,11 +285,6 @@ func (c *BasicClient) TagResource(ctx context.Context, in *ecs.TagResourceInput)
 	return out, nil
 }
 
-// Close cleans up all resources owned by the client.
-func (c *BasicClient) Close(ctx context.Context) error {
-	return c.BaseClient.Close(ctx)
-}
-
 // isNonRetryableError returns whether or not the error type from ECS is
 // known to be not retryable.
 func (c *BasicClient) isNonRetryableError(err error) bool {

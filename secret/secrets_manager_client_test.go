@@ -8,7 +8,6 @@ import (
 	"github.com/evergreen-ci/cocoa"
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
-	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,16 +24,11 @@ func TestBasicSecretsManagerClient(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicSecretsManagerClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, c)
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.SecretsManagerClientTests() {

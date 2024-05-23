@@ -25,7 +25,4 @@ type SecretsManagerClient interface {
 	DeleteSecret(ctx context.Context, in *secretsmanager.DeleteSecretInput) (*secretsmanager.DeleteSecretOutput, error)
 	// TagResource adds tags to an existing secret.
 	TagResource(ctx context.Context, in *secretsmanager.TagResourceInput) (*secretsmanager.TagResourceOutput, error)
-	// Close closes the client and cleans up its resources. Implementations
-	// should ensure that this is idempotent.
-	Close(ctx context.Context) error
 }

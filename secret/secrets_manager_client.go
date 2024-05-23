@@ -207,11 +207,6 @@ func (c *BasicSecretsManagerClient) DeleteSecret(ctx context.Context, in *secret
 	return out, nil
 }
 
-// Close cleans up all resources owned by the client.
-func (c *BasicSecretsManagerClient) Close(ctx context.Context) error {
-	return c.BaseClient.Close(ctx)
-}
-
 // isNonRetryableError returns whether or not the error type from Secrets
 // Manager is known to be not retryable.
 func (c *BasicSecretsManagerClient) isNonRetryableError(err error) bool {

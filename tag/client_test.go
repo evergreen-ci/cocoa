@@ -9,7 +9,6 @@ import (
 	"github.com/evergreen-ci/cocoa/internal/testcase"
 	"github.com/evergreen-ci/cocoa/internal/testutil"
 	"github.com/evergreen-ci/cocoa/secret"
-	"github.com/evergreen-ci/utility"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,15 +25,9 @@ func TestBasicTagClient(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicTagClient(ctx, awsOpts)
 	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, c.Close(ctx))
-	}()
 
 	for tName, tCase := range testcase.TagClientTests() {
 		t.Run(tName, func(t *testing.T) {
@@ -49,8 +42,6 @@ func TestBasicTagClient(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smClient)
-
-		assert.NoError(t, smClient.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.TagClientSecretTests() {

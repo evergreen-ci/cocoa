@@ -65,16 +65,10 @@ func TestBasicPodCreator(t *testing.T) {
 
 			c, err := NewBasicClient(ctx, awsOpts)
 			require.NoError(t, err)
-			defer func() {
-				assert.NoError(t, c.Close(ctx))
-			}()
 
 			smc, err := secret.NewBasicSecretsManagerClient(ctx, awsOpts)
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			defer func() {
-				assert.NoError(t, smc.Close(tctx))
-			}()
 
 			m, err := secret.NewBasicSecretsManager(*secret.NewBasicSecretsManagerOptions().SetClient(smc))
 			require.NoError(t, err)
@@ -93,17 +87,12 @@ func TestECSPodCreator(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
 		testutil.CleanupTasks(ctx, t, c)
-
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSPodCreatorTests() {
@@ -122,8 +111,6 @@ func TestECSPodCreator(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)
-
-		assert.NoError(t, smc.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSPodCreatorVaultTests() {

@@ -25,9 +25,6 @@ func TestBasicPodDefinitionManager(t *testing.T) {
 	t.Run("NewPodDefinitionManager", func(t *testing.T) {
 		c, err := NewBasicClient(ctx, testutil.ValidNonIntegrationAWSOptions())
 		require.NoError(t, err)
-		defer func() {
-			assert.NoError(t, c.Close(ctx))
-		}()
 		t.Run("FailsWithZeroOptions", func(t *testing.T) {
 			pdm, err := NewBasicPodDefinitionManager(*NewBasicPodDefinitionManagerOptions())
 			assert.Error(t, err)
@@ -47,16 +44,12 @@ func TestECSPodDefinitionManager(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	hc := utility.GetHTTPClient()
-	defer utility.PutHTTPClient(hc)
-
-	awsOpts := testutil.ValidIntegrationAWSOptions(ctx, hc)
+	awsOpts := testutil.ValidIntegrationAWSOptions()
 	c, err := NewBasicClient(ctx, awsOpts)
 	require.NoError(t, err)
 	require.NotZero(t, c)
 	defer func() {
 		testutil.CleanupTaskDefinitions(ctx, t, c)
-		assert.NoError(t, c.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSPodDefinitionManagerTests() {
@@ -77,8 +70,6 @@ func TestECSPodDefinitionManager(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		testutil.CleanupSecrets(ctx, t, smc)
-
-		assert.NoError(t, smc.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.ECSPodDefinitionManagerVaultTests() {

@@ -16,10 +16,6 @@ func TestTagClient(t *testing.T) {
 	defer cancel()
 
 	c := &TagClient{}
-	defer func() {
-		assert.NoError(t, c.Close(ctx))
-	}()
-
 	for tName, tCase := range testcase.TagClientTests() {
 		t.Run(tName, func(t *testing.T) {
 			tctx, tcancel := context.WithTimeout(ctx, defaultTestTimeout)
@@ -32,8 +28,6 @@ func TestTagClient(t *testing.T) {
 	smClient := &SecretsManagerClient{}
 	defer func() {
 		ResetGlobalSecretCache()
-
-		assert.NoError(t, smClient.Close(ctx))
 	}()
 
 	for tName, tCase := range testcase.TagClientSecretTests() {

@@ -1,8 +1,6 @@
 package testutil
 
 import (
-	"context"
-	"net/http"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -27,8 +25,8 @@ func AWSRole() string {
 
 // ValidIntegrationAWSOptions returns valid options to create an AWS client that
 // can make actual requests to AWS for integration testing. Credentials and the region
-// will be extracted from the standard environment variables.
-func ValidIntegrationAWSOptions(ctx context.Context, hc *http.Client) awsutil.ClientOptions {
+// will be extracted automatically by the SDK from the standard environment variables.
+func ValidIntegrationAWSOptions() awsutil.ClientOptions {
 	options := awsutil.NewClientOptions()
 	if role := AWSRole(); role != "" {
 		options.SetRole(role)

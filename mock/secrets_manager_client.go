@@ -119,8 +119,6 @@ type SecretsManagerClient struct {
 	TagResourceInput  *secretsmanager.TagResourceInput
 	TagResourceOutput *secretsmanager.TagResourceOutput
 	TagResourceError  error
-
-	CloseError error
 }
 
 // CreateSecret saves the input options and returns a new mock secret. The mock
@@ -437,13 +435,4 @@ func (c *SecretsManagerClient) TagResource(ctx context.Context, in *secretsmanag
 		s.Tags[k] = v
 	}
 	return &secretsmanager.TagResourceOutput{}, nil
-}
-
-// Close closes the mock client. The mock output can be customized. By default,
-// it is a no-op that returns no error.
-func (c *SecretsManagerClient) Close(ctx context.Context) error {
-	if c.CloseError != nil {
-		return c.CloseError
-	}
-	return nil
 }
