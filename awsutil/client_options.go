@@ -83,6 +83,8 @@ func (o *ClientOptions) Validate() error {
 
 var configCache = make(map[string]*aws.Config)
 
+// getAWSConfig fetches an aws.Config for the provided region, httpClient, and credsProvider. The config is cached since the AWS SDK will make a call
+// to STS each time config.LoadDefaultConfig is called if a credsProvider is not provided and we're running in Kubernetes.
 func getAWSConfig(ctx context.Context, region string, httpClient config.HTTPClient, credsProvider aws.CredentialsProvider) (*aws.Config, error) {
 	cachableConfig := httpClient == nil && credsProvider == nil
 	if cachableConfig && configCache[region] != nil {
